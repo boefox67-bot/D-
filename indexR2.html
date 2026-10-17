@@ -1,0 +1,1573 @@
+﻿<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>電工答題 · 飛躍教育中心</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+  :root{
+    --ink:#122644; --blue:#2563eb; --orange:#e8720c; --green:#16a34a;
+    --red:#dc2626; --bg:#f2f4f8; --card:#ffffff; --muted:#64748b; --line:#e2e8f0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{font-family:"Microsoft JhengHei","PingFang TC",system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
+  .app{max-width:520px;margin:0 auto;min-height:100vh;background:var(--bg);padding:0 0 40px}
+  .view{display:none;padding:16px}
+  .view.active{display:block}
+  .topbar{background:var(--ink);color:#fff;padding:16px;border-radius:0 0 14px 14px;margin:-16px -16px 18px}
+  .topbar h1{font-size:20px;font-weight:700}
+  .topbar p{font-size:12px;opacity:.8;margin-top:4px}
+  .card{background:var(--card);border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(18,38,68,.06)}
+  .card h2{font-size:16px;margin-bottom:10px;color:var(--ink)}
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+  input,select{width:100%;padding:12px;border:1.5px solid var(--line);border-radius:10px;font-size:16px;background:#fff;color:var(--ink)}
+  input:focus,select:focus{outline:none;border-color:var(--blue)}
+  .btn{display:block;width:100%;padding:14px;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;margin-top:12px;background:var(--blue);color:#fff}
+  .btn.secondary{background:#e8eefc;color:var(--blue)}
+  .btn.danger{background:#fde8e8;color:var(--red)}
+  .btn.orange{background:var(--orange);color:#fff}
+  .btn:disabled{opacity:.5}
+  .row{display:flex;gap:10px}
+  .row .btn{margin-top:0}
+  .muted{color:var(--muted);font-size:12px}
+  .warn{color:var(--orange);font-size:13px;font-weight:600;margin-top:8px}
+  /* 答題選項 */
+  .opt{display:flex;align-items:center;gap:10px;padding:12px;border:1.5px solid var(--line);border-radius:10px;margin-top:8px;cursor:pointer;font-size:15px;background:#fff}
+  .opt .dot{width:22px;height:22px;border-radius:50%;border:2px solid #94a3b8;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;transition:all .15s}
+  .opt.multi .dot{border-radius:6px}
+  .opt.selected{border-color:var(--green);background:#f0fdf4}
+  .opt.selected .dot{background:var(--green);border-color:var(--green)}
+  .opt .letter{font-weight:700;color:var(--blue);flex-shrink:0}
+  .qmeta{display:inline-block;font-size:11px;background:#e8eefc;color:var(--blue);padding:2px 8px;border-radius:20px;margin-bottom:8px}
+  .qtext{font-size:16px;line-height:1.6;margin-bottom:6px}
+  .progress{font-size:13px;color:var(--muted);margin-bottom:8px}
+  /* 成績 */
+  .bigscore{font-size:44px;font-weight:800;color:var(--blue);text-align:center;margin:8px 0}
+  .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+  .stat{background:#f8fafc;border-radius:10px;padding:12px;text-align:center}
+  .stat .n{font-size:20px;font-weight:700}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:2px}
+  .wronglist{font-size:14px;line-height:1.8}
+  /* 老師功能 */
+  .link-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .link-grid a,.link-grid button{padding:16px 10px;border-radius:12px;background:var(--card);border:1px solid var(--line);text-align:center;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;text-decoration:none;display:block}
+  .link-grid a:active,.link-grid button:active{background:#e8eefc}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left}
+  th{color:var(--muted);font-weight:600;background:#f8fafc}
+  .tag{display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:600}
+  .tag.ok{background:#dcfce7;color:var(--green)}
+  .tag.bad{background:#fde8e8;color:var(--red)}
+  .tag.star{background:#fef3c7;color:#b45309}
+  footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:20px}
+  .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:rgba(18,38,68,.92);color:#fff;padding:10px 18px;border-radius:24px;font-size:14px;z-index:99;display:none;max-width:90%;text-align:center}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ========== 頁面：首頁（學生入場） ========== -->
+  <div class="view" id="view-home">
+    <div class="topbar">
+      <h1>電工答題</h1>
+      <p>飛躍教育中心 · 初級維修電工課程</p>
+    </div>
+    <div class="card">
+      <h2>輸入考試碼入場</h2>
+      <label>考試碼（老師派發嘅數字）</label>
+      <input id="in-code" inputmode="numeric" placeholder="例如 1234">
+      <label>班次（第一欄揀、第二欄自動同步）</label>
+      <div style="display:flex;gap:8px">
+        <select id="in-classSelect" style="flex:1"><option value="">— 揀班 —</option></select>
+        <input id="in-classType" style="flex:1" placeholder="自動同步">
+        <button type="button" class="btn secondary" style="width:auto;padding:6px 10px;margin:0;font-size:13px" onclick="reloadClassList()" title="重新載入班別">↻</button>
+      </div>
+      <label>第一欄：從名單揀名</label>
+      <select id="in-nameSelect"><option value="-1">— 請揀名 —</option></select>
+      <label>第二欄：填寫同名</label>
+      <input id="in-nameType" placeholder="打返頭先揀嗰個名">
+      <div class="warn" id="home-warn" style="display:none"></div>
+      <button class="btn" id="btn-start">開始考試</button>
+      <button class="btn secondary" id="btn-teacherEntry">老師入口</button>
+    </div>
+    <footer>© 2026 豆包工作 版權所有・飛躍教育中心 電工答題系統<br>換 X 檔就係新考試・考試碼 1 小時有效 版本 <span id="footer-ver">1.0</span></footer>
+    <div id="ver-tag" style="position:fixed;left:8px;bottom:8px;background:#0f172a;color:#fff;font-size:11px;padding:3px 8px;border-radius:10px;opacity:0.7;z-index:99">v1.0</div>
+  </div>
+
+  <!-- ========== 頁面：答題 ========== -->
+  <div class="view" id="view-quiz">
+    <div class="topbar">
+      <h1 id="quiz-paperName">考試中</h1>
+      <p id="quiz-className"></p>
+    </div>
+    <div class="progress" id="quiz-progress"></div>
+    <div class="card" id="quiz-card"></div>
+    <div class="row">
+      <button class="btn secondary" id="btn-prev">上一題</button>
+      <button class="btn orange" id="btn-next">下一題</button>
+    </div>
+    <button class="btn danger" id="btn-submit" style="display:none">交卷</button>
+  </div>
+
+  <!-- ========== 頁面：成績 ========== -->
+  <div class="view" id="view-result">
+    <div class="topbar">
+      <h1>成績</h1>
+      <p id="result-paper"></p>
+    </div>
+    <div class="card">
+      <div class="bigscore" id="result-score">0</div>
+      <div class="statgrid">
+        <div class="stat"><div class="n" id="result-correct">0/0</div><div class="l">答對題數</div></div>
+        <div class="stat"><div class="n" id="result-pct">0%</div><div class="l">正確率（上限100%）</div></div>
+      </div>
+      <label>錯題序號</label>
+      <div class="wronglist" id="result-wrong">—</div>
+      <label style="margin-top:14px">逐題對答案</label>
+      <div id="result-detail" style="font-size:14px"></div>
+    </div>
+    <button class="btn secondary" onclick="go('home')">返回首頁</button>
+  </div>
+
+  <!-- ========== 頁面：老師功能 ========== -->
+  <div class="view" id="view-teacher">
+    <div class="topbar">
+      <h1>老師管理</h1>
+      <p>登入成功先見到功能</p>
+      <button class="btn secondary" style="position:fixed;right:12px;top:12px;width:auto;padding:6px 14px;margin:0;font-size:13px;z-index:100" onclick="const _y=window.scrollY;renderSub(curSub);window.scrollTo(0,_y);toast('已刷新')">刷新</button>
+      <div id="verBadge" style="position:fixed;right:12px;top:48px;width:auto;padding:4px 12px;margin:0;font-size:11px;z-index:100;background:#1e293b;color:#fff;border-radius:6px">版本 V4.4</div>
+    </div>
+    <div class="card" id="teacher-loginCard">
+      <h2>老師密碼登入</h2>
+      <input id="t-pwd" type="password" placeholder="輸入主管密碼">
+      <button class="btn" id="t-login">登入</button>
+      <button class="btn secondary" onclick="go('home')">← 返回學生考試介面</button>
+    </div>
+    <div id="teacher-panel" style="display:none">
+      <div class="link-grid" id="t-grid1">
+        <button data-go="launch">發起考試碼</button>
+        <button data-go="classes">學生管理（班次）</button>
+        <button data-go="admin">成績後台</button>
+        <button data-go="papers">考卷管理</button>
+      </div>
+      <div class="link-grid" style="margin-top:10px" id="t-grid2">
+        <button data-go="import">導入 X 檔題庫</button>
+        <button data-go="questions">題庫管理（改題）</button>
+        <button data-go="version">版本號設定</button>
+        <button data-go="chgpwd">修改密碼</button>
+        <button data-go="logout" style="color:var(--red)">登出</button>
+      </div>
+      <div id="t-sub" style="margin-top:14px"></div>
+    </div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= 數據層（localStorage） ================= */
+const DB = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ localStorage.setItem(k, JSON.stringify(v)); },
+  remove(k){ localStorage.removeItem(k); }
+};
+const K = {
+  questions:'quiz_questions_v2', papers:'quiz_papers_v1', activePaper:'quiz_active_paper',
+  exams:'quiz_exams_v1', curExam:'quiz_cur_exam', classes:'quiz_classes_v1',
+  students:'quiz_students_v1', locks:'quiz_name_locks', attempts:'quiz_attempts_v1',
+  lastAttempt:'quiz_last_attempt', isTeacher:'quiz_is_teacher', pwd:'quiz_teacher_pwd',
+  curClass:'quiz_cur_class', userName:'quiz_user_name', ver:'quiz_paper_version'
+};
+const EXAM_HOURS = 4, MAX_CLASSES = 6;
+const TYPE_LABELS = ['單選題','多選題','計算題','混合題'];
+function getVersion(){ return DB.get(K.ver, 2.2); }
+function renderOptContent(text){
+  if(!text) return '（空）';
+  let s=String(text);
+  // Markdown 圖片 ![圖片](url)
+  s=s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" style="max-width:120px;max-height:80px;vertical-align:middle;border-radius:4px">');
+  // DISPIMG 公式 =DISPIMG("ID_xxx",1)
+  const m=s.match(/^=DISPIMG\(["']([^"']+)["']/);
+  if(m){
+    const imgUrl=(window._xlsImages&&window._xlsImages[m[1]]);
+    if(imgUrl){
+      return `<img src="${imgUrl}" style="max-width:120px;max-height:80px;vertical-align:middle;border-radius:4px">`;
+    }
+    return `<span style="display:inline-block;padding:4px 8px;background:#fef3c7;border:1px dashed #f59e0b;border-radius:4px;font-size:12px;color:#92400e">[圖片 ${m[1].slice(0,20)}...]</span>`;
+  }
+  return s;
+}
+function bumpVersion(){
+  const v=Math.round((getVersion()+0.1)*10)/10;
+  DB.set(K.ver, v);
+  const s=v.toFixed(1);
+  const el=document.getElementById('ver-tag');
+  if(el) el.textContent='v'+s;
+  const fv=document.getElementById('footer-ver');
+  if(fv) fv.textContent=s;
+  setTimeout(()=>toast('已更新到版本 '+s), 300);
+}
+
+/* ================= 路由 ================= */
+function go(view){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+view).classList.add('active');
+  window.scrollTo(0,0);
+  if(view==='home'){ renderHome(); if(typeof reloadClassList==='function') reloadClassList(); }
+  if(view==='teacher') renderTeacher();
+}
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
+  clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',2200);
+}
+
+/* ================= 判分（同小程序一致） ================= */
+function matchCalc(correct, user){
+  const c=String(correct==null?'':correct).trim(), u=String(user==null?'':user).trim();
+  if(!u) return false;
+  if(c.toLowerCase()===u.toLowerCase()) return true;
+  const nc=parseFloat(c), nu=extractNumber(u);
+  if(!isNaN(nc) && nu!==null){ const tol=Math.abs(nc)>=1?0.051:0.0051; return Math.abs(nu-nc)<=tol; }
+  return false;
+}
+function extractNumber(s){ const m=String(s).replace(/[,，\s]/g,'').match(/-?\d+(\.\d+)?/); return m?parseFloat(m[0]):null; }
+function partCorrect(pt, up){
+  if(pt.kind==='fill'){
+    const exp=Array.isArray(pt.answer)?pt.answer:[pt.answer];
+    const got=Array.isArray(up)?up:[up];
+    if(exp.length!==got.length) return false;
+    return exp.every((e,i)=>matchCalc(e, got[i]));
+  }
+  const a=(pt.answer||[]).slice().sort(), b=(up||[]).slice().sort();
+  return a.length===b.length && a.every((v,i)=>v===b[i]);
+}
+function isCorrect(q, ua){
+  if(q.type===4){
+    if(!ua||!ua.parts) return false;
+    const parts=q.parts||[], up=ua.parts||[];
+    if(parts.length!==up.length) return false;
+    return parts.every((pt,i)=>partCorrect(pt, up[i]));
+  }
+  if(q.type===3) return matchCalc(q.answer, ua);
+  const a=(q.answer||[]).slice().sort(), b=(ua||[]).slice().sort();
+  return a.length===b.length && a.every((v,i)=>v===b[i]);
+}
+function questionScore(q, ua){
+  const base=Number(q.score)||1;
+  if(q.type===4){
+    const parts=q.parts||[]; if(!parts.length) return 0;
+    const per=base/parts.length, up=(ua&&ua.parts)||[];
+    return parts.reduce((s,pt,i)=>partCorrect(pt,up[i])?s+per:s,0);
+  }
+  return isCorrect(q,ua)?base:0;
+}
+
+/* ================= 題目取得 ================= */
+function getQuestions(){ return DB.get(K.questions, []); }
+function getPapers(){ return DB.get(K.papers, []); }
+function getExams(){ return DB.get(K.exams, []); }
+function getActiveExams(){ const now=Date.now(); return getExams().filter(e=>e.expireAt>=now); }
+function getClasses(){ const c=DB.get(K.classes,null); return (Array.isArray(c)&&c.length)?c:['A班','B班']; }
+function getStudents(){ return DB.get(K.students, []); }
+function getLocks(){ return DB.get(K.locks, {}); }
+function getAttempts(){ return DB.get(K.attempts, []); }
+function examByCode(code){ const c=String(code).trim(); return getActiveExams().find(e=>e.code===c)||null; }
+function paperById(id){ return getPapers().find(p=>p.id===Number(id))||null; }
+function questionsForExam(exam){
+  if(exam && exam.paperId){ const p=paperById(exam.paperId); if(p&&p.questions&&p.questions.length) return p.questions; }
+  return getQuestions();
+}
+
+/* ================= 首頁 ================= */
+function stuName(s){ return typeof s==='string'?s:(s&&s.name?String(s.name):''); }
+function stuCls(s){
+  if(typeof s==='string') return [];
+  if(!s||!s.cls) return [];
+  if(Array.isArray(s.cls)) return s.cls.map(String);
+  return [String(s.cls)];
+}
+function hasClass(s, c){ return stuCls(s).includes(c); }
+function renderHome(){
+  document.getElementById('in-code').value='';
+  document.getElementById('in-classType').value='';
+  document.getElementById('in-nameType').value='';
+  const classes=getClasses();
+  const clsSel=document.getElementById('in-classSelect');
+  clsSel.innerHTML='<option value="">— 請揀班 —</option>'+classes.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  clsSel.onchange=()=>{ document.getElementById('in-classType').value=clsSel.value; reloadNameList(); };
+  const sel=document.getElementById('in-nameSelect');
+  sel.innerHTML='<option value="-1">— 輸入考試碼同揀班先 —</option>';
+  sel.onchange=()=>{
+    const sts=filteredStudents();
+    const i=Number(sel.value);
+    document.getElementById('in-nameType').value = (i>=0 && sts[i]) ? stuName(sts[i]) : '';
+  };
+  document.getElementById('in-code').oninput=()=>{
+    reloadNameList();
+  };
+}
+let currentExamClass='';
+function reloadClassList(){
+  const classes=getClasses();
+  const clsSel=document.getElementById('in-classSelect');
+  const cur=clsSel.value;
+  clsSel.innerHTML='<option value="">— 揀班 —</option>'+classes.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  if(classes.includes(cur)) clsSel.value=cur;
+  toast('已載入最新班別');
+}
+function filteredStudents(){
+  const exam=examByCode(document.getElementById('in-code').value.trim());
+  const clsBox=document.getElementById('in-classSelect').value;
+  const wantCls = exam ? exam.className : clsBox;
+  return getStudents().filter(s=>{
+    if(!wantCls) return stuCls(s).length===0; // 冇班就淨係未編班
+    return hasClass(s, wantCls);
+  });
+}
+function reloadNameList(){
+  const code=document.getElementById('in-code').value.trim();
+  const exam=examByCode(code);
+  const clsSel=document.getElementById('in-classSelect');
+  if(exam && clsSel.value!==exam.className){
+    clsSel.value=exam.className;
+    document.getElementById('in-classType').value=exam.className;
+  }
+  const clsWant = exam ? exam.className : clsSel.value;
+  const sel=document.getElementById('in-nameSelect');
+  if(!clsWant){
+    sel.innerHTML='<option value="-1">— 請揀班 —</option>';
+    return;
+  }
+  const sts=getStudents().filter(s=>hasClass(s, clsWant));
+  sel.innerHTML='<option value="-1">— 請揀名 —</option>'+sts.map((s,i)=>`<option value="${i}">${esc(stuName(s))}</option>`).join('');
+}
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+document.getElementById('btn-start').onclick = function(){
+  const warn=document.getElementById('home-warn'); warn.style.display='none';
+  const code=document.getElementById('in-code').value.trim();
+  const cls1=document.getElementById('in-classSelect').value;
+  const cls2=document.getElementById('in-classType').value.trim();
+  const si=Number(document.getElementById('in-nameSelect').value);
+  const name=document.getElementById('in-nameType').value.trim();
+  if(!code){ warnMsg('請輸入考試碼'); return; }
+  const exam=examByCode(code);
+  if(!exam){ warnMsg('考試碼唔啱或者已過期'); return; }
+  if(!cls1){ warnMsg('請揀班'); return; }
+  if(cls1!==exam.className){ warnMsg('呢個考試碼唔屬於「'+cls1+'」，請揀返「'+exam.className+'」'); return; }
+  if(cls2!==cls1){ warnMsg('班次第二欄要同第一欄一致'); return; }
+  const sts=getStudents().filter(s=>hasClass(s, exam.className));
+  if(si<0){ warnMsg('請先從名單揀名'); return; }
+  const chosen=sts[si]?stuName(sts[si]):'';
+  if(chosen!==name){ warnMsg('填寫姓名同名單唔一致，請重新揀'); return; }
+  const lock=getLocks()[name];
+  if(lock){
+    if(lock.state==='submitted' && lock.code===code){ warnMsg('呢個名已經交卷，唔可以再入本卷'); return; }
+    if(lock.state==='active' && lock.code!==code){ warnMsg('呢個名正在另一場考試，先交卷'); return; }
+  }
+  DB.set(K.curExam, exam);
+  DB.set(K.userName, name);
+  const locks=getLocks(); locks[name]={code,state:'active',at:Date.now()}; DB.set(K.locks, locks);
+  startQuiz(exam, name);
+};
+function warnMsg(m){ const w=document.getElementById('home-warn'); w.textContent=m; w.style.display='block'; }
+document.getElementById('btn-teacherEntry').onclick=()=>go('teacher');
+
+/* ================= 答題頁 ================= */
+let QZ = null; // { exam, name, list, answers, idx }
+function startQuiz(exam, name){
+  const list=questionsForExam(exam);
+  if(!list.length){ toast('呢張卷冇題目'); return; }
+  QZ={ exam, name, list, answers:list.map(()=>null), idx:0 };
+  document.getElementById('quiz-paperName').textContent = exam.paperId? (paperById(exam.paperId)?.name||'考卷') : '全部題庫';
+  document.getElementById('quiz-className').textContent = (exam.className||'')+' · '+name;
+  go('quiz'); renderQuiz();
+}
+function renderQuiz(){
+  if(!QZ){ go('home'); return; }
+  // 檢查考試碼仲存在／未過期（後台可能已關閉考場）
+  if(!examByCode(QZ.exam.code)){ alert('呢場考試已被老師關閉，刷新頁面返回首頁'); go('home'); return; }
+  const {list, answers, idx}=QZ;
+  const q=list[idx];
+  document.getElementById('quiz-progress').textContent=`第 ${idx+1} / ${list.length} 題 · ${TYPE_LABELS[q.type-1]||''}`+(q.score?` · ${q.score}分`:'');
+  let html='';
+  html+=`<span class="qmeta">${TYPE_LABELS[q.type-1]||''}</span>`;
+  html+=`<div class="qtext">${idx+1}. ${renderOptContent(q.question)}</div>`;
+  if(q.type===4){
+    (q.parts||[]).forEach((pt,pi)=>{
+      html+=`<div style="margin:10px 0 4px;font-size:13px;color:var(--muted)">第${pi+1}部分（${pt.kind==='fill'?'填寫':pt.kind==='tf'?'是非':pt.kind==='multi'?'多選':'單選'}）</div>`;
+      if(pt.kind==='fill'){
+        const cur=(answers[idx]&&answers[idx].parts&&typeof answers[idx].parts[pi]==='string')?answers[idx].parts[pi]:'';
+        html+=`<input data-part="${pi}" data-kind="fill" class="fill-input" inputmode="decimal" placeholder="輸入數字答案" value="${esc(cur)}">`;
+      } else {
+        const selArr=(answers[idx]&&answers[idx].parts&&Array.isArray(answers[idx].parts[pi]))?answers[idx].parts[pi]:[];
+        pt.options.forEach((op,oi)=>{
+          const on=selArr.includes(oi);
+          html+=`<div class="opt ${pt.kind==='multi'?'multi':''} ${on?'selected':''}" data-part="${pi}" data-opt="${oi}">
+            <span class="dot">${on?'✓':''}</span><span class="letter">${'ABCDEF'.charAt(oi)}</span><span>${renderOptContent(op)}</span></div>`;
+        });
+      }
+    });
+  } else if(q.type===3){
+    const cur=answers[idx]==null?'':answers[idx];
+    html+=`<input data-kind="fill" class="fill-input" inputmode="decimal" placeholder="輸入計算答案" value="${esc(cur)}">`;
+  } else {
+    const kind=q.type===2?'multi':'';
+    const selArr=Array.isArray(answers[idx])?answers[idx]:[];
+    q.options.forEach((op,oi)=>{
+      const on=selArr.includes(oi);
+      html+=`<div class="opt ${kind} ${on?'selected':''}" data-opt="${oi}">
+        <span class="dot">${on?'✓':''}</span><span class="letter">${'ABCDEF'.charAt(oi)}</span><span>${renderOptContent(op)}</span></div>`;
+    });
+  }
+  document.getElementById('quiz-card').innerHTML=html;
+  // 事件
+  document.querySelectorAll('#quiz-card .opt').forEach(el=>{
+    el.onclick=()=>{
+      const qq=QZ.list[QZ.idx];
+      if(qq.type===4){
+        const pi=Number(el.dataset.part), oi=Number(el.dataset.opt);
+        const pt=qq.parts[pi];
+        if(!QZ.answers[QZ.idx]||!QZ.answers[QZ.idx].parts) QZ.answers[QZ.idx]={parts:qq.parts.map(()=>[])};
+        let arr=Array.isArray(QZ.answers[QZ.idx].parts[pi])?QZ.answers[QZ.idx].parts[pi].slice():[];
+        if(pt.kind==='multi'){ arr=arr.includes(oi)?arr.filter(x=>x!==oi):[...arr,oi]; }
+        else { arr=[oi]; }
+        QZ.answers[QZ.idx].parts[pi]=arr;
+      } else {
+        const oi=Number(el.dataset.opt);
+        if(qq.type===2){
+          let arr=Array.isArray(QZ.answers[QZ.idx])?QZ.answers[QZ.idx].slice():[];
+          arr=arr.includes(oi)?arr.filter(x=>x!==oi):[...arr,oi];
+          QZ.answers[QZ.idx]=arr;
+        } else { QZ.answers[QZ.idx]=[oi]; }
+      }
+      renderQuiz();
+    };
+  });
+  document.querySelectorAll('#quiz-card .fill-input').forEach(el=>{
+    el.oninput=()=>{
+      const qq=QZ.list[QZ.idx];
+      if(qq.type===4){
+        const pi=Number(el.dataset.part);
+        if(!QZ.answers[QZ.idx]||!QZ.answers[QZ.idx].parts) QZ.answers[QZ.idx]={parts:qq.parts.map((p,i)=>p.kind==='fill'?'':[])};
+        QZ.answers[QZ.idx].parts[pi]=el.value;
+      } else { QZ.answers[QZ.idx]=el.value; }
+    };
+  });
+  document.getElementById('btn-next').textContent = idx===list.length-1 ? '完成作答' : '下一題';
+  document.getElementById('btn-submit').style.display = (idx===list.length-1)?'block':'none';
+}
+document.getElementById('btn-prev').onclick=()=>{ if(QZ.idx>0){ QZ.idx--; renderQuiz(); } };
+document.getElementById('btn-next').onclick=()=>{ if(QZ.idx<QZ.list.length-1){ QZ.idx++; renderQuiz(); } };
+document.getElementById('btn-submit').onclick=()=>{
+  const {list, answers}=QZ;
+  const untouched=[];
+  list.forEach((q,i)=>{
+    const a=answers[i];
+    let empty=false;
+    if(q.type===4){
+      empty=(q.parts||[]).every(pt=>{
+        const ua=a&&a.parts?a.parts[q.parts.indexOf(pt)]:null;
+        if(pt.kind==='fill') return ua==null||ua==='';
+        return !ua || (Array.isArray(ua)&&ua.length===0);
+      });
+    } else if(q.type===3){
+      empty=a==null||a==='';
+    } else {
+      empty=!a || (Array.isArray(a)&&a.length===0);
+    }
+    if(empty) untouched.push(i+1);
+  });
+  let msg='確認交卷？交卷後個名會鎖死，唔可以再入本卷';
+  if(untouched.length) msg='⚠ 未作答題號：'+untouched.join('、')+'\n\n'+msg;
+  if(!confirm(msg)) return;
+  const {exam, name}=QZ;
+  // 檢查考試碼仲存在（後台可能已關閉考場）
+  if(!examByCode(exam.code)){ alert('呢場考試已被老師關閉，唔可以交卷'); go('home'); return; }
+  let totalScore=0, gotScore=0, wrongIdx=[];
+  list.forEach((q,i)=>{
+    const sc=Number(q.score)||1; totalScore+=sc;
+    const got=questionScore(q, answers[i]); gotScore+=got;
+    if(!isCorrect(q, answers[i])) wrongIdx.push({i:i+1, q, ua:answers[i]});
+  });
+  const pn=exam.paperId?(paperById(exam.paperId)?.name||'考卷#'+exam.paperId):'全部題庫';
+  const attempt={
+    name, className:exam.className||'', paperName:pn,
+    score:Math.round(gotScore*10)/10, total:list.length, totalScore,
+    score100: totalScore?Math.min(100, Math.round(gotScore/totalScore*100)):0,
+    date:new Date().toLocaleString('zh-HK'),
+    ts:Date.now(),
+    wrong:wrongIdx,
+    detail:list.map((q,i)=>({question:q.question,type:q.type,parts:q.parts||null,options:q.options,answer:q.answer,score:Number(q.score)||0,ok:isCorrect(q,answers[i]),userAnswer:answers[i]}))
+  };
+  const att=getAttempts(); att.push(attempt); DB.set(K.attempts, att);
+  DB.set(K.lastAttempt, attempt);
+  const locks=getLocks(); locks[name]={code:exam.code,state:'submitted',at:Date.now()}; DB.set(K.locks, locks);
+  DB.remove(K.curExam);
+  showResult(attempt);
+};
+function showResult(a){
+  go('result');
+  document.getElementById('result-score').textContent=a.score+' / '+a.totalScore;
+  document.getElementById('result-paper').textContent=a.paperName+' · '+a.name+' · '+a.className;
+  document.getElementById('result-correct').textContent= a.total - (a.wrong?a.wrong.length:0) +' / '+a.total;
+  document.getElementById('result-pct').textContent=a.score100+'%';
+  if(!a.wrong || !a.wrong.length){
+    document.getElementById('result-wrong').innerHTML='<span class="tag ok">全對！</span>';
+  } else {
+    document.getElementById('result-wrong').innerHTML=a.wrong.map(w=>{
+      let extra='';
+      if(w.q.type===4){
+        extra=(w.q.parts||[]).map((pt,pi)=>{
+          const up=(w.ua&&w.ua.parts)?w.ua.parts[pi]:null;
+          return partCorrect(pt,up)?'':`；第${pi+1}部分（${pt.kind==='fill'?'填寫':pt.kind==='tf'?'是非':pt.kind==='multi'?'多選':'單選'}）錯`;
+        }).join('');
+      }
+      return `<div><b>第 ${w.i} 題</b>${esc(extra)}</div>`;
+    }).join('');
+  }
+  // 逐題對答案
+  const det=a.detail||[];
+  const ansText=(d, ua)=>{
+    if(d.type===4){
+      const parts=d.parts||[];
+      return parts.map((pt,pi)=>{
+        const up=ua&&ua.parts?ua.parts[pi]:null;
+        const upTxt=fmtPartAns(pt, up);
+        const coTxt=fmtPartAns(pt, pt.answer);
+        return `第${pi+1}部分：你答「${upTxt}」／正確「${coTxt}」`;
+      }).join('；');
+    }
+    if(d.type===3){
+      return `你答「${fmtUserAns(ua)}」／正確「${d.answer}」`;
+    }
+    const opts=d.options||[];
+    const coArr=Array.isArray(d.answer)?d.answer:[d.answer];
+    const coTxt=coArr.map(i=>opts[i]!==undefined?opts[i]:('選項'+(i+1))).join('、');
+    const upArr=Array.isArray(ua)?ua:(ua==null||ua===''?[]:[ua]);
+    const upTxt=upArr.map(i=>opts[i]!==undefined?opts[i]:('選項'+(i+1))).join('、')||'（未作答）';
+    return `你答「${upTxt}」／正確「${coTxt}」`;
+  };
+  const fmtPartAns=(pt, up)=>{
+    if(pt.kind==='fill') return String(up==null||up===''?'（未作答）':up);
+    const opts=pt.options||[];
+    const arr=Array.isArray(up)?up:(up==null?[]:[up]);
+    return arr.map(i=>opts[i]!==undefined?opts[i]:('選項'+(i+1))).join('、')||'（未作答）';
+  };
+  const fmtUserAns=ua=>String(ua==null||ua===''?'（未作答）':ua);
+  document.getElementById('result-detail').innerHTML=det.map((d,i)=>{
+    const ok=isCorrect(d, d.userAnswer);
+    const tag=ok?'<span class="tag ok">啱</span>':'<span class="tag bad">錯</span>';
+    const sc=Number(d.score)||0;
+    return `<div style="padding:8px;border-bottom:1px solid var(--line)">
+      <div><b>第${i+1}題</b> ${tag} <span class="muted" style="font-size:12px">（${sc}%）</span></div>
+      <div style="color:var(--muted);margin:4px 0">${esc(d.question)}</div>
+      <div style="font-size:13px">${esc(ansText(d, d.userAnswer))}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ================= 老師後台 ================= */
+document.getElementById('t-login').onclick=()=>{
+  const p=document.getElementById('t-pwd').value.trim();
+  if(!p){ toast('請輸入密碼'); return; }
+  if(p!==DB.get(K.pwd,'20261010')){ toast('密碼唔啱'); return; }
+  DB.set(K.isTeacher, true);
+  renderTeacher();
+};
+function renderTeacher(){
+  const logged=DB.get(K.isTeacher,false)===true;
+  document.getElementById('teacher-loginCard').style.display=logged?'none':'block';
+  document.getElementById('teacher-panel').style.display=logged?'block':'none';
+  if(logged) renderSub('');
+}
+document.querySelectorAll('#t-grid1 button, #t-grid2 button').forEach(b=>{
+  b.onclick=()=>{
+    const g=b.dataset.go;
+    if(g==='logout'){ DB.remove(K.isTeacher); renderTeacher(); return; }
+    renderSub(g);
+  };
+});
+function subHead(t){ return `<div class="card"><h2>${t}</h2><div class="muted" style="margin-bottom:10px"><a href="#" onclick="renderSub('');return false" style="color:var(--blue)">← 返回功能頁</a> &nbsp;·&nbsp; <a href="#" onclick="go('home');return false" style="color:var(--blue)">← 返回學生考試介面</a></div>`; }
+function getVersion(){ return '4.9'; }
+function setVersion(v){ DB.set(K.ver,v); updateVerBadge(); }
+function updateVerBadge(){
+  const v=getVersion();
+  const badge=document.getElementById('verBadge');
+  if(badge) badge.textContent='版本 V'+v;
+  const disp=document.getElementById('curVerDisplay');
+  if(disp) disp.textContent='V'+v;
+  const inp=document.getElementById('verInput');
+  if(inp && !inp.value) inp.value=v;
+}
+function saveVersion(){
+  const inp=document.getElementById('verInput');
+  const v=(inp.value||'').trim();
+  if(!v){ toast('請輸入版本號'); return; }
+  setVersion(v);
+  toast('版本號已更新為 V'+v);
+}
+let curSub='';
+function renderSub(g){
+  curSub=g||'';
+  const el=document.getElementById('t-sub');
+  if(!g){ el.innerHTML='<div class="card"><p class="muted">揀上面功能開始。</p></div>'; return; }
+  if(g==='version'){
+    el.innerHTML=subHead('版本號設定')+`
+      <div class="card" style="padding:16px">
+        <label>新版本號</label>
+        <input id="verInput" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px;font-size:14px" placeholder="例如 4.5" value="${getVersion()}">
+        <button class="btn" style="margin-top:10px;width:auto;padding:8px 20px" onclick="saveVersion()">更新版本</button>
+        <div class="muted" style="margin-top:10px;font-size:13px">當前版本：V${getVersion()}</div>
+      </div>`;
+    return;
+  }
+  if(g==='launch'){
+    const cls=getClasses(), papers=getPapers();
+    el.innerHTML=subHead('發起考試碼')+`
+      <label>揀班次</label><select id="L-cls">${cls.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
+      <label>揀考卷</label><select id="L-paper"><option value="0">全部題庫（${getQuestions().length}題）</option>${papers.map(p=>`<option value="${p.id}">${esc(p.name)}（${p.questions.length}題）</option>`).join('')}</select>
+      <label>考試碼（阿拉伯數字）</label><input id="L-code" inputmode="numeric" placeholder="例如 1234">
+      <label>開放時長（小時，1～168，一週）</label>
+      <input id="L-hours" type="number" min="1" max="168" value="4" inputmode="numeric">
+      <button class="btn" id="L-go">生成考試碼</button></div>
+      <div class="card"><h2>進行中考試</h2><div id="L-list"></div></div>`;
+    renderActiveExams();
+    document.getElementById('L-go').onclick=()=>{
+      const code=document.getElementById('L-code').value.trim();
+      if(!code){ toast('請輸入考試碼'); return; }
+      let hours=Number(document.getElementById('L-hours').value);
+      if(!hours||hours<1) hours=1;
+      if(hours>168) hours=168;
+      const paperId=Number(document.getElementById('L-paper').value);
+      const className=document.getElementById('L-cls').value;
+      const now=Date.now();
+      const list=getExams().filter(e=>!(e.code===code));
+      list.push({code,paperId,durationMin:hours*60,className,launchedAt:now,expireAt:now+hours*3600*1000});
+      DB.set(K.exams, list);
+      toast('已生成考試碼 '+code+'（'+hours+' 小時有效）');
+      renderSub('launch');
+    };
+  }
+  if(g==='classes'){
+    const cls=getClasses(), sts=getStudents();
+    el.innerHTML=subHead('學生管理（班次加減）')+`
+      <label>現有班次（按右邊掣拆除）</label>
+      <div id="C-clsList">${cls.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid var(--line)"><span>${esc(c)}</span><button class="btn danger" style="width:auto;padding:4px 12px;margin:0;font-size:13px" data-delcls="${esc(c)}">拆除</button></div>`).join('')||'<span class="muted">暫無班次</span>'}</div>
+      <label>加新班次名</label>
+      <input id="C-add" placeholder="新班次名">
+      <button class="btn" id="C-addBtn">加班</button>
+      <div class="card" style="margin-top:14px"><h2>名單（查找學生／班次，顯示相關學生）</h2>
+        <label>查找學生（打名即時過濾）</label>
+        <input id="C-search" placeholder="例如：陳大文">
+        <label>查找班次</label>
+        <select id="C-filterCls"><option value="">全部</option>${cls.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select>
+        <div id="C-stuList">${sts.length?sts.map((s,idx)=>{
+          const nm=stuName(s), arr=stuCls(s);
+          const cbs=cls.map(c=>`<label style="display:inline-block;margin-right:10px;font-size:13px"><input type="checkbox" data-cls-toggle="${idx}" value="${esc(c)}" ${arr.includes(c)?'checked':''}> ${esc(c)}</label>`).join('');
+          return `<div data-row="${idx}" data-cls="${esc(arr.join(','))}" data-name="${esc(nm.toLowerCase())}" style="padding:8px;border-bottom:1px solid var(--line)">
+            <details>
+              <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;list-style:none">
+                <span>${esc(nm)} ${arr.length?'<span class="tag ok" style="margin-left:6px">'+esc(arr.join('、'))+'</span>':'<span class="tag">未編班</span>'}</span>
+                <span style="display:flex;gap:6px;align-items:center">
+                  <span class="muted" style="font-size:12px">折開改班</span>
+                  <button class="btn danger" style="width:auto;padding:4px 12px;margin:0;font-size:13px" data-delstu-idx="${idx}">拆除</button>
+                </span>
+              </summary>
+              <div style="font-size:13px;margin-top:6px;padding:6px;background:#f8fafc;border-radius:6px">屬於：${cbs||'<span class="muted">未編班</span>'}</div>
+            </details>
+          </div>`;
+        }).join(''):'<span class="muted">未有名單</span>'}</div>
+        <label>加學生名</label><input id="C-stu" placeholder="學生姓名">
+        <label>分流選班（可多選，唔揀就未編班）</label>
+        <div id="C-stuClsBox2">${cls.map(c=>`<label style="display:inline-block;margin-right:10px;font-size:13px"><input type="checkbox" class="C-stuCls2" value="${esc(c)}"> ${esc(c)}</label>`).join('')||'<span class="muted">先加班次</span>'}</div>
+        <button class="btn" id="C-stuBtn">加入名單</button></div>`;
+    function applyStuFilter(){
+      const kw=(document.getElementById('C-search').value||'').trim().toLowerCase();
+      const want=document.getElementById('C-filterCls').value;
+      document.querySelectorAll('#C-stuList [data-row]').forEach(row=>{
+        const name=row.dataset.name||'';
+        const arr=(row.dataset.cls||'').split(',').filter(Boolean);
+        const show=(!kw||name.includes(kw))&&(!want||arr.includes(want));
+        row.style.display=show?'':'none';
+      });
+    }
+    document.getElementById('C-search').oninput=applyStuFilter;
+    document.getElementById('C-filterCls').onchange=applyStuFilter;
+    document.getElementById('C-addBtn').onclick=()=>{
+      const n=document.getElementById('C-add').value.trim();
+      if(!n) return toast('輸入班次名');
+      if(cls.includes(n)) return toast('班次已存在');
+      DB.set(K.classes,[...cls,n]); renderSub('classes');
+    };
+    document.getElementById('C-stuBtn').onclick=()=>{
+      const n=document.getElementById('C-stu').value.trim();
+      if(!n) return;
+      const picked=Array.from(document.querySelectorAll('.C-stuCls2:checked')).map(c=>c.value);
+      const sts2=getStudents();
+      if(sts2.some(s=>stuName(s)===n)) return toast('名單已有');
+      sts2.push({name:n, cls:picked});
+      DB.set(K.students,sts2); renderSub('classes');
+    };
+    // 改學生班別（toggle）
+    document.querySelectorAll('#C-stuList [data-cls-toggle]').forEach(cb=>{
+      cb.onchange=()=>{
+        const idx=Number(cb.dataset.clsToggle);
+        const sts2=getStudents();
+        const s=sts2[idx]; if(!s) return;
+        const arr=stuCls(s);
+        const v=cb.value;
+        const i=arr.indexOf(v);
+        if(i>=0) arr.splice(i,1); else arr.push(v);
+        sts2[idx]={name:stuName(s), cls:arr};
+        DB.set(K.students,sts2);
+      };
+    });
+    // 拆除班次
+    document.querySelectorAll('#C-clsList [data-delcls]').forEach(b=>{
+      b.onclick=()=>{
+        const n=b.dataset.delcls;
+        const nStu=getStudents().filter(s=>hasClass(s, n)).length;
+        const msg='確認要拆除班次「'+n+'」？\n'+(nStu>0?('該班有 '+nStu+' 名學生，會一併轉為「未編班」。\n'):'')+'該班次嘅進行中考試會一併結束。';
+        if(!confirm(msg)) return;
+        DB.set(K.classes, getClasses().filter(c=>c!==n));
+        DB.set(K.exams, getExams().filter(e=>e.className!==n));
+        // 該班學生轉為未編班
+        const sts2=getStudents().map(s=>{
+          const arr=stuCls(s).filter(c=>c!==n);
+          return {name:stuName(s), cls:arr};
+        });
+        DB.set(K.students,sts2);
+        toast('已拆除班次 '+n); renderSub('classes');
+      };
+    });
+    // 拆除學生
+    document.querySelectorAll('#C-stuList [data-delstu-idx]').forEach(b=>{
+      b.onclick=()=>{
+        const idx=Number(b.dataset.delstuIdx);
+        const sts2=getStudents();
+        const s=sts2[idx]; if(!s) return;
+        const nm=stuName(s);
+        if(!confirm('確認要拆除學生「'+nm+'」？\n（該學生嘅名鎖記錄會一併清除）')) return;
+        sts2.splice(idx,1);
+        DB.set(K.students, sts2);
+        const locks=getLocks(); delete locks[nm]; DB.set(K.locks, locks);
+        toast('已拆除學生 '+nm); renderSub('classes');
+      };
+    });
+  }
+  if(g==='admin'){
+    const att=getAttempts();
+    const sortedAll=att.slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+    el.innerHTML=subHead('成績後台')+`
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:10px">
+        <div><label>開始日期時間</label><input type="datetime-local" id="A-from"></div>
+        <div><label>結束日期時間</label><input type="datetime-local" id="A-to"></div>
+        <button class="btn secondary" id="A-filter">篩選時段</button>
+        <button class="btn" id="A-export">提取時段成績生成 X 檔</button>
+      </div>
+      <div style="overflow-x:auto"><table>
+      <tr><th>操作</th><th>日期</th><th>班次</th><th>姓名</th><th>卷名</th><th>得分</th><th>正確率</th><th>錯題</th></tr>
+      <tbody id="A-tbody"></tbody>
+      </table></div>`;
+    function renderTable(list){
+      document.getElementById('A-tbody').innerHTML=list.map((a,ri)=>{
+        // 日期時間分兩行
+        const dt=String(a.date||'').split(/\s+/);
+        const dateStr=dt[0]||'';
+        const timeStr=dt.slice(1).join(' ')||'';
+        return `<tr>
+        <td><button class="btn danger" style="width:auto;padding:4px 10px;margin:0;font-size:12px" data-del-attempt="${ri}">拆除</button></td>
+        <td style="white-space:nowrap">${esc(dateStr)}<br><span class="muted" style="font-size:11px">${esc(timeStr)}</span></td>
+        <td>${esc(a.className)}</td><td><b>${esc(a.name)}</b></td>
+        <td>${esc(a.paperName)}</td><td>${a.score}/${a.totalScore}</td>
+        <td><span class="tag ${a.score100>=60?'ok':'bad'}">${a.score100}%</span></td>
+        <td>${(a.wrong||[]).map(w=>w.i).join('、')||'—'}</td></tr>`;
+      }).join('')||'<tr><td colspan="8" class="muted">暫無成績</td></tr>';
+    }
+    let curList=sortedAll;
+    renderTable(curList);
+    function refreshTable(){
+      const from=document.getElementById('A-from').value;
+      const to=document.getElementById('A-to').value;
+      let list=sortedAll;
+      // 手動 parse zh-HK 格式日期：「15/10/2026 下午 4:10:10」
+      function parseZhDate(s){
+        if(!s) return null;
+        const m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s*(上午|下午)?\s*(\d{1,2}):(\d{1,2}):(\d{1,2})/);
+        if(!m) return null;
+        let [_,d,mo,y,ap,h,mi,se]=m;
+        h=Number(h); if(ap==='下午'&&h<12) h+=12; if(ap==='上午'&&h===12) h=0;
+        return new Date(Number(y),Number(mo)-1,Number(d),h,Number(mi),Number(se)).getTime();
+      }
+      const tsOf=a=>a.ts||parseZhDate(a.date);
+      if(from){ const f=new Date(from).getTime(); list=list.filter(a=>{ const t=tsOf(a); return t!==null&&t>=f; }); }
+      if(to){ const t=new Date(to).getTime(); list=list.filter(a=>{ const ts=tsOf(a); return ts!==null&&ts<=t; }); }
+      curList=list; renderTable(curList);
+      document.querySelectorAll('[data-del-attempt]').forEach(b=>{
+        b.onclick=()=>{
+          const idx=Number(b.dataset.delAttempt);
+          const a=curList[idx]; if(!a) return;
+          if(!confirm('確認要拆除呢筆成績？\n'+a.date+' · '+a.name+' · '+a.paperName+' · '+a.score+'分')) return;
+          // 從 attempts 移除
+          const att=getAttempts();
+          const origIdx=att.findIndex(x=>x.date===a.date&&x.name===a.name&&x.paperName===a.paperName&&x.score===a.score);
+          if(origIdx>=0){ att.splice(origIdx,1); DB.set(K.attempts,att); }
+          toast('已拆除');
+          sortedAll.splice(sortedAll.indexOf(a),1);
+          refreshTable();
+        };
+      });
+    }
+    refreshTable();
+    document.getElementById('A-filter').onclick=()=>{ refreshTable(); toast('已篩選 '+curList.length+' 筆'); };
+    document.getElementById('A-export').onclick=()=>{
+      const rows1=curList.map(a=>({日期:a.date,班次:a.className,姓名:a.name,卷名:a.paperName,得分:a.score,總分:a.totalScore,正確率:a.score100+'%',答對: a.total-(a.wrong||[]).length+'/'+a.total,錯題號:(a.wrong||[]).map(w=>w.i).join('、'),狀態: a.score100>=60?'合格':'不合格'}));
+      const rows2=[];
+      curList.forEach(a=>(a.detail||[]).forEach((d,i)=>rows2.push({姓名:a.name,卷名:a.paperName,題號:i+1,題型:TYPE_LABELS[d.type-1]||'',題目:d.question,得分:Number(d.score)||1,是否答對:d.ok?'啱':'錯',學生答案:JSON.stringify(d.userAnswer||'')})));
+      const rows3=(getQuestions()).map((q,i)=>({序號:i+1,題型:TYPE_LABELS[q.type-1]||'',題目:q.question,分數:Number(q.score)||1,答案:JSON.stringify(q.answer||q.parts||'')}));
+      const wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows1),'成績記錄');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows2),'作答明細');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows3),'題庫');
+      const d=new Date();
+      XLSX.writeFile(wb,'電工答題成績_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'.xlsx');
+      toast('已導出 '+curList.length+' 筆成績');
+    };
+  }
+  if(g==='papers'){
+    const papers=getPapers();
+    el.innerHTML=subHead('考卷管理')+`
+      <div>${papers.map(p=>`<div style="padding:12px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px">
+        <b>${esc(p.name)}</b> <span class="muted">（${p.questions.length} 題）</span>
+        <button class="btn danger" style="margin-top:8px" onclick="delPaper(${p.id})">拆除呢張卷</button></div>`).join('')||'<span class="muted">未導入考卷</span>'}</div>`;
+  }
+  if(g==='import'){
+    el.innerHTML=subHead('導入 X 檔題庫')+`
+      <p class="muted">揀標準考卷範本格式嘅 .xlsx（34欄：題型標記=1 先打開，AI 欄「多少分題」寫分數）。導入後會存為一張考卷，老師開考時揀呢張卷。</p>
+      <input type="file" id="I-file" accept=".xlsx,.xls" style="margin:12px 0">
+      <label>考卷名稱</label><input id="I-name" placeholder="例如 考題1">
+      <button class="btn" id="I-go">導入並存考卷</button>
+      <div id="I-msg" class="warn"></div>`;
+    document.getElementById('I-go').onclick=()=>{
+      const f=document.getElementById('I-file').files[0];
+      if(!f) return toast('揀 X 檔');
+      const name=document.getElementById('I-name').value.trim()||f.name.replace(/\.xlsx?$/i,'');
+      const rd=new FileReader();
+      rd.onload=async e=>{
+        try{
+          const buf=new Uint8Array(e.target.result);
+          const wb=XLSX.read(buf,{type:'array'});
+          const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+          const d=detectColumns(rows);
+          if(!d.fmt){ document.getElementById('I-msg').textContent='認唔到 X 檔格式，請用標準考卷範本（要有「問題」「單選題答案位A內容」等表頭）'; return; }
+          // 讀取 XLSX 入面嘅圖片（DISPIMG）
+          let imgMap={};
+          try{
+            const zip=await JSZip.loadAsync(buf);
+            console.log('=== XLSX 檔案列表 ===');
+            const files=Object.keys(zip.files);
+            files.forEach(f=>console.log(f));
+            // 嘗試多個可能嘅 cellimages 路徑
+            const possiblePaths=[
+              'xl/cellimages.xml',
+              'xl/media/cellimages.xml',
+              'cellimages.xml'
+            ];
+            let cellImgFile=null;
+            for(const p of possiblePaths){
+              const f=zip.file(p);
+              if(f){ cellImgFile=f; console.log('搵到 cellimages:',p); break; }
+            }
+            // 列出 xl/media/ 入面嘅檔案
+            const mediaFiles=files.filter(f=>f.startsWith('xl/media/'));
+            console.log('xl/media/ 檔案:',mediaFiles);
+            if(cellImgFile){
+              const xml=await cellImgFile.async('string');
+              console.log('cellimages.xml 內容:',xml);
+              // 解析 cellimages.xml
+              const re=/<cellImage[^>]*>\s*<name>([^<]+)<\/name>\s*<drawingR:id>([^<]+)<\/drawingR:id>/g;
+              let m;
+              const idMap={};
+              while((m=re.exec(xml))!==null){ idMap[m[2]]=m[1]; }
+              console.log('idMap:',idMap);
+              // 讀取 rels
+              const relsFile=zip.file('xl/_rels/cellimages.xml.rels');
+              if(relsFile){
+                const rels=await relsFile.async('string');
+                console.log('rels:',rels);
+                const re2=/<Relationship[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"/g;
+                let r;
+                while((r=re2.exec(rels))!==null){
+                  const id=idMap[r[1]];
+                  if(id){
+                    const imgPath='xl/'+r[2].replace(/^\//,'');
+                    const imgFile=zip.file(imgPath);
+                    if(imgFile){
+                      const blob=await imgFile.async('base64');
+                      imgMap[id]='data:image/png;base64,'+blob;
+                    }
+                  }
+                }
+              }
+            } else {
+              console.log('冇搵到 cellimages.xml');
+              // 如果冇 cellimages.xml，嘗試直接用 xl/media/ 入面嘅檔案
+              if(mediaFiles.length>0){
+                console.log('嘗試直接載入 xl/media/ 檔案');
+                for(const mf of mediaFiles){
+                  const imgFile=zip.file(mf);
+                  if(imgFile){
+                    const blob=await imgFile.async('base64');
+                    const id=mf.split('/').pop().replace(/\.[^.]+$/,'');
+                    imgMap[id]='data:image/png;base64,'+blob;
+                  }
+                }
+              }
+            }
+          }catch(e){ console.warn('讀取圖片失敗',e); }
+          window._xlsImages=imgMap;
+          const qs=rowsToQuestions(rows, d.col);
+          if(!qs.length){ document.getElementById('I-msg').textContent='搵唔到題目，檢查格式'; return; }
+          // debug：顯示第一題讀到嘅選項
+          const q0=qs[0]||{};
+          const debugMsg='導入成功：'+qs.length+' 題\n第1題類型：'+q0.type+'\n第1題選項：'+JSON.stringify(q0.options)+'\n第1題答案：'+JSON.stringify(q0.answer)+'\n載入圖片：'+Object.keys(imgMap).length+' 張';
+          document.getElementById('I-msg').textContent=debugMsg;
+          alert(debugMsg); // 彈出視窗
+          const papers=getPapers();
+          const newPid=Date.now()*100+Math.floor(Math.random()*900);
+          papers.push({id:newPid,name,createdAt:Date.now(),questions:qs});
+          DB.set(K.papers,papers);
+          DB.set(K.activePaper,newPid); // 自動切換到新導入嘅卷
+          document.getElementById('I-msg').textContent=`成功導入 ${qs.length} 題，儲存為「${name}」，已自動切換到呢張卷`;
+          setTimeout(()=>{ renderSub('questions'); }, 500); // 自動跳去題庫管理
+        }catch(err){ document.getElementById('I-msg').textContent='解析失敗：'+err.message; }
+      };
+      rd.readAsArrayBuffer(f);
+    };
+  }
+  if(g==='questions'){
+    const papers=getPapers();
+    let total=papers.reduce((s,p)=>s+(p.questions?p.questions.length:0),0);
+    function optRow(pid,qi,oi,opt,oldIsAns,newIsAns,kind,pi){
+      if(pi===undefined) pi=-1;
+      const type=kind==='multi'?'checkbox':'radio';
+      const chk=newIsAns?'checked':'';
+      let oc;
+      if(pi>=0){
+        oc = kind==='multi'
+          ? `togglePartMultiAnswer(${pid},${qi},${pi},${oi})`
+          : `setPartSingleAnswer(${pid},${qi},${pi},${oi})`;
+      } else {
+        oc = kind==='multi'
+          ? `toggleMultiAnswer(${pid},${qi},${oi})`
+          : `setSingleAnswer(${pid},${qi},${oi})`;
+      }
+      const editFn=pi>=0?`editPartOption(${pid},${qi},${pi},${oi},this.value)`:`editOption(${pid},${qi},${oi},this.value)`;
+      const delFn=pi>=0?`delPartOption(${pid},${qi},${pi},${oi})`:`delOption(${pid},${qi},${oi})`;
+      return `<div style="margin:4px 0;padding:6px;background:#f8fafc;border-radius:8px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="${type}" disabled style="margin:0;width:18px;height:18px;cursor:not-allowed;appearance:none;-webkit-appearance:none;border:1px solid #ccc;border-radius:3px;outline:none;background:${oldIsAns?'#10b981':'#fff'}">
+          <input type="${type}" name="q${qi}_p${pi}_new" ${chk} onchange="${oc}" style="margin:0;accent-color:#eab308;cursor:pointer;width:18px;height:18px">
+          <span class="letter" style="color:var(--blue);font-weight:700">${'ABCDEF'.charAt(oi)||'?'}</span>
+          <div style="flex:1;padding:6px;background:#eef2f7;border-radius:4px;font-size:14px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${renderOptContent(opt)}</div>
+          <span class="tag ${newIsAns?'ok':''}">${newIsAns?'正確':'錯'}</span>
+          <button class="btn" style="width:auto;padding:3px 10px;font-size:11px;background:#10b981;color:#fff" onclick="editOptionSave(${pid},${qi},${pi},${oi})">覆盖</button>
+          <button class="btn danger" style="width:auto;padding:2px 8px;margin:0;font-size:11px" onclick="${delFn}">刪</button>
+        </div>
+        <input id="opt_input_${qi}_${pi}_${oi}" style="width:100%;margin-top:4px;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:13px" placeholder="輸入新內容..." value="${esc(opt)}">
+        <button class="btn secondary" style="width:auto;padding:2px 8px;margin-top:4px;font-size:11px" onclick="insertOptImage(${qi},${pi},${oi})">＋插入圖片</button>
+        <input type="file" id="opt_img_${qi}_${pi}_${oi}" accept="image/*" style="display:none" onchange="readOptImage(this,${qi},${pi},${oi})">
+      </div>`;
+    }
+    window.insertOptImage=function(qi,pi,oi){
+      document.getElementById('opt_img_'+qi+'_'+pi+'_'+oi).click();
+    };
+    window.readOptImage=function(input,qi,pi,oi){
+      const f=input.files[0]; if(!f) return;
+      const rd=new FileReader();
+      rd.onload=e=>{
+        // 壓縮圖片到 200px 寬，JPEG 0.7 質量
+        const img=new Image();
+        img.onload=()=>{
+          const canvas=document.createElement('canvas');
+          const maxW=200;
+          const ratio=Math.min(1, maxW/img.width);
+          canvas.width=img.width*ratio;
+          canvas.height=img.height*ratio;
+          const ctx=canvas.getContext('2d');
+          ctx.drawImage(img,0,0,canvas.width,canvas.height);
+          const compressed=canvas.toDataURL('image/jpeg',0.7);
+          const imgTag='![圖片]('+compressed+')';
+          const inp=document.getElementById('opt_input_'+qi+'_'+pi+'_'+oi);
+          inp.value=inp.value? inp.value+' '+imgTag : imgTag;
+        };
+        img.src=e.target.result;
+      };
+      rd.readAsDataURL(f);
+    };
+    window.insertQImage=function(pid,qi){
+      document.getElementById('q_img_'+qi).click();
+    };
+    window.readQImage=function(input,pid,qi){
+      const f=input.files[0]; if(!f) return;
+      const rd=new FileReader();
+      rd.onload=e=>{
+        // 壓縮圖片到 300px 寬，JPEG 0.7 質量
+        const img=new Image();
+        img.onload=()=>{
+          const canvas=document.createElement('canvas');
+          const maxW=300;
+          const ratio=Math.min(1, maxW/img.width);
+          canvas.width=img.width*ratio;
+          canvas.height=img.height*ratio;
+          const ctx=canvas.getContext('2d');
+          ctx.drawImage(img,0,0,canvas.width,canvas.height);
+          const compressed=canvas.toDataURL('image/jpeg',0.7);
+          const imgTag='![圖片]('+compressed+')';
+          const ta=document.getElementById('q_text_'+qi);
+          ta.value=ta.value? ta.value+' '+imgTag : imgTag;
+          editQText(pid,qi,ta.value);
+        };
+        img.src=e.target.result;
+      };
+      rd.readAsDataURL(f);
+    };
+    function partBlock(pid,qi,pi,pt){
+      let h=`<div style="margin:8px 0;padding:10px;border:1px dashed var(--line);border-radius:8px;background:#fafbfd">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="muted">第${pi+1}部分（${pt.kind==='fill'?'填寫':pt.kind==='tf'?'是非':pt.kind==='multi'?'多選':'單選'}）</div>
+          <button class="btn" style="width:auto;padding:3px 12px;margin:0;font-size:11px;background:#10b981;color:#fff" onclick="savePart(${pid},${qi},${pi})">題目覆盖</button>
+        </div>`;
+      if(pt.kind==='fill'){
+        h+=`<div style="margin:4px 0;padding:6px;background:#f8fafc;border-radius:8px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="flex:0 0 auto;font-size:13px;color:#64748b">舊答案：</label>
+            <div style="flex:1;padding:6px;background:#eef2f7;border-radius:4px;font-size:14px;color:#334155">${esc(pt.answer)||'（空）'}</div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <input id="fill_input_${qi}_${pi}" style="flex:1;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:13px" placeholder="輸入新答案..." value="${esc(pt.answer)}">
+            <button class="btn" style="width:auto;padding:3px 10px;margin:0;font-size:11px;background:#10b981;color:#fff" onclick="editPartFillSave(${pid},${qi},${pi})">覆盖</button>
+          </div>
+        </div>`;
+      } else if(pt.kind==='tf'){
+        const tfOpts=['正確','錯誤'];
+        const pending = window._pendingAns && window._pendingAns[qi+'_'+pi];
+        const ansArr = pending ? pending : (pt.answer||[]);
+        h+=tfOpts.map((t,oi)=>optRow(pid,qi,oi,t,(pt.answer||[]).includes(oi),ansArr.includes(oi),'single',pi)).join('');
+      } else {
+        const kind=pt.kind==='multi'?'multi':'single';
+        const pending = window._pendingAns && window._pendingAns[qi+'_'+pi];
+        const ansArr = pending ? pending : (pt.answer||[]);
+        h+=(pt.options||[]).map((op,oi)=>optRow(pid,qi,oi,op,(pt.answer||[]).includes(oi),ansArr.includes(oi),kind,pi)).join('');
+        if((pt.options||[]).length<6) h+=`<button class="btn secondary" style="width:auto;padding:3px 10px;margin-top:4px;font-size:11px" onclick="addPartOption(${pid},${qi},${pi})">＋加選項</button>`;
+      }
+      h+=`</div>`;
+      return h;
+    }
+    el.innerHTML=subHead('題庫管理（改題目同答案）')+`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <p class="muted" style="margin:0">先揀考卷，再睇嗰卷題目。直接改下面欄位就會即時儲存；改選項做正確答案請撳旁邊圓圈。</p>
+        <button class="btn" style="width:auto;padding:6px 14px;font-size:13px;background:#10b981;color:#fff" onclick="exportPaperXlsx()">導出X檔</button>
+      </div>
+      ${papers.length===0?'<div class="muted" style="padding:20px;text-align:center">未導入考卷，請先去「導入 X 檔題庫」</div>':`
+        <label>揀考卷</label>
+        <select id="Q-paperSel">${papers.map(p=>`<option value="${p.id}">${esc(p.name)}（${p.questions?p.questions.length:0} 題）</option>`).join('')}</select>
+        <div id="Q-area" style="margin-top:12px"></div>`}
+    `;
+    const qArea=document.getElementById('Q-area');
+    function renderQArea(pid){
+      const p=getPapers().find(x=>x.id===Number(pid)); if(!p){ qArea.innerHTML=''; return; }
+      if(!(p.questions||[]).length){ qArea.innerHTML='<div class="muted" style="padding:20px;text-align:center">呢張卷冇題目，請重新導入 X 檔</div>'; return; }
+      let h=(p.questions||[]).map((q,i)=>{
+        const isMix=q.type===4;
+        // 如果 q.parts 為空（舊數據），根據 q.type 預設勾選
+        let cbs;
+        if(q.parts&&q.parts.length>0){
+          cbs=q.parts.filter(pt=>pt.visible!==false).map(pt=>pt.kind);
+          // 確保根據 q.type 對應嘅 part 係 visible
+          if(q.type===1&&!cbs.includes('single')) cbs.push('single');
+          else if(q.type===2&&!cbs.includes('multi')) cbs.push('multi');
+          else if(q.type===3&&!cbs.includes('fill')) cbs.push('fill');
+        } else {
+          cbs=[];
+          if(q.type===1) cbs=['single'];
+          else if(q.type===2) cbs=['multi'];
+          else if(q.type===3) cbs=['fill'];
+        }
+        const chk=k=>cbs.includes(k)?'checked':'';
+        let x=`<div style="padding:12px;border-bottom:1px solid var(--line)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <b>第${i+1}題</b> <span class="qmeta">${TYPE_LABELS[q.type-1]||''}</span>
+            <button class="btn" style="width:auto;padding:4px 12px;margin:0;font-size:12px;background:#2563eb;color:#fff" onclick="saveQuestion(${p.id},${i})">儲存</button>
+          </div>
+            <span>分數（%）：<input type="number" min="0" step="0.5" style="width:70px;padding:4px" value="${Number(q.score)||0}" onchange="editPaperQScore(${p.id},${i},this.value)"></span>
+          </div>
+          <div style="display:flex;gap:12px;font-size:13px;margin-bottom:8px;padding:6px;background:#f8fafc;border-radius:6px">
+            <label><input type="checkbox" data-type-toggle="${i}" value="fill" ${chk('fill')}> 填寫(D)</label>
+            <label><input type="checkbox" data-type-toggle="${i}" value="single" ${chk('single')}> 單選(E)</label>
+            <label><input type="checkbox" data-type-toggle="${i}" value="multi" ${chk('multi')}> 多選(F)</label>
+            <label><input type="checkbox" data-type-toggle="${i}" value="tf" ${chk('tf')}> 是非(G)</label>
+          </div>
+          <label>題目內容</label>
+          <div style="padding:8px;background:#f8fafc;border:1px solid var(--line);border-radius:6px;margin-bottom:6px;min-height:40px">${renderOptContent(q.question)}</div>
+          <textarea id="q_text_${i}" style="width:100%;padding:8px;min-height:60px" onchange="editQText(${p.id},${i},this.value)">${esc(q.question)}</textarea>
+          <button class="btn secondary" style="width:auto;padding:2px 8px;margin-top:4px;font-size:11px" onclick="insertQImage(${p.id},${i})">＋插入圖片</button>
+          <input type="file" id="q_img_${i}" accept="image/*" style="display:none" onchange="readQImage(this,${p.id},${i})">`;
+        // 渲染 visible parts（混合題模式）
+        const visibleParts=(q.parts||[]).map((pt,idx)=>({pt,idx})).filter(x=>x.pt.visible!==false);
+        if(visibleParts.length>0){
+          x+=visibleParts.map(({pt,idx})=>partBlock(p.id,i,idx,pt)).join('');
+        } else if(q.type===3){
+          x+=`<div style="margin:4px 0;padding:6px;background:#f8fafc;border-radius:8px">
+            <div style="display:flex;gap:8px;align-items:center">
+              <label style="flex:0 0 auto;font-size:13px;color:#64748b">舊答案：</label>
+              <div style="flex:1;padding:6px;background:#eef2f7;border-radius:4px;font-size:14px;color:#334155">${esc(q.answer)||'（空）'}</div>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <input id="fill_input_${i}" style="flex:1;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:13px" placeholder="輸入新答案..." value="${esc(q.answer)}">
+              <button class="btn" style="width:auto;padding:3px 10px;margin:0;font-size:11px;background:#10b981;color:#fff" onclick="editFillAnswerSave(${p.id},${i})">覆盖</button>
+            </div>
+          </div>`;
+        } else if(q.type===1||q.type===2){
+          const kind=q.type===2?'multi':'single';
+          const pending = window._pendingAns && window._pendingAns[i+'_-1'];
+          const ansArr = pending ? pending : (q.answer||[]);
+          x+=(q.options||[]).map((op,oi)=>optRow(p.id,i,oi,op,(q.answer||[]).includes(oi),ansArr.includes(oi),kind)).join('');
+          if((q.options||[]).length<6) x+=`<button class="btn secondary" style="width:auto;padding:4px 12px;margin-top:6px;font-size:12px" onclick="addOption(${p.id},${i})">＋加選項</button>`;
+        }
+        x+=`</div>`;
+        return x;
+      }).join('');
+      h+=`<div style="margin-top:14px;padding:10px;background:#f8fafc;border-radius:8px">
+        <b>新增題目</b>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:13px" onclick="addQuestion(${p.id},1)">＋單選</button>
+          <button class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:13px" onclick="addQuestion(${p.id},2)">＋多選</button>
+          <button class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:13px" onclick="addQuestion(${p.id},3)">＋填寫/計算</button>
+          <button class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:13px" onclick="addQuestion(${p.id},4)">＋混合題</button>
+        </div>
+      </div>`;
+      qArea.innerHTML=h;
+      // 題型 toggle（D-G 直行對應 checkbox）
+      qArea.querySelectorAll('[data-type-toggle]').forEach(cb=>{
+        cb.onchange=()=>{
+          const qi=Number(cb.dataset.typeToggle);
+          const papers=getPapers();
+          const pp=papers.find(x=>x.id===Number(pid)); const q=pp&&pp.questions[qi]; if(!q) return;
+          // 確保 parts 存在，並初始化所有四種 part
+          if(!q.parts) q.parts=[];
+          const kinds=['fill','single','multi','tf'];
+          kinds.forEach(kind=>{
+            if(!q.parts.find(pt=>pt.kind===kind)){
+              if(kind==='fill') q.parts.push({kind:'fill',answer:q.type===3?(q.answer==null?'':String(q.answer)):'',visible:q.type===3});
+              else if(kind==='single'){
+                const singleAns=q.type===1?(q.answer||[0]):[0];
+                q.parts.push({kind:'single',options:(q.options||[]).slice(),answer:Array.isArray(singleAns)?[singleAns[0]||0]:[0],visible:q.type===1});
+              }
+              else if(kind==='multi') q.parts.push({kind:'multi',options:(q.options||[]).slice(),answer:q.type===2?(q.answer||[0]):[0],visible:q.type===2});
+              else q.parts.push({kind:'tf',options:['正確','錯誤'],answer:[0],visible:false});
+            }
+          });
+          // checkbox 只係切換 visible 屬性，唔拆除唔改寫
+          const marks=Array.from(qArea.querySelectorAll(`[data-type-toggle="${qi}"]:checked`)).map(c=>c.value);
+          q.parts.forEach(pt=>{ pt.visible=marks.includes(pt.kind); });
+          DB.set(K.papers,papers);
+          renderQArea(pid);
+        };
+      });
+    }
+    window.addQuestion=function(pid, type){
+      try{
+        const papers=getPapers();
+        const p=papers.find(x=>x.id===Number(pid)); if(!p){ alert('搵唔到考卷 pid='+pid); return; }
+        if(!p.questions) p.questions=[];
+        let q={question:'（新題目）', type, score:0, answer:[]};
+        if(type===1||type===2){ q.options=['選項A','選項B','選項C','選項D']; q.answer=[0]; }
+        else if(type===3){ q.answer=''; }
+        else if(type===4){
+          q.parts=[
+            {kind:'single', options:['選項A','選項B','選項C','選項D'], answer:[0]},
+            {kind:'multi', options:['選項A','選項B','選項C','選項D'], answer:[0]},
+            {kind:'tf', options:['正確','錯誤'], answer:[0]},
+            {kind:'fill', answer:''}
+          ];
+        }
+        p.questions.push(q);
+        DB.set(K.papers,papers);
+        toast('已新增題目，請編輯內容');
+        renderQArea(pid);
+      }catch(err){ alert('新增失敗：'+err.message+'\n'+err.stack); }
+    };
+    if(papers.length>0){
+      renderQArea(papers[0].id);
+      document.getElementById('Q-paperSel').onchange=e=>renderQArea(e.target.value);
+    }
+  }
+  if(g==='chgpwd'){
+    el.innerHTML=subHead('修改密碼')+`
+      <label>新密碼（至少4位）</label><input id="P1" type="password">
+      <label>再輸入一次</label><input id="P2" type="password">
+      <button class="btn" id="P-go">確認修改</button>`;
+    document.getElementById('P-go').onclick=()=>{
+      const p1=document.getElementById('P1').value.trim(), p2=document.getElementById('P2').value.trim();
+      if(!p1||p1.length<4) return toast('密碼至少4位');
+      if(p1!==p2) return toast('兩次輸入唔一致');
+      if(!confirm('確認要更改密碼？')) return;
+      DB.set(K.pwd,p1); toast('密碼已更新'); renderSub('chgpwd');
+    };
+  }
+}
+function renderActiveExams(){
+  const el=document.getElementById('L-list'); if(!el) return;
+  const ex=getActiveExams();
+  el.innerHTML = ex.length? ex.map(e=>`<div style="padding:8px;border-bottom:1px solid var(--line)">
+    <b>碼 ${e.code}</b> · ${esc(e.className)} · ${e.paperId?(paperById(e.paperId)?.name||'考卷'):'全部題庫'} · 剩餘 ${Math.max(0,Math.round((e.expireAt-Date.now())/3600000*10)/10)}小時
+    <button class="btn danger" style="margin-top:6px;padding:8px" onclick="endExam('${e.code}')">結束呢場考試</button></div>`).join('') : '<span class="muted">冇進行中考試</span>';
+}
+function delPaper(id){ if(!confirm('確認拆除呢張卷？'))return; DB.set(K.papers, getPapers().filter(p=>p.id!==id)); renderSub('papers'); }
+function endExam(code){ DB.set(K.exams, getExams().filter(e=>e.code!==code)); const locks=getLocks(); for(const k in locks) if(locks[k].code===code) delete locks[k]; DB.set(K.locks,locks); renderSub('launch'); }
+function editPaperQScore(pid, i, v){
+  if(!confirm('確定要儲存呢項分數修改？')) return;
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid));
+  if(!p||!p.questions||!p.questions[i]) return toast('搵唔到題目');
+  p.questions[i].score=Number(v)||1;
+  DB.set(K.papers,papers);
+}
+function saveQuestion(pid, i){
+  if(!confirm('確定要儲存呢題嘅所有改動？')) return;
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[i]; if(!q) return;
+  // 應用暫存答案改動
+  if(window._pendingAns&&window._pendingAns[i]) q.answer=window._pendingAns[i];
+  // 應用暫存部分答案改動
+  if(q.parts&&window._pendingPartAns){
+    q.parts.forEach((pt,pi)=>{
+      const key=i+'_'+pi;
+      if(window._pendingPartAns[key]) pt.answer=window._pendingPartAns[key];
+    });
+  }
+  DB.set(K.papers,papers);
+  toast('第'+(i+1)+'題已儲存');
+  renderSub('questions');
+}
+function editQText(pid, i, v){
+  if(!confirm('確定要儲存呢項題目修改？')) return;
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); if(!p||!p.questions[i]) return;
+  p.questions[i].question=v; DB.set(K.papers,papers); toast('題目已更新');
+}
+function editOption(pid, qi, oi, v){
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[qi]; if(!q) return;
+  if(q.type===4){ toast('混合題選項請用部分編輯'); return; }
+  if(q.options&&q.options[oi]!==undefined){ q.options[oi]=v; DB.set(K.papers,papers); toast('選項已更新'); }
+}
+function editOptionSave(pid, qi, pi, oi){
+  const input=document.getElementById(`opt_input_${qi}_${pi}_${oi}`);
+  if(!input) return;
+  const v=input.value.trim();
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[qi]; if(!q) return;
+  if(pi>=0){
+    if(q.parts&&q.parts[pi]&&q.parts[pi].options&&q.parts[pi].options[oi]!==undefined){
+      q.parts[pi].options[oi]=v;
+      // 寫入 pending 答案
+      if(window._pendingAns && window._pendingAns[qi+'_'+pi]){
+        q.parts[pi].answer = window._pendingAns[qi+'_'+pi].slice();
+        delete window._pendingAns[qi+'_'+pi];
+      }
+      DB.set(K.papers,papers);
+      renderSub('questions');
+      toast('選項與答案已更新');
+    }
+  } else {
+    if(q.options&&q.options[oi]!==undefined){
+      q.options[oi]=v;
+      // 寫入 pending 答案
+      if(window._pendingAns && window._pendingAns[qi+'_-1']){
+        q.answer = window._pendingAns[qi+'_-1'].slice();
+        delete window._pendingAns[qi+'_-1'];
+      }
+      DB.set(K.papers,papers);
+      renderSub('questions');
+      toast('選項與答案已更新');
+    }
+  }
+}
+function editPartOption(pid, qi, pi, oi, v){
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[qi];
+  if(!q||!q.parts||!q.parts[pi]) return;
+  if(q.parts[pi].options&&q.parts[pi].options[oi]!==undefined){
+    q.parts[pi].options[oi]=v;
+    DB.set(K.papers,papers);
+    toast('選項已更新');
+  }
+}
+function setSingleAnswer(pid, qi, oi){
+  if(!window._pendingAns) window._pendingAns={};
+  window._pendingAns[qi+'_-1']=[oi];
+  renderSub('questions');
+}
+function toggleMultiAnswer(pid, qi, oi){
+  if(!window._pendingAns) window._pendingAns={};
+  const key=qi+'_-1';
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[qi]; if(!q) return;
+  if(q.type===4){ toast('混合題答案請用部分編輯'); return; }
+  const base = (q.answer||[]);
+  const cur = window._pendingAns[key] ? window._pendingAns[key].slice() : base.slice();
+  const idx=cur.indexOf(oi);
+  if(idx>=0) cur.splice(idx,1); else cur.push(oi);
+  window._pendingAns[key]=cur;
+  renderSub('questions');
+}
+function editFillAnswer(pid, qi, v){
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[qi]; if(!q) return;
+  q.answer=v; DB.set(K.papers,papers); toast('答案已更新');
+}
+function exportPaperXlsx(){
+  const sel=document.getElementById('Q-paperSel');
+  const pid=sel?Number(sel.value):null;
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===pid)||papers[0];
+  if(!p){ toast('沒有考卷可導出'); return; }
+  // 將 base64 圖片壓縮並保留，避免超過 Excel 儲存格 32767 字元限制
+  const cleanText=(s)=>{
+    if(!s) return '';
+    s=String(s);
+    // 如果超過 32000 字元，嘗試將 base64 圖片替換做 [圖片]
+    if(s.length>32000){
+      s=s.replace(/!\[([^\]]*)\]\([^)]+\)/g, '[圖片]');
+    }
+    return s;
+  };
+  const headers=['序號','問題','填寫題','單選題','多選題','是非題','填寫題答案位內容',
+    '單選題答案位A內容','單選題答案位B內容','單選題答案位C內容','單選題答案位D內容','單選題答案位E內容','單選題答案位F內容',
+    '多選題答案位A內容','多選題答案位B內容','多選題答案位C內容','多選題答案位D內容','多選題答案位E內容','多選題答案位F內容',
+    '填寫題答案位(學生)','單選題A(學生)','單選題B(學生)','單選題C(學生)','單選題D(學生)','單選題E(學生)','單選題F(學生)',
+    '多選題A(學生)','多選題B(學生)','多選題C(學生)','多選題D(學生)','多選題E(學生)','多選題F(學生)',
+    '是非題對(學生)','是非題錯(學生)','多少分題'];
+  const rows=[headers];
+  (p.questions||[]).forEach((q,idx)=>{
+    const row=new Array(35).fill('');
+    row[0]=idx+1;
+    row[1]=cleanText(q.question);
+    row[34]=q.score||'';
+    if(q.type===3){
+      row[2]=1; // 填寫題
+      row[6]=cleanText(q.answer); // 填寫答案
+    } else if(q.type===1){
+      row[3]=1; // 單選題
+      const ans=q.answer||[];
+      (q.options||[]).forEach((op,i)=>{ row[7+i] = cleanText(op); });
+      for(let i=0;i<6;i++){ row[20+i] = ans.includes(i)?1:0; }
+    } else if(q.type===2){
+      row[4]=1; // 多選題
+      const ans=q.answer||[];
+      (q.options||[]).forEach((op,i)=>{ row[13+i] = cleanText(op); });
+      for(let i=0;i<6;i++){ row[26+i] = ans.includes(i)?1:0; }
+    } else if(q.type===4){
+      // 混合題
+      (q.parts||[]).forEach(pt=>{
+        if(pt.kind==='fill'){
+          row[2]=1; row[6]=cleanText(pt.answer);
+        } else if(pt.kind==='single'){
+          row[3]=1;
+          const ans=pt.answer||[];
+          (pt.options||[]).forEach((op,i)=>{ row[7+i] = cleanText(op); });
+          for(let i=0;i<6;i++){ row[20+i] = ans.includes(i)?1:0; }
+        } else if(pt.kind==='multi'){
+          row[4]=1;
+          const ans=pt.answer||[];
+          (pt.options||[]).forEach((op,i)=>{ row[13+i] = cleanText(op); });
+          for(let i=0;i<6;i++){ row[26+i] = ans.includes(i)?1:0; }
+        } else if(pt.kind==='tf'){
+          row[5]=1;
+          const ans=pt.answer||[];
+          row[32] = ans.includes(0)?1:0;
+          row[33] = ans.includes(1)?1:0;
+        }
+      });
+    }
+    rows.push(row);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'題庫');
+  XLSX.writeFile(wb, (p.name||'題庫')+'.xlsx');
+  toast('已導出X檔');
+}
+function editFillAnswerSave(pid, qi){
+  const input=document.getElementById(`fill_input_${qi}`);
+  if(!input) return;
+  const v=input.value.trim();
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[qi]; if(!q) return;
+  q.answer=v;
+  DB.set(K.papers,papers);
+  renderSub('questions');
+  toast('答案已更新');
+}
+function editPartFill(pid, qi, pi, v){
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[qi];
+  if(!q||!q.parts||!q.parts[pi]) return;
+  q.parts[pi].answer=v; DB.set(K.papers,papers); toast('部分答案已更新');
+}
+function editPartFillSave(pid, qi, pi){
+  const input=document.getElementById(`fill_input_${qi}_${pi}`);
+  if(!input) return;
+  const v=input.value.trim();
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[qi];
+  if(!q||!q.parts||!q.parts[pi]) return;
+  q.parts[pi].answer=v;
+  DB.set(K.papers,papers);
+  renderSub('questions');
+  toast('答案已更新');
+}
+function savePart(pid, qi, pi){
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[qi];
+  if(!q||!q.parts||!q.parts[pi]) return;
+  DB.set(K.papers,papers);
+  toast('第'+(pi+1)+'部分已儲存');
+  renderSub('questions');
+}
+function addOption(pid, qi){
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[qi]; if(!q) return;
+  if((q.options||[]).length>=6) return toast('最多 6 個選項');
+  if(!confirm('確定要加一個新選項？')) return;
+  q.options=q.options||[]; q.options.push('（新選項）');
+  DB.set(K.papers,papers); renderSub('questions');
+}
+function delOption(pid, qi, oi){
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[qi]; if(!q) return;
+  if(!confirm('確定要刪除呢個選項？')) return;
+  q.options.splice(oi,1);
+  q.answer=(q.answer||[]).filter(a=>a!==oi).map(a=>a>oi?a-1:a);
+  DB.set(K.papers,papers); renderSub('questions');
+}
+function addPartOption(pid, qi, pi){
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[qi]; const pt=q&&q.parts&&q.parts[pi]; if(!pt) return;
+  if((pt.options||[]).length>=6) return toast('最多 6 個選項');
+  if(!confirm('確定要加一個新選項？')) return;
+  pt.options=pt.options||[]; pt.options.push('（新選項）');
+  DB.set(K.papers,papers); renderSub('questions');
+}
+function delPartOption(pid, qi, pi, oi){
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[qi]; const pt=q&&q.parts&&q.parts[pi]; if(!pt) return;
+  if(!confirm('確定要刪除呢個選項？')) return;
+  pt.options.splice(oi,1);
+  pt.answer=(pt.answer||[]).filter(a=>a!==oi).map(a=>a>oi?a-1:a);
+  DB.set(K.papers,papers); renderSub('questions');
+}
+function setPartSingleAnswer(pid, qi, pi, oi){
+  if(!window._pendingAns) window._pendingAns={};
+  window._pendingAns[qi+'_'+pi]=[oi];
+}
+function togglePartMultiAnswer(pid, qi, pi, oi){
+  if(!window._pendingAns) window._pendingAns={};
+  const key=qi+'_'+pi;
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[qi];
+  const base = (q&&q.parts&&q.parts[pi]&&q.parts[pi].answer)||[];
+  const cur = window._pendingAns[key] ? window._pendingAns[key].slice() : base.slice();
+  const idx=cur.indexOf(oi);
+  if(idx>=0) cur.splice(idx,1); else cur.push(oi);
+  window._pendingAns[key]=cur;
+}
+
+/* ================= X 檔解析（同小程序 questionnaire.js） ================= */
+function hasKW(h, kws){ return kws.some(k=>String(h).indexOf(k)>=0); }
+function detectColumns(rows){
+  const first=rows[0]||[], joined=first.join('|');
+  if(hasKW(joined,['问题','問題']) && (hasKW(joined,['填写题','填寫題'])||hasKW(joined,['单选题','單選題'])||hasKW(joined,['是非题','是非題']))){
+    // 固定映射（跟標準考卷範本）
+    // B=問題, C=填寫題, D=單選題, E=多選題, F=是非題, G=填寫題答案
+    // H-M(8-13)=單選選項A-F, N-S(14-19)=多選選項A-F
+    // T(20)=填寫題學生答案, U-Z(21-26)=單選學生答案A-F, AA-AF(27-32)=多選學生答案A-F
+    // AG(33)=是非對, AH(34)=是非錯, AI(35)=多少分題
+    const singleOpt=[8,9,10,11,12,13];
+    const multiOpt=[14,15,16,17,18,19];
+    const singleStudent=[21,22,23,24,25,26];
+    const multiStudent=[27,28,29,30,31,32];
+    return {header:true, fmt:2, col:{question:2,fillMark:3,singleMark:4,multiMark:5,tfMark:6,fillAns:7,singleOpt,multiOpt,singleStudent,multiStudent,tfTrue:33,tfFalse:34,score:35}};
+  }
+  return {header:false, fmt:0, col:{}};
+}
+function rowToQuestion(cells, col){
+  const get=idx=>{ if(!idx) return ''; const v=cells[idx-1]; return v==null?'':String(v).trim(); };
+  const isMark=idx=>{ if(!idx) return false; return String(cells[idx-1]??'').trim()==='1'; };
+  const question=get(col.question); if(!question) return null;
+  // debug
+  console.log('rowToQuestion:', {question, col, cellsLen: cells.length, h: get(8), i: get(9), j: get(10), k: get(11)});
+  const hasAny=idxs=>idxs.some(i=>get(i));
+  const singleHas=hasAny(col.singleOpt), multiHas=hasAny(col.multiOpt);
+  const tfHas=isMark(col.tfTrue)||isMark(col.tfFalse);
+  let type;
+  if(isMark(col.fillMark)) type=3; else if(multiHas) type=2; else if(singleHas||tfHas) type=1; else return null;
+  const q={type, question, options:[], answer:[], score:0};
+  const scN=parseFloat(get(col.score)); q.score=(!scN||scN<=0)?0:scN;
+  const marks=[];
+  if(isMark(col.singleMark)) marks.push('single');
+  if(isMark(col.multiMark)) marks.push('multi');
+  if(isMark(col.tfMark)) marks.push('tf');
+  if(isMark(col.fillMark)) marks.push('fill');
+  if(marks.length>=2){
+    const parts=[];
+    marks.forEach(kind=>{
+      if(kind==='single'){ const so=col.singleOpt.map(get).filter(Boolean); const sa=[]; col.singleStudent.forEach((s,i)=>{ if(isMark(s)&&i<so.length) sa.push(i); }); if(so.length) parts.push({kind:'single',options:so,answer:sa}); }
+      else if(kind==='multi'){ const mo=col.multiOpt.map(get).filter(Boolean); const ma=[]; col.multiStudent.forEach((s,i)=>{ if(isMark(s)&&i<mo.length) ma.push(i); }); if(mo.length) parts.push({kind:'multi',options:mo,answer:ma}); }
+      else if(kind==='tf'){ const ta=[]; if(isMark(col.tfTrue)) ta.push(0); if(isMark(col.tfFalse)) ta.push(1); parts.push({kind:'tf',options:['正確','錯誤'],answer:ta}); }
+      else { const raw=get(col.fillAns); const vals=String(raw).split(/[;,，；\s]+/).filter(t=>t.trim());
+        if(vals.length>1) parts.push({kind:'fill',answer:vals.map(t=>{const n=parseFloat(t); return isNaN(n)?t:n;})});
+        else if(vals.length===1){ const n=parseFloat(vals[0]); parts.push({kind:'fill',answer:isNaN(n)?vals[0]:n}); }
+        else parts.push({kind:'fill',answer:''});
+      }
+    });
+    q.type=4; q.parts=parts; q.options=[]; q.answer=[];
+  } else if(type===3){ const n=parseFloat(get(col.fillAns)); q.answer=isNaN(n)?get(col.fillAns):n; }
+  else if(type===2){ col.multiOpt.forEach(o=>{ const v=get(o); if(v) q.options.push(v); }); while(q.options.length<4) q.options.push('選項'+String.fromCharCode(65+q.options.length)); const idxs=[]; col.multiStudent.forEach((s,i)=>{ if(isMark(s)&&i<q.options.length) idxs.push(i); }); q.answer=idxs; }
+  else if(tfHas){ q.options=['正確','錯誤']; q.answer=isMark(col.tfTrue)?[0]:[1]; }
+  else { col.singleOpt.forEach(o=>{ const v=get(o); if(v) q.options.push(v); }); while(q.options.length<4) q.options.push('選項'+String.fromCharCode(65+q.options.length)); let idx=-1; col.singleStudent.forEach((s,i)=>{ if(isMark(s)&&i<q.options.length) idx=i; }); q.answer=idx>=0?[idx]:[]; }
+  return q;
+}
+function rowsToQuestions(rows, col){
+  if(!col) return [];
+  const out=[]; const start=1;
+  for(let i=start;i<rows.length;i++){ const q=rowToQuestion(rows[i], col); if(q) out.push(q); }
+  // 分數規則：AI 欄寫 0 或空 = 用百分比計分（剩餘分數平均分俾呢啲題目）；寫 1/5/10 等 = 直接占用嗰個百分比
+  const scored=out.filter(q=>q.score>0);
+  const unscored=out.filter(q=>!q.score||q.score<=0);
+  let scoredTotal=scored.reduce((s,q)=>s+q.score,0);
+  // 如果寫咗嘅分數總和超過 100，按比例縮水
+  if(scoredTotal>100){ const scale=100/scoredTotal; scored.forEach(q=>q.score=Math.round(q.score*scale*100)/100); scoredTotal=100; }
+  if(unscored.length){
+    const remain=Math.max(0,100-scoredTotal);
+    const per=unscored.length?Math.round(remain/unscored.length*100)/100:0;
+    unscored.forEach(q=>q.score=per);
+  }
+  return out;
+}
+
+<!-- 初始化：首頁顯示 -->
+document.getElementById('view-home').classList.add('active');
+updateVerBadge();
+const _v='v'+getVersion();
+document.getElementById('ver-tag').textContent=_v;
+document.getElementById('footer-ver').textContent=getVersion();
+renderHome();
+</script>
+</body>
+</html>
