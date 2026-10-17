@@ -156,6 +156,7 @@
         <button data-go="import">導入 X 檔題庫</button>
         <button data-go="questions">題庫管理（改題）</button>
         <button data-go="version">版本號設定</button>
+        <button data-go="cloud">雲端同步設置</button>
         <button data-go="chgpwd">修改密碼</button>
         <button data-go="logout" style="color:var(--red)">登出</button>
       </div>
@@ -170,7 +171,7 @@
 /* ================= 數據層（localStorage） ================= */
 const DB = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } },
-  set(k, v){ localStorage.setItem(k, JSON.stringify(v)); },
+  set(k, v){ localStorage.setItem(k, JSON.stringify(v)); if(window.Cloud) Cloud.queue(k, v); },
   remove(k){ localStorage.removeItem(k); }
 };
 const K = {
@@ -180,9 +181,60 @@ const K = {
   lastAttempt:'quiz_last_attempt', isTeacher:'quiz_is_teacher', pwd:'quiz_teacher_pwd',
   curClass:'quiz_cur_class', userName:'quiz_user_name', ver:'quiz_paper_version'
 };
+
+/* ================= 雲端同步（Firebase Realtime Database REST，可選；唔設網址就退回純本機） ================= */
+const CLOUD_KEY='quiz_cloud_url';
+const SERVER_KEYS=['questions','papers','exams','classes','students','attempts','locks','pwd','ver'];
+const Cloud={
+  _timers:{},
+  url(){ let u=(localStorage.getItem(CLOUD_KEY)||'').trim(); return u?u.replace(/\/+$/,''):''; },
+  enabled(){ return !!this.url(); },
+  async raw(path, method, body){
+    const u=this.url(); if(!u) throw new Error('未設定雲端網址');
+    const res=await fetch(u+'/db/'+(path?path+'/':'')+'.json',{method,headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    return await res.json();
+  },
+  queue(key,val){
+    if(!this.enabled() || !SERVER_KEYS.includes(key)) return;
+    clearTimeout(this._timers[key]);
+    this._timers[key]=setTimeout(()=>this.pushKey(key,val), key==='attempts'?800:400);
+  },
+  async pushKey(key,val){
+    try{
+      if(key==='attempts'){
+        let cur=[]; try{ cur=(await this.raw('attempts','GET'))||[]; }catch(e){ cur=[]; }
+        if(!Array.isArray(cur)) cur=[];
+        const have=new Set(cur.map(a=>a&&a.ts));
+        (val||[]).forEach(a=>{ if(a&&a.ts!=null&&!have.has(a.ts)) cur.push(a); });
+        await this.raw('attempts','PUT',cur);
+      } else {
+        await this.raw(key,'PATCH',val);
+      }
+    }catch(e){ console.warn('雲端上傳失敗',key,e); }
+  },
+  async pull(){
+    if(!this.enabled()) return false;
+    let data; try{ data=await this.raw('','GET'); }catch(e){ console.warn('雲端讀取失敗',e); return false; }
+    if(!data||typeof data!=='object') return false;
+    SERVER_KEYS.forEach(k=>{ if(data[k]!==undefined) DB.set(k,data[k]); });
+    return true;
+  },
+  async pushAll(){
+    if(!this.enabled()) return;
+    for(const k of SERVER_KEYS){ const v=DB.get(k, undefined); if(v!==undefined) await this.raw(k,'PUT',v); }
+  }
+};
+window.Cloud=Cloud;
+function cloudRefreshView(){
+  const active=document.querySelector('.view.active');
+  const id=active?active.id:'';
+  if(id==='view-home') renderHome();
+  else if(id==='view-teacher' && DB.get(K.isTeacher,false)===true) renderSub(curSub);
+}
 const EXAM_HOURS = 4, MAX_CLASSES = 6;
 const TYPE_LABELS = ['單選題','多選題','計算題','混合題'];
-function getVersion(){ return DB.get(K.ver, 2.2); }
+function getVersion(){ return DB.get(K.ver, '4.9'); }
 function renderOptContent(text){
   if(!text) return '（空）';
   let s=String(text);
@@ -269,7 +321,7 @@ function getQuestions(){ return DB.get(K.questions, []); }
 function getPapers(){ return DB.get(K.papers, []); }
 function getExams(){ return DB.get(K.exams, []); }
 function getActiveExams(){ const now=Date.now(); return getExams().filter(e=>e.expireAt>=now); }
-function getClasses(){ return ['A班','B班']; }
+function getClasses(){ const c=DB.get(K.classes, []); return Array.isArray(c)?c.map(String):[]; }
 function getStudents(){ return DB.get(K.students, []); }
 function getLocks(){ return DB.get(K.locks, {}); }
 function getAttempts(){ return DB.get(K.attempts, []); }
@@ -591,7 +643,7 @@ document.querySelectorAll('#t-grid1 button, #t-grid2 button').forEach(b=>{
   };
 });
 function subHead(t){ return `<div class="card"><h2>${t}</h2><div class="muted" style="margin-bottom:10px"><a href="#" onclick="renderSub('');return false" style="color:var(--blue)">← 返回功能頁</a> &nbsp;·&nbsp; <a href="#" onclick="go('home');return false" style="color:var(--blue)">← 返回學生考試介面</a></div>`; }
-function getVersion(){ return '4.9'; }
+function getVersion(){ return DB.get(K.ver,'4.9'); }
 function setVersion(v){ DB.set(K.ver,v); updateVerBadge(); }
 function updateVerBadge(){
   const v=getVersion();
@@ -608,6 +660,7 @@ function saveVersion(){
   if(!v){ toast('請輸入版本號'); return; }
   setVersion(v);
   toast('版本號已更新為 V'+v);
+  renderSub('version');
 }
 let curSub='';
 function renderSub(g){
@@ -1206,6 +1259,43 @@ function renderSub(g){
       document.getElementById('Q-paperSel').onchange=e=>renderQArea(e.target.value);
     }
   }
+  if(g==='cloud'){
+    const cur=Cloud.url();
+    el.innerHTML=subHead('雲端同步設置（多手機共享）')+`
+      <div class="card" style="padding:16px">
+        <div id="CL-status" class="warn">檢查中…</div>
+        <label>Firebase Realtime Database 網址</label>
+        <input id="CL-url" placeholder="https://xxxx-default-rtdb.firebaseio.com" value="${esc(cur)}">
+        <button class="btn" id="CL-save">保存並測試連線</button>
+        <button class="btn secondary" id="CL-pull">立即由雲端拉取最新資料</button>
+        <button class="btn secondary" id="CL-push">把本機全部資料上傳雲端</button>
+        <p class="muted" style="margin-top:12px;font-size:12px;line-height:1.7">
+        唔填就純本機使用（換機唔同步）。填咗之後：老師加班／加學生／改題、學生交卷成績都會自動同步到所有手機，每 20 秒更新一次。<br>
+        首次建議：先「保存並測試連線」成功，再「把本機全部資料上傳雲端」。
+        </p>
+      </div>`;
+    const st=document.getElementById('CL-status');
+    const paint=(ok,txt)=>{ st.textContent=txt; st.style.color=ok?'#16a34a':'#e8720c'; };
+    async function testConn(){
+      const u=document.getElementById('CL-url').value.trim().replace(/\/+$/,'');
+      if(!u){ paint(false,'未設定雲端網址（純本機模式）'); return false; }
+      try{ const r=await fetch(u+'/db.json'); if(!r.ok) throw new Error('HTTP '+r.status); paint(true,'已連線：'+u); return true; }
+      catch(e){ paint(false,'連線失敗：'+e.message+'（檢查網址同 Firebase 規則）'); return false; }
+    }
+    testConn();
+    document.getElementById('CL-save').onclick=async()=>{
+      const u=document.getElementById('CL-url').value.trim().replace(/\/+$/,'');
+      localStorage.setItem(CLOUD_KEY,u);
+      if(await testConn()){ toast('已保存雲端設定'); Cloud.pull().then(()=>renderSub('cloud')); }
+    };
+    document.getElementById('CL-pull').onclick=async()=>{
+      const ok=await Cloud.pull(); toast(ok?'已由雲端拉取':'拉取失敗（未設定或連線錯誤）'); renderSub('cloud');
+    };
+    document.getElementById('CL-push').onclick=async()=>{
+      if(!confirm('確定把本機（此裝置）全部資料上傳並覆蓋雲端？')) return;
+      await Cloud.pushAll(); toast('已上傳本機資料到雲端'); renderSub('cloud');
+    };
+  }
   if(g==='chgpwd'){
     el.innerHTML=subHead('修改密碼')+`
       <label>新密碼（至少4位）</label><input id="P1" type="password">
@@ -1561,13 +1651,16 @@ function rowsToQuestions(rows, col){
   return out;
 }
 
-<!-- 初始化：首頁顯示 -->
+// 初始化：首頁顯示
 document.getElementById('view-home').classList.add('active');
 updateVerBadge();
 const _v='v'+getVersion();
 document.getElementById('ver-tag').textContent=_v;
 document.getElementById('footer-ver').textContent=getVersion();
 renderHome();
+// 開機先由雲端拉取最新資料，再每 20 秒同步一次
+Cloud.pull().then(ok=>{ if(ok) cloudRefreshView(); });
+setInterval(()=>{ Cloud.pull().then(ok=>{ if(ok) cloudRefreshView(); }); },20000);
 </script>
 </body>
 </html>
