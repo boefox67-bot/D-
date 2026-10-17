@@ -211,7 +211,7 @@ const Cloud={
         (val||[]).forEach(a=>{ if(a&&a.ts!=null&&!have.has(a.ts)) cur.push(a); });
         await this.raw('attempts','PUT',cur);
       } else {
-        await this.raw(key,'PATCH',val);
+        await this.raw(key,'PUT',val);
       }
     }catch(e){ console.warn('雲端上傳失敗',key,e); }
   },
