@@ -550,16 +550,22 @@ document.getElementById('btn-start').onclick = async function(){
   const name=document.getElementById('in-nameType').value.trim();
   if(!code){ warnMsg('請輸入考試碼'); return; }
   // 入場前先由雲端拉最新考試碼同考卷，避免本機未同步就誤判無效
+  let cloudPapers=[], cloudExams=[];
   try{ await Cloud.pull(); }catch(e){}
-  // 保險：直接重拉考卷同考試碼兩節，寫入本機再核對（唔靠一次性靜默同步）
+  // 直接重拉考卷同考試碼兩節，寫入本機並留低雲端原陣列做權威核對
   try{
-    const pp=await Cloud.raw('papers','GET'); DB.set(K.papers,toArr(pp));
-    const ee=await Cloud.raw('exams','GET'); DB.set(K.exams,toArr(ee));
+    cloudPapers=toArr(await Cloud.raw('papers','GET')); DB.set(K.papers,cloudPapers);
+    cloudExams=toArr(await Cloud.raw('exams','GET')); DB.set(K.exams,cloudExams);
   }catch(e){}
-  const exam=examByCode(code);
+  let exam=examByCode(code);
+  if(!exam && cloudExams.length) exam=cloudExams.find(x=>String(x.code)===String(code) && x.expireAt>=Date.now());
   if(!exam){ warnMsg('考試碼唔啱或者已過期'); return; }
-  // 只認有效考卷：連結嘅卷要存在且有題，否則拒絕入場
-  if(!questionsForExam(exam).length){ warnMsg('呢場考試連結嘅考卷無效或者冇題目'); return; }
+  // 權威核對：直接用雲端考卷陣列計有效題數，避免本機列表異常誤判無效
+  const findCloudPaper=id=>cloudPapers.find(p=>p.id===Number(id))||paperById(id);
+  let availQ=0;
+  if(exam.paperIds&&exam.paperIds.length) exam.paperIds.forEach(pid=>{ const p=findCloudPaper(pid); if(p&&p.questions) availQ+=p.questions.length; });
+  else if(exam.paperId){ const p=findCloudPaper(exam.paperId); if(p&&p.questions) availQ=p.questions.length; }
+  if(!availQ){ warnMsg('呢場考試連結嘅考卷無效或者冇題目'); return; }
   if(!cls1){ warnMsg('請揀班'); return; }
   if(cls1!==exam.className){ warnMsg('呢個考試碼唔屬於「'+cls1+'」，請揀返「'+exam.className+'」'); return; }
   if(cls2!==cls1){ warnMsg('班次第二欄要同第一欄一致'); return; }
@@ -580,8 +586,8 @@ document.getElementById('btn-start').onclick = async function(){
     if(!confirm('你正在第「'+lock.code+'」場，要登出並直接入新考場「'+code+'」嗎？\n未交卷嘅作答唔會保留，已經交卷嘅成績唔受影響。')) return;
     QZ=null; // 丟棄舊場未交卷草稿
   }
-  // 只認有效考卷：無效／空卷唔准入
-  if(!questionsForExam(exam).length){ warnMsg('呢場考卷無效或者冇題目，請聯絡老師'); return; }
+  // 只認有效考卷：無效／空卷唔准入（沿用剛才雲端權威題數）
+  if(!availQ){ warnMsg('呢場考卷無效或者冇題目，請聯絡老師'); return; }
   DB.set(K.curExam, exam);
   DB.set(K.userName, name);
   const locks=getLocks(); locks[name]={code,state:'active',at:Date.now()}; DB.set(K.locks, locks);
