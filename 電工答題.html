@@ -195,6 +195,15 @@
   </div>
 
 </div>
+<!-- 30秒登出通知：全屏遮罩，所有已登入老師都見到，按確定先解除 -->
+<div id="signout-mask" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.72);align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:18px;max-width:420px;width:100%;padding:30px 24px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35)">
+    <div style="font-size:21px;font-weight:800;margin-bottom:10px">老師登出通知</div>
+    <div style="font-size:15px;color:#475569;line-height:1.6;margin-bottom:8px">收到登出通知，30秒內無動作將自動登出</div>
+    <div id="signout-sec" style="font-size:48px;font-weight:900;color:#e11d48;margin:12px 0"></div>
+    <button class="btn" style="margin-top:14px" onclick="cancelTeacherSignout()">確定，我仲喺度</button>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1614,6 +1623,7 @@ async function cancelTeacherSignout(){
   if(window._act){ ['mousemove','keydown','click','touchstart'].forEach(ev=>document.removeEventListener(ev,window._act,true)); window._act=null; }
   if(window._lt){ clearInterval(window._lt); window._lt=null; }
   const box=document.getElementById('t-countdown'); if(box) box.style.display='none';
+  const mask=document.getElementById('signout-mask'); if(mask) mask.style.display='none';
 }
 // 登入／刷新时检查云端有冇收到登出通知
 async function checkCloudSignout(){
@@ -1626,15 +1636,13 @@ async function checkCloudSignout(){
 function armLocalLogout(){
   cancelTeacherSignout();
   let logoutAt=Date.now()+30000;
-  const box=document.getElementById('t-countdown');
-  window._act=()=>{ logoutAt=Date.now()+30000; };
-  ['mousemove','keydown','click','touchstart'].forEach(ev=>document.addEventListener(ev,window._act,true));
+  const mask=document.getElementById('signout-mask');
+  const sec=document.getElementById('signout-sec');
+  if(mask) mask.style.display='flex';
+  // 30秒純倒數，唔隨動作重設；必須按「確定」先解除
   window._lt=setInterval(()=>{
     const left=logoutAt-Date.now();
-    if(box){
-      box.style.display='block';
-      box.innerHTML=`收到登出通知：30秒無動作將登出，剩 <b>${Math.ceil(left/1000)}</b> 秒　<button class="btn secondary" style="width:auto;padding:4px 10px;margin:0;font-size:12px" onclick="cancelTeacherSignout()">取消，我仲喺度</button>`;
-    }
+    if(sec) sec.textContent=Math.max(0,Math.ceil(left/1000))+' 秒';
     if(left<=0){
       cancelTeacherSignout();
       deregisterOnline();
