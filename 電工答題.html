@@ -66,6 +66,13 @@
 </style>
 </head>
 <body>
+<!-- 進場封面：封鎖整個畫面，輕觸一下同時讀取雲端並刷新，然後進入學生介面 -->
+<div id="splash" onclick="splashEnter()" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(160deg,#0d2a5e 0%,#1e468c 60%,#2563b8 100%);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;text-align:center;padding:24px">
+  <div style="font-size:38px;font-weight:800;letter-spacing:6px">飛躍教育中心</div>
+  <div style="margin-top:14px;font-size:16px;opacity:.9">初級維修電工課程 · 電工答題系統</div>
+  <div id="splash-tip" style="margin-top:42px;font-size:14px;opacity:.75;animation:blink 1.6s infinite">輕觸螢幕進入</div>
+</div>
+<style>@keyframes blink{0%,100%{opacity:.75}50%{opacity:.3}}</style>
 <div class="app">
 
   <!-- ========== 頁面：首頁（學生入場） ========== -->
@@ -76,21 +83,12 @@
     </div>
     <div class="card">
       <h2>輸入考試碼入場</h2>
-      <!-- 同步入口：按一下由雲端即時更新，完成後呢塊自動消失，返回一般入場介面 -->
-      <div id="home-sync" style="text-align:center;margin:4px 0 14px">
-        <button type="button" id="btn-manualRefresh" onclick="manualRefreshHome()" style="width:100%;padding:14px 12px;border:2px solid var(--blue);background:#eef4ff;color:var(--blue);border-radius:10px;cursor:pointer">
-          <div id="sync-logo" style="font-size:18px;font-weight:700;letter-spacing:1px;margin-bottom:4px">飛躍教育中心</div>
-          <div style="font-size:15px;font-weight:600">立即重新整理入場</div>
-          <div style="font-size:12px;opacity:.75;margin-top:2px">老師改完／開新卷先按呢個</div>
-        </button>
-      </div>
       <label>考試碼（老師派發嘅數字）</label>
       <input id="in-code" inputmode="numeric" placeholder="例如 1234">
       <label>班次（第一欄揀、第二欄自動同步）</label>
       <div style="display:flex;gap:8px">
         <select id="in-classSelect" style="flex:1"><option value="">— 揀班 —</option></select>
         <input id="in-classType" style="flex:1" placeholder="自動同步">
-        <button type="button" class="btn secondary" style="width:auto;padding:6px 10px;margin:0;font-size:13px" onclick="manualRefreshHome()" title="由雲端立即更新班別同名單">↻</button>
       </div>
       <label>第一欄：從名單揀名</label>
       <select id="in-nameSelect"><option value="-1">— 請揀名 —</option></select>
@@ -307,22 +305,19 @@ function refreshHomeOptions(){
   }
   updateVerDisplay();
 }
-// 學生手動按「立即重新整理」：即刻由雲端拉最新班次／名單／考卷；成功後同步塊自動消失，返回一般入場介面
-async function manualRefreshHome(){
-  const box=document.getElementById('home-sync');
-  const btn=document.getElementById('btn-manualRefresh');
-  if(btn){ btn.disabled=true; btn.style.opacity='.7'; }
-  let ok=false;
-  try{ ok=await Cloud.pull(); }catch(e){ ok=false; }
-  if(ok){
-    refreshHomeOptions();
-    updateVerDisplay();
-    if(box) box.style.display='none';
-    toast('已更新最新班次・名單・考卷');
-  } else {
-    if(btn){ btn.disabled=false; btn.style.opacity='1'; }
-    toast('連線失敗，請檢查網絡再試一次');
-  }
+// 輕觸封面：同時由雲端讀取最新資料並刷新，然後淡出進入學生介面（學生介面唔做任何自動刷新）
+async function splashEnter(){
+  const s=document.getElementById('splash');
+  if(!s || s.dataset.done) return;
+  s.dataset.done='1';
+  const tip=document.getElementById('splash-tip');
+  if(tip) tip.textContent='讀取最新資料中…';
+  try{ await Cloud.pull(); }catch(e){}
+  refreshHomeOptions();
+  updateVerDisplay();
+  s.style.transition='opacity .35s ease';
+  s.style.opacity='0';
+  setTimeout(()=>{ if(s&&s.parentNode) s.parentNode.removeChild(s); },360);
 }
 function cloudRefreshView(){
   const active=document.querySelector('.view.active');
@@ -1789,8 +1784,7 @@ document.getElementById('view-home').classList.add('active');
 updateVerBadge();
 updateVerDisplay();
 renderHome();
-// 開機先由雲端拉取一次最新資料；之後唔做自動輪詢，學生按「立即重新整理」先再同步
-Cloud.pull().then(ok=>{ if(ok){ cloudRefreshView(); updateVerDisplay(); } });
+// 唔做開機自動拉取、唔做自動輪詢；輕觸封面先由雲端讀取刷新，再進入學生介面
 </script>
 </body>
 </html>
