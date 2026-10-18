@@ -530,6 +530,11 @@ document.getElementById('btn-start').onclick = async function(){
   if(!code){ warnMsg('請輸入考試碼'); return; }
   // 入場前先由雲端拉最新考試碼同考卷，避免本機未同步就誤判無效
   try{ await Cloud.pull(); }catch(e){}
+  // 保險：直接重拉考卷同考試碼兩節，寫入本機再核對（唔靠一次性靜默同步）
+  try{
+    const pp=await Cloud.raw('papers','GET'); if(Array.isArray(pp)) DB.set(K.papers,pp);
+    const ee=await Cloud.raw('exams','GET'); if(Array.isArray(ee)) DB.set(K.exams,ee);
+  }catch(e){}
   const exam=examByCode(code);
   if(!exam){ warnMsg('考試碼唔啱或者已過期'); return; }
   // 只認有效考卷：連結嘅卷要存在且有題，否則拒絕入場
