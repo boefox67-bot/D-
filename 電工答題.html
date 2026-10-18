@@ -431,8 +431,26 @@ function getAttempts(){ return DB.get(K.attempts, []); }
 function examByCode(code){ const c=String(code).trim(); return getActiveExams().find(e=>e.code===c)||null; }
 function paperById(id){ return getPapers().find(p=>p.id===Number(id))||null; }
 function questionsForExam(exam){
-  if(exam && exam.paperId){ const p=paperById(exam.paperId); if(p&&p.questions&&p.questions.length) return p.questions; }
-  return getQuestions();
+  if(exam && exam.paperIds && exam.paperIds.length){
+    let n=0; exam.paperIds.forEach(pid=>{ const p=paperById(pid); if(p&&p.questions) n+=p.questions.length; }); return n;
+  }
+  if(exam && exam.paperId){ const p=paperById(exam.paperId); if(p&&p.questions&&p.questions.length) return p.questions.length; }
+  return getQuestions().length;
+}
+// 組成答題列表：支援單卷／多卷混合、順序／隨機、抽指定題數；每題保留原始序號同原卷名
+function buildQuizList(exam){
+  let pool=[];
+  const addPaper=(pid)=>{ const p=paperById(pid); if(!p||!p.questions) return; p.questions.forEach((q,idx)=>{ pool.push(Object.assign({},q,{_orig:idx+1,_paper:p.name,_pid:p.id})); }); };
+  if(!exam.useAll && exam.paperIds&&exam.paperIds.length){ exam.paperIds.forEach(addPaper); }
+  else if(!exam.useAll && exam.paperId){ addPaper(exam.paperId); }
+  else { pool=getQuestions().map((q,idx)=>Object.assign({},q,{_orig:idx+1,_paper:'全部題庫'})); }
+  let arr=pool.slice();
+  if(exam.order==='rand'){
+    for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=arr[i]; arr[i]=arr[j]; arr[j]=t; }
+  }
+  const n=Number(exam.drawCount)||0;
+  if(n>0&&n<arr.length) arr=arr.slice(0,n);
+  return arr;
 }
 
 /* ================= 首頁 ================= */
@@ -547,10 +565,13 @@ document.getElementById('btn-teacherEntry').onclick=()=>go('teacher');
 /* ================= 答題頁 ================= */
 let QZ = null; // { exam, name, list, answers, idx }
 function startQuiz(exam, name){
-  const list=questionsForExam(exam);
-  if(!list.length){ toast('呢張卷冇題目'); return; }
+  const list=buildQuizList(exam);
+  if(!list.length){ toast('呢場考卷無效或者冇題目'); return; }
   QZ={ exam, name, list, answers:list.map(()=>null), idx:0 };
-  document.getElementById('quiz-paperName').textContent = exam.paperId? (paperById(exam.paperId)?.name||'考卷') : '全部題庫';
+  let pname='全部題庫';
+  if(exam.paperIds&&exam.paperIds.length>1) pname='混合卷（'+exam.paperIds.length+'張）';
+  else if(exam.paperId){ const p=paperById(exam.paperId); pname=p?p.name:'考卷'; }
+  document.getElementById('quiz-paperName').textContent=pname;
   document.getElementById('quiz-className').textContent = (exam.className||'')+' · '+name;
   go('quiz'); renderQuiz();
 }
@@ -664,9 +685,11 @@ document.getElementById('btn-submit').onclick=()=>{
   list.forEach((q,i)=>{
     const sc=Number(q.score)||1; totalScore+=sc;
     const got=questionScore(q, answers[i]); gotScore+=got;
-    if(!isCorrect(q, answers[i])) wrongIdx.push({i:i+1, q, ua:answers[i]});
+    if(!isCorrect(q, answers[i])) wrongIdx.push({i:i+1, orig:q._orig, paper:q._paper, q, ua:answers[i]});
   });
-  const pn=exam.paperId?(paperById(exam.paperId)?.name||'考卷#'+exam.paperId):'全部題庫';
+  let pn='全部題庫';
+  if(exam.paperIds&&exam.paperIds.length>1) pn='混合卷（'+exam.paperIds.length+'張）';
+  else if(exam.paperId){ const p=paperById(exam.paperId); pn=p?p.name:'考卷#'+exam.paperId; }
   const attempt={
     name, className:exam.className||'', paperName:pn,
     score:Math.round(gotScore*10)/10, total:list.length, totalScore,
@@ -674,7 +697,7 @@ document.getElementById('btn-submit').onclick=()=>{
     date:new Date().toLocaleString('zh-HK'),
     ts:Date.now(),
     wrong:wrongIdx,
-    detail:list.map((q,i)=>({question:q.question,type:q.type,parts:q.parts||null,options:q.options,answer:q.answer,score:Number(q.score)||0,ok:isCorrect(q,answers[i]),userAnswer:answers[i]}))
+    detail:list.map((q,i)=>({question:q.question,type:q.type,parts:q.parts||null,options:q.options,answer:q.answer,score:Number(q.score)||0,orig:q._orig,paper:q._paper,ok:isCorrect(q,answers[i]),userAnswer:answers[i]}))
   };
   const att=getAttempts(); att.push(attempt); DB.set(K.attempts, att);
   DB.set(K.lastAttempt, attempt);
@@ -699,7 +722,8 @@ function showResult(a){
           return partCorrect(pt,up)?'':`；第${pi+1}部分（${pt.kind==='fill'?'填寫':pt.kind==='tf'?'是非':pt.kind==='multi'?'多選':'單選'}）錯`;
         }).join('');
       }
-      return `<div><b>第 ${w.i} 題</b>${esc(extra)}</div>`;
+      const src=w.paper?`《${esc(w.paper)}》原第 ${w.orig||w.i} 題`:`全部題庫 原第 ${w.orig||w.i} 題`;
+      return `<div style="margin:6px 0"><b>${src}</b>（本場第 ${w.i} 題）${esc(extra)}</div>`;
     }).join('');
   }
   // 逐題對答案
@@ -735,8 +759,9 @@ function showResult(a){
     const ok=isCorrect(d, d.userAnswer);
     const tag=ok?'<span class="tag ok">啱</span>':'<span class="tag bad">錯</span>';
     const sc=Number(d.score)||0;
+    const src=d.paper?`《${esc(d.paper)}》原第 ${d.orig||(i+1)} 題`:`原第 ${d.orig||(i+1)} 題`;
     return `<div style="padding:8px;border-bottom:1px solid var(--line)">
-      <div><b>第${i+1}題</b> ${tag} <span class="muted" style="font-size:12px">（${sc}%）</span></div>
+      <div><b>第${i+1}題</b> ${tag} <span class="muted" style="font-size:12px">（${sc}分）· ${src}</span></div>
       <div style="color:var(--muted);margin:4px 0">${esc(d.question)}</div>
       <div style="font-size:13px">${esc(ansText(d, d.userAnswer))}</div>
     </div>`;
@@ -815,9 +840,21 @@ function renderSub(g){
   }
   if(g==='launch'){
     const cls=getClasses(), papers=getPapers();
+    const paperBoxes=papers.map(p=>`<label style="display:block;font-size:13px;margin:4px 0"><input type="checkbox" class="L-pchk" value="${p.id}"> ${esc(p.name)}（${p.questions.length}題）</label>`).join('')||'<span class="muted">未有考卷，先去導入</span>';
     el.innerHTML=subHead('發起考試碼')+`
       <label>揀班次</label><select id="L-cls">${cls.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
-      <label>揀考卷</label><select id="L-paper"><option value="0">全部題庫（${getQuestions().length}題）</option>${papers.map(p=>`<option value="${p.id}">${esc(p.name)}（${p.questions.length}題）</option>`).join('')}</select>
+      <label>揀考卷（可多張混合；唔勾選＝全部題庫）</label>
+      <div style="max-height:140px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px">
+        <label style="font-size:13px"><input type="checkbox" class="L-pchk" value="0"> 全部題庫（${getQuestions().length}題）</label>
+        ${paperBoxes}
+      </div>
+      <label>出題順序</label>
+      <div style="font-size:13px">
+        <label><input type="radio" name="L-order" value="seq" checked> 順序出題</label>
+        <label style="margin-left:12px"><input type="radio" name="L-order" value="rand"> 隨機出題</label>
+      </div>
+      <label>抽題數量（0＝全部；混合時隨機抽指定題數）</label>
+      <input id="L-count" type="number" min="0" value="0" inputmode="numeric">
       <label>考試碼（阿拉伯數字）</label><input id="L-code" inputmode="numeric" placeholder="例如 1234">
       <label>開放時長（小時，1～168，一週）</label>
       <input id="L-hours" type="number" min="1" max="168" value="4" inputmode="numeric">
@@ -830,16 +867,21 @@ function renderSub(g){
       let hours=Number(document.getElementById('L-hours').value);
       if(!hours||hours<1) hours=1;
       if(hours>168) hours=168;
-      const paperId=Number(document.getElementById('L-paper').value);
       const className=document.getElementById('L-cls').value;
-      // 只認有效考卷：空卷／已拆除嘅卷唔可以開碼
-      let pValid;
-      if(paperId>0){ const p=paperById(paperId); pValid=!!(p&&p.questions&&p.questions.length); }
-      else { pValid=getQuestions().length>0; }
-      if(!pValid){ toast('揀嘅考卷無效或者冇題目'); return; }
+      // 收集勾選嘅考卷
+      const paperIds=[...document.querySelectorAll('.L-pchk:checked')].map(el=>Number(el.value)).filter(v=>v>0);
+      const useAll=![...document.querySelectorAll('.L-pchk:checked')].some(el=>Number(el.value)>0);
+      const order=(document.querySelector('input[name="L-order"]:checked')||{}).value||'seq';
+      const drawCount=Math.max(0,Number(document.getElementById('L-count').value)||0);
+      // 只認有效考卷：計總題數
+      let pool=0;
+      if(useAll){ pool=getQuestions().length; }
+      else { paperIds.forEach(pid=>{ const p=paperById(pid); if(p&&p.questions) pool+=p.questions.length; }); }
+      if(pool<=0){ toast('揀嘅考卷無效或者冇題目'); return; }
+      if(drawCount>pool){ toast('抽題數量多過總題數（'+pool+'題）'); return; }
       const now=Date.now();
       const list=getExams().filter(e=>!(e.code===code));
-      list.push({code,paperId,durationMin:hours*60,className,launchedAt:now,expireAt:now+hours*3600*1000});
+      list.push({code,paperId:paperIds[0]||0,paperIds,useAll,order,drawCount,durationMin:hours*60,className,launchedAt:now,expireAt:now+hours*3600*1000});
       DB.set(K.exams, list);
       // 用同一個號碼重開：清走該碼舊嘅進場／交卷鎖，等學生可以重新刷題；舊成績歷史保留
       const locks=getLocks(); for(const k in locks) if(locks[k].code===code) delete locks[k]; DB.set(K.locks,locks);
@@ -990,7 +1032,7 @@ function renderSub(g){
         <td>${esc(a.className)}</td><td><b>${esc(a.name)}</b></td>
         <td>${esc(a.paperName)}</td><td>${a.score}/${a.totalScore}</td>
         <td><span class="tag ${a.score100>=60?'ok':'bad'}">${a.score100}%</span></td>
-        <td>${(a.wrong||[]).map(w=>w.i).join('、')||'—'}</td></tr>`;
+        <td>${(a.wrong||[]).map(w=>`${w.paper||''}#${w.orig||w.i}`).join('、')||'—'}</td></tr>`;
       }).join('')||'<tr><td colspan="8" class="muted">暫無成績</td></tr>';
     }
     let curList=sortedAll;
@@ -1030,9 +1072,9 @@ function renderSub(g){
     refreshTable();
     document.getElementById('A-filter').onclick=()=>{ refreshTable(); toast('已篩選 '+curList.length+' 筆'); };
     document.getElementById('A-export').onclick=()=>{
-      const rows1=curList.map(a=>({日期:a.date,班次:a.className,姓名:a.name,卷名:a.paperName,得分:a.score,總分:a.totalScore,正確率:a.score100+'%',答對: a.total-(a.wrong||[]).length+'/'+a.total,錯題號:(a.wrong||[]).map(w=>w.i).join('、'),狀態: a.score100>=60?'合格':'不合格'}));
+      const rows1=curList.map(a=>({日期:a.date,班次:a.className,姓名:a.name,卷名:a.paperName,得分:a.score,總分:a.totalScore,正確率:a.score100+'%',答對: a.total-(a.wrong||[]).length+'/'+a.total,錯題:(a.wrong||[]).map(w=>`${w.paper||'全部題庫'}#原${w.orig||w.i}`).join('、'),狀態: a.score100>=60?'合格':'不合格'}));
       const rows2=[];
-      curList.forEach(a=>(a.detail||[]).forEach((d,i)=>rows2.push({姓名:a.name,卷名:a.paperName,題號:i+1,題型:TYPE_LABELS[d.type-1]||'',題目:d.question,得分:Number(d.score)||1,是否答對:d.ok?'啱':'錯',學生答案:JSON.stringify(d.userAnswer||'')})));
+      curList.forEach(a=>(a.detail||[]).forEach((d,i)=>rows2.push({姓名:a.name,班次:a.className,原卷名:d.paper||'全部題庫',原始題號:d.orig||(i+1),本場題號:i+1,題型:TYPE_LABELS[d.type-1]||'',題目:d.question,得分:Number(d.score)||1,是否答對:d.ok?'啱':'錯',學生答案:JSON.stringify(d.userAnswer||''),正確答案:JSON.stringify(d.answer||d.parts||'')})));
       const rows3=(getQuestions()).map((q,i)=>({序號:i+1,題型:TYPE_LABELS[q.type-1]||'',題目:q.question,分數:Number(q.score)||1,答案:JSON.stringify(q.answer||q.parts||'')}));
       const wb=XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows1),'成績記錄');
