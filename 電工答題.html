@@ -1645,9 +1645,12 @@ function fireTeacherSignout(){
   window._selfRefresh=setTimeout(()=>{ try{ quickRefresh(); }catch(e){} },30000);
   toast('已通知其他老師，佢哋刷新後30秒無動作將登出');
 }
-async function cancelTeacherSignout(){
-  DB.remove(K.tsesh);
-  if(Cloud.enabled()){ try{ await Cloud.raw('tsesh','DELETE'); }catch(e){} }
+async function cancelTeacherSignout(clearCloud=true){
+  // clearCloud=false：弹通知时只清本机计时，唔删云端信号，其他老师仍收得到
+  if(clearCloud){
+    DB.remove(K.tsesh);
+    if(Cloud.enabled()){ try{ await Cloud.raw('tsesh','DELETE'); }catch(e){} }
+  }
   if(window._act){ ['mousemove','keydown','click','touchstart'].forEach(ev=>document.removeEventListener(ev,window._act,true)); window._act=null; }
   if(window._lt){ clearInterval(window._lt); window._lt=null; }
   const box=document.getElementById('t-countdown'); if(box) box.style.display='none';
@@ -1663,7 +1666,7 @@ async function checkCloudSignout(){
   }catch(e){}
 }
 function armLocalLogout(){
-  cancelTeacherSignout();
+  cancelTeacherSignout(false);
   let logoutAt=Date.now()+30000;
   const mask=document.getElementById('signout-mask');
   const sec=document.getElementById('signout-sec');
@@ -1673,7 +1676,7 @@ function armLocalLogout(){
     const left=logoutAt-Date.now();
     if(sec) sec.textContent=Math.max(0,Math.ceil(left/1000))+' 秒';
     if(left<=0){
-      cancelTeacherSignout();
+      cancelTeacherSignout(false);
       deregisterOnline();
       DB.remove(K.isTeacher);
       renderTeacher();
