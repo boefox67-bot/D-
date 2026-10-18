@@ -457,6 +457,23 @@ function getActiveExams(){ const now=Date.now(); return getExams().filter(e=>e.e
 function getClasses(){ const c=DB.get(K.classes, []); return Array.isArray(c)?c.map(String):[]; }
 function getStudents(){ return DB.get(K.students, []); }
 function getLocks(){ return DB.get(K.locks, {}); }
+// 锁定按考试码保存：入新场唔会抹走另一场已完成状态
+function lockRec(L,name){ const r=L[name]||{}; r.history=r.history||{};
+  // 兼容旧版扁平锁定：把旧 code/state 迁入历史，入新场唔会丢旧场已完成
+  if(r.code && r.state && !r.history[r.code]) r.history[r.code]=r.state;
+  L[name]=r; return r; }
+function lockState(L,name,code){
+  const r=L[name]; if(!r) return null;
+  if(r.history && r.history[code]) return r.history[code];
+  if(r.code===code) return r.state;
+  return null;
+}
+function clearLockCode(L,code){
+  for(const k in L){ const r=L[k]; if(!r) continue;
+    if(r.history){ delete r.history[code]; if(r.code===code) r.code=Object.keys(r.history)[0]||null; if(!r.code&&!Object.keys(r.history).length) delete L[k]; }
+    else if(r.code===code) delete L[k];
+  }
+}
 function getAttempts(){ return DB.get(K.attempts, []); }
 function examByCode(code){ const c=String(code).trim(); return getActiveExams().find(e=>e.code===c)||null; }
 function paperById(id){ return getPapers().find(p=>p.id===Number(id))||null; }
@@ -586,23 +603,24 @@ document.getElementById('btn-start').onclick = async function(){
   if(si<0){ warnMsg('請先從名單揀名'); return; }
   const chosen=sts[si]?stuName(sts[si]):'';
   if(chosen!==name){ warnMsg('填寫姓名同名單唔一致，請重新揀'); return; }
-  let lock=getLocks()[name];
-  // 舊碼已被老師關閉或過期＝無效，自動解鎖，唔再擋學生
-  if(lock && !examByCode(lock.code)){
-    const L=getLocks(); delete L[name]; DB.set(K.locks,L); lock=null;
+  const L=getLocks();
+  let lock=L[name];
+  // 当前码已关闭/过期先清当前位，历史已完成记录保留
+  if(lock && lock.code && !examByCode(lock.code) && !(lock.history&&lock.history[lock.code])){
+    delete L[name]; lock=null; DB.set(K.locks,L);
   }
-  // 只擋「本場已交卷」；交過另一場唔擋入新場
-  if(lock && lock.state==='submitted' && lock.code===code){ warnMsg('呢個名已經交卷，唔可以再入考場'); return; }
-  if(lock && lock.state==='active' && lock.code!==code){
-    // 同一個學生由第一場直入第二場：先問登出舊場，再開新場；已交卷成績唔受影響
+  // 只擋「本場已交卷」；入13唔會改1111已完成
+  if(lockState(L,name,code)==='submitted'){ warnMsg('呢個名已經交卷，唔可以再入考場'); return; }
+  const curActive=lock && lock.code && lockState(L,name,lock.code)==='active' && lock.code!==code;
+  if(curActive){
     if(!confirm('你正在第「'+lock.code+'」場，要登出並直接入新考場「'+code+'」嗎？\n未交卷嘅作答唔會保留，已經交卷嘅成績唔受影響。')) return;
-    QZ=null; // 丟棄舊場未交卷草稿
+    QZ=null;
   }
   // 只認有效考卷：無效／空卷唔准入（沿用剛才雲端權威題數）
   if(!availQ){ warnMsg('呢場考卷無效或者冇題目，請聯絡老師'); return; }
   DB.set(K.curExam, exam);
   DB.set(K.userName, name);
-  const locks=getLocks(); locks[name]={code,state:'active',at:Date.now()}; DB.set(K.locks, locks);
+  const rec=lockRec(L,name); rec.code=code; rec.state='active'; rec.at=Date.now(); rec.history[code]='active'; L[name]=rec; DB.set(K.locks,L);
   startQuiz(exam, name);
 };
 function warnMsg(m){ const w=document.getElementById('home-warn'); w.textContent=m; w.style.display='block'; }
@@ -749,7 +767,7 @@ document.getElementById('btn-submit').onclick=()=>{
   };
   const att=getAttempts(); att.push(attempt); DB.set(K.attempts, att);
   DB.set(K.lastAttempt, attempt);
-  const locks=getLocks(); locks[name]={code:exam.code,state:'submitted',at:Date.now()}; DB.set(K.locks, locks);
+  const L=getLocks(); const rec=lockRec(L,name); rec.code=exam.code; rec.state='submitted'; rec.at=Date.now(); rec.history[exam.code]='submitted'; L[name]=rec; DB.set(K.locks,L);
   DB.remove(K.curExam);
   showResult(attempt);
 };
@@ -964,7 +982,7 @@ function renderSub(g){
       list.push({code,paperId:paperIds[0]||0,paperIds,useAll,order,drawCount,durationMin:hours*60,className,launchedAt:now,expireAt:now+hours*3600*1000});
       DB.set(K.exams, list);
       // 用同一個號碼重開：清走該碼舊嘅進場／交卷鎖，等學生可以重新刷題；舊成績歷史保留
-      const locks=getLocks(); for(const k in locks) if(locks[k].code===code) delete locks[k]; DB.set(K.locks,locks);
+      const locks=getLocks(); clearLockCode(locks,code); DB.set(K.locks,locks);
       toast('已生成考試碼 '+code+'（'+hours+' 小時有效）');
       renderSub('launch');
     };
@@ -1694,18 +1712,20 @@ function renderActiveExams(){
   const ex=getActiveExams();
   const locks=getLocks();
   function statusOf(name, code){
-    const lk=locks[name];
-    if(lk && lk.code===code){
-      if(lk.state==='submitted') return 'done';
-      if(lk.state==='active') return 'active';
-    }
+    const st=lockState(locks,name,code);
+    if(st==='submitted') return 'done';
+    if(st==='active') return 'active';
     return 'todo';
+  }
+  function hasLock(name,code){
+    const r=locks[name]; if(!r) return false;
+    return (r.history&&r.history[code])||r.code===code;
   }
   el.innerHTML = ex.length? ex.map(e=>{
     // 名單：本班學生＋本場有鎖嘅人（防止漏網）
     const seen=new Map();
     getStudents().filter(s=>hasClass(s,e.className)).forEach(s=>seen.set(stuName(s),1));
-    for(const n in locks){ if(locks[n].code===e.code) seen.set(n,1); }
+    for(const n in locks){ if(hasLock(n,e.code)) seen.set(n,1); }
     const names=[...seen.keys()].filter(Boolean).sort((a,b)=>a.localeCompare(b,'zh-Hans-CN'));
     let done=0, active=0, todo=0;
     const chips=names.map(n=>{
@@ -1749,7 +1769,7 @@ function renderActiveExams(){
   }).join('') : '<span class="muted">冇進行中考試</span>';
 }
 function delPaper(id){ if(!confirm('確認拆除呢張卷？'))return; DB.set(K.papers, getPapers().filter(p=>p.id!==id)); renderSub('papers'); }
-function endExam(code){ DB.set(K.exams, getExams().filter(e=>e.code!==code)); const locks=getLocks(); for(const k in locks) if(locks[k].code===code) delete locks[k]; DB.set(K.locks,locks); renderSub('launch'); }
+function endExam(code){ DB.set(K.exams, getExams().filter(e=>e.code!==code)); const locks=getLocks(); clearLockCode(locks,code); DB.set(K.locks,locks); renderSub('launch'); }
 function editPaperQScore(pid, i, v){
   if(!confirm('確定要儲存呢項分數修改？')) return;
   const papers=getPapers();
