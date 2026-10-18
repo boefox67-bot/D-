@@ -1166,7 +1166,7 @@ function renderSub(g){
         const gKeys=Object.keys(groups).slice(0,5);
         const row={
           日期:a.date,班次:a.className,姓名:a.name,卷名:a.paperName,
-          得分:(a.pct!=null?a.pct:(a.totalScore?Math.round(a.score/a.totalScore*1000)/10:a.score100)),總分:100,正確率:(a.pct!=null?a.pct:a.score100)+'%',
+          得分:(a.pct!=null?a.pct:(a.totalScore?Math.round(a.score/a.totalScore*1000)/10:a.score100)),總分:100,正確率:a.score100+'%',
           答對:(a.total-(a.wrong||[]).length)+'/'+a.total,
           次序:a.order||'',狀態:a.score100>=60?'合格':'不合格'
         };
@@ -1178,11 +1178,10 @@ function renderSub(g){
       });
       const rows2=[];
       curList.forEach(a=>(a.detail||[]).forEach((d,i)=>rows2.push({姓名:a.name,班次:a.className,原卷名:d.paper||'全部題庫',原始題號:d.orig||(i+1),本場題號:i+1,題型:TYPE_LABELS[d.type-1]||'',題目:d.question,得分:Number(d.score)||1,是否答對:d.ok?'啱':'錯',學生答案:JSON.stringify(d.userAnswer||''),正確答案:JSON.stringify(d.answer||d.parts||'')})));
-      const rows3=(getQuestions()).map((q,i)=>({序號:i+1,題型:TYPE_LABELS[q.type-1]||'',題目:q.question,分數:Number(q.score)||1,答案:JSON.stringify(q.answer||q.parts||'')}));
       const wb=XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows1),'成績記錄');
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows2),'作答明細');
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows3),'題庫');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[]]),'題庫');
       const d=new Date();
       XLSX.writeFile(wb,'電工答題成績_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'.xlsx');
       toast('已導出 '+curList.length+' 筆成績');
