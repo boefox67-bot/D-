@@ -156,6 +156,7 @@
     <div class="topbar">
       <h1>老師管理</h1>
       <p>登入成功先見到功能</p>
+      <p id="t-online" class="muted" style="font-size:13px;margin:4px 0 0"></p>
       <button class="btn secondary" style="position:fixed;right:12px;top:12px;width:auto;padding:6px 14px;margin:0;font-size:13px;z-index:100" onclick="quickRefresh()">刷新</button>
       <div id="verBadge" style="position:fixed;right:12px;top:48px;width:auto;padding:4px 12px;margin:0;font-size:11px;z-index:100;background:#1e293b;color:#fff;border-radius:6px">版本 V4.4</div>
     </div>
@@ -802,7 +803,7 @@ function renderTeacher(){
   const logged=DB.get(K.isTeacher,false)===true;
   document.getElementById('teacher-loginCard').style.display=logged?'none':'block';
   document.getElementById('teacher-panel').style.display=logged?'block':'none';
-  if(logged) renderSub('');
+  if(logged){ renderSub(''); refreshTeacherOnline(); }
 }
 document.querySelectorAll('#t-grid1 button, #t-grid2 button').forEach(b=>{
   b.onclick=()=>{
@@ -821,7 +822,7 @@ async function cloudSaveAll(){
 async function quickRefresh(){
   const y=window.scrollY;
   try{ await Cloud.pull(); }catch(e){}
-  updateVerDisplay(); renderSub(curSub); window.scrollTo(0,y);
+  updateVerDisplay(); renderSub(curSub); refreshTeacherOnline(); window.scrollTo(0,y);
   toast('已由雲端刷新');
 }
 async function cloudRefreshAll(){
@@ -1540,7 +1541,15 @@ function renderSub(g){
     };
   }
 }
+// 老师左上角：当前有效考场内作答中/已完成人数
+function refreshTeacherOnline(){
+  const el=document.getElementById('t-online'); if(!el) return;
+  const locks=getLocks(); let act=0,done=0;
+  for(const n in locks){ const lk=locks[n]; if(!lk||!examByCode(lk.code)) continue; if(lk.state==='active') act++; else if(lk.state==='submitted') done++; }
+  el.textContent='作答中 '+act+' 人 · 已完成 '+done+' 人';
+}
 function renderActiveExams(){
+  refreshTeacherOnline();
   const el=document.getElementById('L-list'); if(!el) return;
   const ex=getActiveExams();
   const locks=getLocks();
