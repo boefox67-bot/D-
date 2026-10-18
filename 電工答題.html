@@ -187,6 +187,11 @@ const CLOUD_KEY='quiz_cloud_url';
 // 部署前把 Firebase 網址填到下面引號內，所有手機會自動共用同一個雲端，唔使逐部機設定
 const DEFAULT_CLOUD_URL='https://project-3342944994395704108-default-rtdb.firebaseio.com';
 const SERVER_KEYS=['questions','papers','exams','classes','students','attempts','locks','pwd','ver'];
+// 云端裸名 -> 本机 localStorage 键（K 里带 quiz_ 前缀）
+const SERVER_MAP={
+  questions:K.questions, papers:K.papers, exams:K.exams, classes:K.classes,
+  students:K.students, attempts:K.attempts, locks:K.locks, pwd:K.pwd, ver:K.ver
+};
 const Cloud={
   _timers:{},
   url(){ let u=(DEFAULT_CLOUD_URL||localStorage.getItem(CLOUD_KEY)||'').trim(); return u?u.replace(/\/+$/,''):''; },
@@ -197,34 +202,37 @@ const Cloud={
     if(!res.ok) throw new Error('HTTP '+res.status);
     return await res.json();
   },
+  bareOf(storageKey){ return SERVER_KEYS.find(b=>SERVER_MAP[b]===storageKey)||null; },
   queue(key,val){
-    if(!this.enabled() || !SERVER_KEYS.includes(key)) return;
-    clearTimeout(this._timers[key]);
-    this._timers[key]=setTimeout(()=>this.pushKey(key,val), key==='attempts'?800:400);
+    const bare=this.bareOf(key);
+    if(!this.enabled() || !bare) return;
+    clearTimeout(this._timers[bare]);
+    this._timers[bare]=setTimeout(()=>this.pushKey(bare,val), bare==='attempts'?800:400);
   },
-  async pushKey(key,val){
+  async pushKey(bare,val){
     try{
-      if(key==='attempts'){
+      if(bare==='attempts'){
         let cur=[]; try{ cur=(await this.raw('attempts','GET'))||[]; }catch(e){ cur=[]; }
         if(!Array.isArray(cur)) cur=[];
         const have=new Set(cur.map(a=>a&&a.ts));
         (val||[]).forEach(a=>{ if(a&&a.ts!=null&&!have.has(a.ts)) cur.push(a); });
         await this.raw('attempts','PUT',cur);
       } else {
-        await this.raw(key,'PUT',val);
+        await this.raw(bare,'PUT',val);
       }
-    }catch(e){ console.warn('雲端上傳失敗',key,e); }
+    }catch(e){ console.warn('雲端上傳失敗',bare,e); }
   },
   async pull(){
     if(!this.enabled()) return false;
     let data; try{ data=await this.raw('','GET'); }catch(e){ console.warn('雲端讀取失敗',e); return false; }
     if(!data||typeof data!=='object') return false;
-    SERVER_KEYS.forEach(k=>{ if(data[k]!==undefined) DB.set(k,data[k]); });
-    return true;
+    let changed=false;
+    SERVER_KEYS.forEach(b=>{ if(data[b]!==undefined){ DB.set(SERVER_MAP[b],data[b]); changed=true; } });
+    return changed;
   },
   async pushAll(){
     if(!this.enabled()) return;
-    for(const k of SERVER_KEYS){ const v=DB.get(k, undefined); if(v!==undefined) await this.raw(k,'PUT',v); }
+    for(const b of SERVER_KEYS){ const v=DB.get(SERVER_MAP[b], undefined); if(v!==undefined) await this.raw(b,'PUT',v); }
   }
 };
 window.Cloud=Cloud;
