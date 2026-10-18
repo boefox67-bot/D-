@@ -591,7 +591,8 @@ document.getElementById('btn-start').onclick = async function(){
   if(lock && !examByCode(lock.code)){
     const L=getLocks(); delete L[name]; DB.set(K.locks,L); lock=null;
   }
-  if(lock && lock.state==='submitted'){ warnMsg('呢個名已經交卷，唔可以再入考場'); return; }
+  // 只擋「本場已交卷」；交過另一場唔擋入新場
+  if(lock && lock.state==='submitted' && lock.code===code){ warnMsg('呢個名已經交卷，唔可以再入考場'); return; }
   if(lock && lock.state==='active' && lock.code!==code){
     // 同一個學生由第一場直入第二場：先問登出舊場，再開新場；已交卷成績唔受影響
     if(!confirm('你正在第「'+lock.code+'」場，要登出並直接入新考場「'+code+'」嗎？\n未交卷嘅作答唔會保留，已經交卷嘅成績唔受影響。')) return;
