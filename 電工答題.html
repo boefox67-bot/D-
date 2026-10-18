@@ -146,6 +146,11 @@
       <button class="btn secondary" onclick="go('home')">← 返回學生考試介面</button>
     </div>
     <div id="teacher-panel" style="display:none">
+      <div class="card" style="padding:12px;margin-bottom:10px">
+        <div class="muted" style="font-size:13px;margin-bottom:8px">雲端同步：喺任何手機／電腦登入老師都可以改。改完按「儲存到雲端」，其他裝置按「從雲端重新整理」就會一樣。</div>
+        <button class="btn" style="margin-right:8px;padding:8px 16px" onclick="cloudSaveAll()">儲存到雲端（覆蓋其他裝置）</button>
+        <button class="btn secondary" style="padding:8px 16px" onclick="cloudRefreshAll()">從雲端重新整理（覆蓋本機）</button>
+      </div>
       <div class="link-grid" id="t-grid1">
         <button data-go="launch">發起考試碼</button>
         <button data-go="classes">學生管理（班次）</button>
@@ -665,6 +670,19 @@ document.querySelectorAll('#t-grid1 button, #t-grid2 button').forEach(b=>{
     renderSub(g);
   };
 });
+async function cloudSaveAll(){
+  if(!Cloud.enabled()) return toast('未設定雲端網址');
+  if(!confirm('確定把本機（此裝置）全部資料上傳，覆蓋雲端同其他裝置？')) return;
+  await Cloud.pushAll();
+  toast('已儲存到雲端');
+}
+async function cloudRefreshAll(){
+  if(!Cloud.enabled()) return toast('未設定雲端網址');
+  if(!confirm('確定用雲端資料覆蓋本機現有檔案？本機資料會被雲端取代。')) return;
+  const r=await Cloud.forceDownload();
+  toast(r.ok?('已從雲端重新整理（同步 '+r.n+' 項）'):'重新整理失敗（雲端空白或連線錯誤）');
+  renderTeacher();
+}
 function subHead(t){ return `<div class="card"><h2>${t}</h2><div class="muted" style="margin-bottom:10px"><a href="#" onclick="renderSub('');return false" style="color:var(--blue)">← 返回功能頁</a> &nbsp;·&nbsp; <a href="#" onclick="go('home');return false" style="color:var(--blue)">← 返回學生考試介面</a></div>`; }
 function getVersion(){ return DB.get(K.ver,'4.9'); }
 function setVersion(v){ DB.set(K.ver,v); updateVerBadge(); }
