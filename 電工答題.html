@@ -1048,8 +1048,8 @@ function renderSub(g){
           papers.push({id:newPid,name,createdAt:Date.now(),questions:qs});
           DB.set(K.papers,papers);
           DB.set(K.activePaper,newPid); // 自動切換到新導入嘅卷
-          document.getElementById('I-msg').textContent=`成功導入 ${qs.length} 題，儲存為「${name}」，已自動切換到呢張卷`;
-          setTimeout(()=>{ renderSub('questions'); }, 500); // 自動跳去題庫管理
+          document.getElementById('I-msg').textContent=`成功導入 ${qs.length} 題，儲存為「${name}」，已自動切換到呢張卷（保持喺導入頁，唔跳去題庫管理）`;
+          // 唔跳頁，留喺導入頁
         }catch(err){ document.getElementById('I-msg').textContent='解析失敗：'+err.message; }
       };
       rd.readAsArrayBuffer(f);
