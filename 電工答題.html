@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Feiyue Education Centre · 電工答題 · 飛躍教育中心</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -1566,8 +1569,16 @@ function renderActiveExams(){
       return `<span style="display:inline-block;margin:2px;padding:2px 8px;border-radius:12px;background:${col};color:#fff;font-size:12px">${esc(n)} · ${txt}</span>`;
     }).join('');
     const pname=e.useAll||(!e.paperIds?.length&&!e.paperId)?'全部題庫':(e.paperIds&&e.paperIds.length>1?'混合卷('+e.paperIds.length+'張)':(paperById(e.paperId)?.name||'考卷'));
+    // 計應考題數：抽指定題數就顯示抽數，否則顯示總題數
+    let poolN=0;
+    if(e.useAll){ poolN=getQuestions().length; }
+    else if(e.paperIds&&e.paperIds.length){ e.paperIds.forEach(pid=>{ const p=paperById(pid); if(p&&p.questions) poolN+=p.questions.length; }); }
+    else if(e.paperId){ const p=paperById(e.paperId); if(p&&p.questions) poolN=p.questions.length; }
+    const drawN=Number(e.drawCount)||0;
+    const showN=drawN>0?drawN:poolN;
+    const ordTxt=e.order==='rand'?'隨機出題':'順序出題';
     return `<div style="padding:8px;border-bottom:1px solid var(--line)">
-      <b>碼 ${e.code}</b> · ${esc(e.className)} · ${esc(pname)} · 剩餘 ${Math.max(0,Math.round((e.expireAt-Date.now())/3600000*10)/10)}小時
+      <b>碼 ${e.code}</b> · ${esc(e.className)} · ${esc(pname)} · ${ordTxt} · ${showN}題 · 剩餘 ${Math.max(0,Math.round((e.expireAt-Date.now())/3600000*10)/10)}小時
       <div style="margin:6px 0;font-size:13px">
         <span style="color:#16a34a">已完成 ${done}</span> ·
         <span style="color:#ca8a04">作答中 ${active}</span> ·
