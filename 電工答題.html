@@ -124,6 +124,7 @@
       <button class="btn orange" id="btn-next">下一題</button>
     </div>
     <button class="btn danger" id="btn-submit" style="display:none">交卷</button>
+    <button class="btn secondary" id="btn-exit" style="margin-top:8px;font-size:13px;padding:10px">換考場（未交卷離開，草稿唔保留）</button>
   </div>
 
   <!-- ========== 頁面：成績 ========== -->
@@ -521,9 +522,11 @@ document.getElementById('btn-start').onclick = function(){
   const chosen=sts[si]?stuName(sts[si]):'';
   if(chosen!==name){ warnMsg('填寫姓名同名單唔一致，請重新揀'); return; }
   const lock=getLocks()[name];
-  if(lock){
-    if(lock.state==='submitted' && lock.code===code){ warnMsg('呢個名已經交卷，唔可以再入本卷'); return; }
-    if(lock.state==='active' && lock.code!==code){ warnMsg('呢個名正在另一場考試，先交卷'); return; }
+  if(lock && lock.state==='submitted'){ warnMsg('呢個名已經交卷，唔可以再入考場'); return; }
+  if(lock && lock.state==='active' && lock.code!==code){
+    // 同一個學生由第一場直入第二場：先問登出舊場，再開新場；已交卷成績唔受影響
+    if(!confirm('你正在第「'+lock.code+'」場，要登出並直接入新考場「'+code+'」嗎？\n未交卷嘅作答唔會保留，已經交卷嘅成績唔受影響。')) return;
+    QZ=null; // 丟棄舊場未交卷草稿
   }
   DB.set(K.curExam, exam);
   DB.set(K.userName, name);
@@ -619,6 +622,11 @@ function renderQuiz(){
 }
 document.getElementById('btn-prev').onclick=()=>{ if(QZ.idx>0){ QZ.idx--; renderQuiz(); } };
 document.getElementById('btn-next').onclick=()=>{ if(QZ.idx<QZ.list.length-1){ QZ.idx++; renderQuiz(); } };
+document.getElementById('btn-exit').onclick=()=>{
+  if(!QZ){ go('home'); return; }
+  if(!confirm('未交卷離開，呢場作答唔會保留，確定離開返首頁？已經交卷嘅成績唔受影響。')) return;
+  QZ=null; DB.remove(K.curExam); go('home');
+};
 document.getElementById('btn-submit').onclick=()=>{
   const {list, answers}=QZ;
   const untouched=[];
