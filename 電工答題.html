@@ -902,18 +902,18 @@ function renderSub(g){
   }
   if(g==='launch'){
     const cls=getClasses(), papers=getPapers();
-    const paperBoxes=papers.map(p=>`<label style="display:block;font-size:13px;margin:4px 0"><input type="checkbox" class="L-pchk" value="${p.id}"> ${esc(p.name)}（${p.questions.length}題）</label>`).join('')||'<span class="muted">未有考卷，先去導入</span>';
+    const paperBoxes=papers.map(p=>`<label class="L-opt" style="display:block;font-size:13px;margin:4px 0;cursor:pointer"><input type="checkbox" class="L-pchk" value="${p.id}"> ${esc(p.name)}（${p.questions.length}題）</label>`).join('')||'<span class="muted">未有考卷，先去導入</span>';
     el.innerHTML=subHead('發起考試碼')+`
       <label>揀班次</label><select id="L-cls">${cls.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
       <label>揀考卷（可多張混合；唔勾選＝全部題庫）</label>
       <div style="max-height:140px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px">
-        <label style="font-size:13px"><input type="checkbox" class="L-pchk" value="0"> 全部題庫（${getQuestions().length}題）</label>
+        <label class="L-opt" style="font-size:13px;cursor:pointer"><input type="checkbox" class="L-pchk" value="0"> 全部題庫（${getQuestions().length}題）</label>
         ${paperBoxes}
       </div>
       <label>出題順序</label>
       <div style="font-size:13px">
-        <label><input type="radio" name="L-order" value="seq" checked> 順序出題</label>
-        <label style="margin-left:12px"><input type="radio" name="L-order" value="rand"> 隨機出題</label>
+        <label class="L-opt" style="cursor:pointer"><input type="radio" name="L-order" value="seq" checked> 順序出題</label>
+        <label class="L-opt" style="margin-left:12px;cursor:pointer"><input type="radio" name="L-order" value="rand"> 隨機出題</label>
       </div>
       <label>抽題數量（0＝全部；混合時隨機抽指定題數）</label>
       <input id="L-count" type="number" min="0" value="0" inputmode="numeric">
@@ -923,6 +923,24 @@ function renderSub(g){
       <button class="btn" id="L-go">生成考試碼</button></div>
       <div class="card"><h2>進行中考試</h2><div id="L-list"></div></div>`;
     renderActiveExams();
+    // 勾选/选中后，对应文字转绿色，方便睇拣中边张卷、边个顺序
+    const syncLaunchOpt=()=>{
+      document.querySelectorAll('.L-pchk').forEach(cb=>{
+        const lb=cb.closest('label'); if(!lb) return;
+        lb.style.color=cb.checked?'#16a34a':''; lb.style.fontWeight=cb.checked?'700':'';
+      });
+      document.querySelectorAll('input[name="L-order"]').forEach(r=>{
+        const lb=r.closest('label'); if(!lb) return;
+        lb.style.color=r.checked?'#16a34a':''; lb.style.fontWeight=r.checked?'700':'';
+      });
+    };
+    document.querySelectorAll('.L-pchk').forEach(cb=>cb.onchange=()=>{
+      if(cb.value==='0'&&cb.checked){ document.querySelectorAll('.L-pchk').forEach(x=>{ if(x.value!=='0') x.checked=false; }); }
+      else if(cb.checked){ const all=document.querySelector('.L-pchk[value="0"]'); if(all) all.checked=false; }
+      syncLaunchOpt();
+    });
+    document.querySelectorAll('input[name="L-order"]').forEach(r=>r.onchange=syncLaunchOpt);
+    syncLaunchOpt();
     document.getElementById('L-go').onclick=()=>{
       const code=document.getElementById('L-code').value.trim();
       if(!code){ toast('請輸入考試碼'); return; }
