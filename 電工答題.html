@@ -1515,9 +1515,42 @@ function renderSub(g){
 function renderActiveExams(){
   const el=document.getElementById('L-list'); if(!el) return;
   const ex=getActiveExams();
-  el.innerHTML = ex.length? ex.map(e=>`<div style="padding:8px;border-bottom:1px solid var(--line)">
-    <b>碼 ${e.code}</b> · ${esc(e.className)} · ${e.paperId?(paperById(e.paperId)?.name||'考卷'):'全部題庫'} · 剩餘 ${Math.max(0,Math.round((e.expireAt-Date.now())/3600000*10)/10)}小時
-    <button class="btn danger" style="margin-top:6px;padding:8px" onclick="endExam('${e.code}')">結束呢場考試</button></div>`).join('') : '<span class="muted">冇進行中考試</span>';
+  const locks=getLocks();
+  function statusOf(name, code){
+    const lk=locks[name];
+    if(lk && lk.code===code){
+      if(lk.state==='submitted') return 'done';
+      if(lk.state==='active') return 'active';
+    }
+    return 'todo';
+  }
+  el.innerHTML = ex.length? ex.map(e=>{
+    // 名單：本班學生＋本場有鎖嘅人（防止漏網）
+    const seen=new Map();
+    getStudents().filter(s=>hasClass(s,e.className)).forEach(s=>seen.set(stuName(s),1));
+    for(const n in locks){ if(locks[n].code===e.code) seen.set(n,1); }
+    const names=[...seen.keys()].filter(Boolean).sort((a,b)=>a.localeCompare(b,'zh-Hans-CN'));
+    let done=0, active=0, todo=0;
+    const chips=names.map(n=>{
+      const st=statusOf(n,e.code);
+      if(st==='done') done++;
+      else if(st==='active') active++;
+      else todo++;
+      const col=st==='done'?'#16a34a':st==='active'?'#eab308':'#9ca3af';
+      const txt=st==='done'?'已完成':st==='active'?'作答中':'未開始';
+      return `<span style="display:inline-block;margin:2px;padding:2px 8px;border-radius:12px;background:${col};color:#fff;font-size:12px">${esc(n)} · ${txt}</span>`;
+    }).join('');
+    const pname=e.useAll||(!e.paperIds?.length&&!e.paperId)?'全部題庫':(e.paperIds&&e.paperIds.length>1?'混合卷('+e.paperIds.length+'張)':(paperById(e.paperId)?.name||'考卷'));
+    return `<div style="padding:8px;border-bottom:1px solid var(--line)">
+      <b>碼 ${e.code}</b> · ${esc(e.className)} · ${esc(pname)} · 剩餘 ${Math.max(0,Math.round((e.expireAt-Date.now())/3600000*10)/10)}小時
+      <div style="margin:6px 0;font-size:13px">
+        <span style="color:#16a34a">已完成 ${done}</span> ·
+        <span style="color:#ca8a04">作答中 ${active}</span> ·
+        <span class="muted">未開始 ${todo}</span> · 共 ${names.length} 人
+      </div>
+      <div style="margin:6px 0;line-height:2">${chips||'<span class="muted">名單為空</span>'}</div>
+      <button class="btn danger" style="margin-top:6px;padding:8px" onclick="endExam('${e.code}')">結束呢場考試</button></div>`;
+  }).join('') : '<span class="muted">冇進行中考試</span>';
 }
 function delPaper(id){ if(!confirm('確認拆除呢張卷？'))return; DB.set(K.papers, getPapers().filter(p=>p.id!==id)); renderSub('papers'); }
 function endExam(code){ DB.set(K.exams, getExams().filter(e=>e.code!==code)); const locks=getLocks(); for(const k in locks) if(locks[k].code===code) delete locks[k]; DB.set(K.locks,locks); renderSub('launch'); }
