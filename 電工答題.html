@@ -328,8 +328,8 @@ function refreshHomeOptions(){
 async function syncHomeNow(){
   try{ await Cloud.pull(); }catch(e){}
   try{
-    const pp=await Cloud.raw('papers','GET'); if(Array.isArray(pp)) DB.set(K.papers,pp);
-    const ee=await Cloud.raw('exams','GET'); if(Array.isArray(ee)) DB.set(K.exams,ee);
+    const pp=await Cloud.raw('papers','GET'); DB.set(K.papers,toArr(pp));
+    const ee=await Cloud.raw('exams','GET'); DB.set(K.exams,toArr(ee));
   }catch(e){}
   refreshHomeOptions(); updateVerDisplay();
   toast('已同步最新考試資料');
@@ -538,6 +538,8 @@ function reloadNameList(){
   sel.innerHTML='<option value="-1">— 請揀名 —</option>'+currentRoster.map((s,i)=>`<option value="${i}">${esc(stuName(s))}</option>`).join('');
 }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// Firebase 有时回传对象（按键），统一转成数组，避免 Array.isArray 误判跳过
+function toArr(v){ if(Array.isArray(v)) return v; if(v&&typeof v==='object') return Object.values(v); return []; }
 
 document.getElementById('btn-start').onclick = async function(){
   const warn=document.getElementById('home-warn'); warn.style.display='none';
@@ -551,8 +553,8 @@ document.getElementById('btn-start').onclick = async function(){
   try{ await Cloud.pull(); }catch(e){}
   // 保險：直接重拉考卷同考試碼兩節，寫入本機再核對（唔靠一次性靜默同步）
   try{
-    const pp=await Cloud.raw('papers','GET'); if(Array.isArray(pp)) DB.set(K.papers,pp);
-    const ee=await Cloud.raw('exams','GET'); if(Array.isArray(ee)) DB.set(K.exams,ee);
+    const pp=await Cloud.raw('papers','GET'); DB.set(K.papers,toArr(pp));
+    const ee=await Cloud.raw('exams','GET'); DB.set(K.exams,toArr(ee));
   }catch(e){}
   const exam=examByCode(code);
   if(!exam){ warnMsg('考試碼唔啱或者已過期'); return; }
