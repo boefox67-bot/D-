@@ -157,6 +157,8 @@
       <h1>老師管理</h1>
       <p>登入成功先見到功能</p>
       <p id="t-online" class="muted" style="font-size:13px;margin:4px 0 0"></p>
+      <button class="btn secondary" id="t-signout" style="width:auto;padding:6px 12px;margin:6px 0 0;font-size:13px" onclick="fireTeacherSignout()">通知其他老師30秒後登出</button>
+      <div id="t-countdown" style="display:none;margin:6px 0;padding:8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;font-size:13px"></div>
       <button class="btn secondary" style="position:fixed;right:12px;top:12px;width:auto;padding:6px 14px;margin:0;font-size:13px;z-index:100" onclick="quickRefresh()">刷新</button>
       <div id="verBadge" style="position:fixed;right:12px;top:48px;width:auto;padding:4px 12px;margin:0;font-size:11px;z-index:100;background:#1e293b;color:#fff;border-radius:6px">版本 V4.4</div>
     </div>
@@ -205,18 +207,20 @@ const K = {
   exams:'quiz_exams_v1', curExam:'quiz_cur_exam', classes:'quiz_classes_v1',
   students:'quiz_students_v1', locks:'quiz_name_locks', attempts:'quiz_attempts_v1',
   lastAttempt:'quiz_last_attempt', isTeacher:'quiz_is_teacher', pwd:'quiz_teacher_pwd',
-  curClass:'quiz_cur_class', userName:'quiz_user_name', ver:'quiz_paper_version'
+  curClass:'quiz_cur_class', userName:'quiz_user_name', ver:'quiz_paper_version',
+  tsesh:'quiz_teacher_session'
 };
 
 /* ================= 雲端同步（Firebase Realtime Database REST，可選；唔設網址就退回純本機） ================= */
 const CLOUD_KEY='quiz_cloud_url';
 // 部署前把 Firebase 網址填到下面引號內，所有手機會自動共用同一個雲端，唔使逐部機設定
 const DEFAULT_CLOUD_URL='https://project-3342944994395704108-default-rtdb.firebaseio.com';
-const SERVER_KEYS=['questions','papers','exams','classes','students','attempts','locks','pwd','ver'];
+const SERVER_KEYS=['questions','papers','exams','classes','students','attempts','locks','pwd','ver','tsesh'];
 // 云端裸名 -> 本机 localStorage 键（K 里带 quiz_ 前缀）
 const SERVER_MAP={
   questions:K.questions, papers:K.papers, exams:K.exams, classes:K.classes,
-  students:K.students, attempts:K.attempts, locks:K.locks, pwd:K.pwd, ver:K.ver
+  students:K.students, attempts:K.attempts, locks:K.locks, pwd:K.pwd, ver:K.ver,
+  tsesh:K.tsesh
 };
 const Cloud={
   _timers:{},
@@ -803,7 +807,7 @@ function renderTeacher(){
   const logged=DB.get(K.isTeacher,false)===true;
   document.getElementById('teacher-loginCard').style.display=logged?'none':'block';
   document.getElementById('teacher-panel').style.display=logged?'block':'none';
-  if(logged){ renderSub(''); refreshTeacherOnline(); }
+  if(logged){ renderSub(''); refreshTeacherOnline(); if(DB.get(K.tsesh,null)) armLocalLogout(); }
 }
 document.querySelectorAll('#t-grid1 button, #t-grid2 button').forEach(b=>{
   b.onclick=()=>{
@@ -1540,6 +1544,38 @@ function renderSub(g){
       DB.set(K.pwd,p1); toast('密碼已更新'); renderSub('chgpwd');
     };
   }
+}
+// 30秒无动作本地闲置自动登出：只在本机倒计时，不做云端定时刷新；发信号通知其他老师
+function fireTeacherSignout(){
+  DB.set(K.tsesh,{start:Date.now(), signoutAt:Date.now()+30000});
+  armLocalLogout();
+  toast('已通知，30秒無動作將自動登出');
+}
+function cancelTeacherSignout(){
+  DB.remove(K.tsesh);
+  if(window._act){ ['mousemove','keydown','click','touchstart'].forEach(ev=>document.removeEventListener(ev,window._act,true)); window._act=null; }
+  if(window._lt){ clearInterval(window._lt); window._lt=null; }
+  const box=document.getElementById('t-countdown'); if(box) box.style.display='none';
+}
+function armLocalLogout(){
+  cancelTeacherSignout();
+  let logoutAt=Date.now()+30000;
+  const box=document.getElementById('t-countdown');
+  window._act=()=>{ logoutAt=Date.now()+30000; };
+  ['mousemove','keydown','click','touchstart'].forEach(ev=>document.addEventListener(ev,window._act,true));
+  window._lt=setInterval(()=>{
+    const left=logoutAt-Date.now();
+    if(box){
+      box.style.display='block';
+      box.innerHTML=`30秒無動作將登出，剩 <b>${Math.ceil(left/1000)}</b> 秒　<button class="btn secondary" style="width:auto;padding:4px 10px;margin:0;font-size:12px" onclick="cancelTeacherSignout()">取消</button>`;
+    }
+    if(left<=0){
+      cancelTeacherSignout();
+      DB.remove(K.isTeacher);
+      renderTeacher();
+      alert('30秒無動作，已自動登出');
+    }
+  },1000);
 }
 // 老师左上角：当前有效考场内作答中/已完成人数
 function refreshTeacherOnline(){
