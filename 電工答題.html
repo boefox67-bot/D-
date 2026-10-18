@@ -1618,13 +1618,14 @@ async function refreshTeacherOnline(){
     el.textContent='在線老師 '+Math.max(1,n)+' 人';
   }catch(e){ el.textContent='在線老師 1 人（本機）'; }
 }
-// 30秒无动作自动登出：发云端信号，其他已登入老师手动刷新即收到通知；本机倒计时，不开云端定时刷新
+// 通知其他老师：自己界面不弹倒计时，只发云端信号；其他老师刷新收到后30秒登出；自己30秒后做一次更新
 function fireTeacherSignout(){
   const payload={start:Date.now(), signoutAt:Date.now()+30000, by:teacherDevId()};
-  DB.set(K.tsesh,payload);
   if(Cloud.enabled()){ Cloud.raw('tsesh','PUT',payload).catch(()=>{}); }
-  armLocalLogout();
-  toast('已通知其他老師，30秒無動作將自動登出');
+  // 自己唔即时弹遮罩，30秒后自动更新一次，或者按右上角刷新更新
+  if(window._selfRefresh) clearTimeout(window._selfRefresh);
+  window._selfRefresh=setTimeout(()=>{ try{ quickRefresh(); }catch(e){} },30000);
+  toast('已通知其他老師，佢哋刷新後30秒無動作將登出');
 }
 async function cancelTeacherSignout(){
   DB.remove(K.tsesh);
@@ -1639,7 +1640,8 @@ async function checkCloudSignout(){
   if(!Cloud.enabled()) return;
   try{
     const sig=await Cloud.raw('tsesh','GET');
-    if(sig&&sig.signoutAt&&sig.signoutAt>Date.now()){ DB.set(K.tsesh,sig); armLocalLogout(); toast('收到老師登出通知，30秒無動作將登出'); }
+    // 发起人自己唔弹倒计时，只通知其他老师
+    if(sig&&sig.signoutAt&&sig.signoutAt>Date.now()&&sig.by!==teacherDevId()){ DB.set(K.tsesh,sig); armLocalLogout(); toast('收到老師登出通知，30秒無動作將登出'); }
   }catch(e){}
 }
 function armLocalLogout(){
