@@ -76,6 +76,14 @@
     </div>
     <div class="card">
       <h2>輸入考試碼入場</h2>
+      <!-- 同步入口：按一下由雲端即時更新，完成後呢塊自動消失，返回一般入場介面 -->
+      <div id="home-sync" style="text-align:center;margin:4px 0 14px">
+        <button type="button" id="btn-manualRefresh" onclick="manualRefreshHome()" style="width:100%;padding:14px 12px;border:2px solid var(--blue);background:#eef4ff;color:var(--blue);border-radius:10px;cursor:pointer">
+          <div id="sync-logo" style="font-size:18px;font-weight:700;letter-spacing:1px;margin-bottom:4px">飛躍教育中心</div>
+          <div style="font-size:15px;font-weight:600">立即重新整理入場</div>
+          <div style="font-size:12px;opacity:.75;margin-top:2px">老師改完／開新卷先按呢個</div>
+        </button>
+      </div>
       <label>考試碼（老師派發嘅數字）</label>
       <input id="in-code" inputmode="numeric" placeholder="例如 1234">
       <label>班次（第一欄揀、第二欄自動同步）</label>
@@ -89,7 +97,6 @@
       <label>第二欄：填寫同名</label>
       <input id="in-nameType" placeholder="打返頭先揀嗰個名">
       <div class="warn" id="home-warn" style="display:none"></div>
-      <button type="button" class="btn secondary" id="btn-manualRefresh" style="width:auto;padding:8px 16px;margin:0 0 8px;font-size:14px" onclick="manualRefreshHome()">立即重新整理（老師改完／開新卷按呢個）</button>
       <button class="btn" id="btn-start">開始考試</button>
       <button class="btn secondary" id="btn-teacherEntry">老師入口</button>
     </div>
@@ -300,13 +307,22 @@ function refreshHomeOptions(){
   }
   updateVerDisplay();
 }
-// 學生手動按「立即重新整理」：即刻由雲端拉最新班次／名單／考卷，唔使等 30 秒
+// 學生手動按「立即重新整理」：即刻由雲端拉最新班次／名單／考卷；成功後同步塊自動消失，返回一般入場介面
 async function manualRefreshHome(){
+  const box=document.getElementById('home-sync');
+  const btn=document.getElementById('btn-manualRefresh');
+  if(btn){ btn.disabled=true; btn.style.opacity='.7'; }
   let ok=false;
   try{ ok=await Cloud.pull(); }catch(e){ ok=false; }
-  refreshHomeOptions();
-  updateVerDisplay();
-  toast(ok?'已更新最新班次・名單・考卷':'連線失敗，請檢查網絡再試一次');
+  if(ok){
+    refreshHomeOptions();
+    updateVerDisplay();
+    if(box) box.style.display='none';
+    toast('已更新最新班次・名單・考卷');
+  } else {
+    if(btn){ btn.disabled=false; btn.style.opacity='1'; }
+    toast('連線失敗，請檢查網絡再試一次');
+  }
 }
 function cloudRefreshView(){
   const active=document.querySelector('.view.active');
