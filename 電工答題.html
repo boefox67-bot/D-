@@ -233,6 +233,19 @@ const Cloud={
   async pushAll(){
     if(!this.enabled()) return;
     for(const b of SERVER_KEYS){ const v=DB.get(SERVER_MAP[b], undefined); if(v!==undefined) await this.raw(b,'PUT',v); }
+  },
+  // 用雲端整份資料覆蓋本機現有檔案：雲端有就寫入，雲端冇就清除本機，令兩邊完全一致
+  async forceDownload(){
+    if(!this.enabled()) return {ok:false, n:0};
+    const data=await this.raw('','GET');
+    if(!data||typeof data!=='object') return {ok:false, n:0};
+    let n=0;
+    SERVER_KEYS.forEach(b=>{
+      const lk=SERVER_MAP[b];
+      if(data[b]!==undefined){ DB.set(lk,data[b]); n++; }
+      else { localStorage.removeItem(lk); }
+    });
+    return {ok:true, n};
   }
 };
 window.Cloud=Cloud;
@@ -1278,6 +1291,7 @@ function renderSub(g){
         <input id="CL-url" placeholder="https://xxxx-default-rtdb.firebaseio.com" value="${esc(cur)}">
         <button class="btn" id="CL-save">保存並測試連線</button>
         <button class="btn secondary" id="CL-pull">立即由雲端拉取最新資料</button>
+        <button class="btn secondary" id="CL-overwrite">用雲端覆蓋本機檔案</button>
         <button class="btn secondary" id="CL-push">把本機全部資料上傳雲端</button>
         <p class="muted" style="margin-top:12px;font-size:12px;line-height:1.7">
         唔填就純本機使用（換機唔同步）。填咗之後：老師加班／加學生／改題、學生交卷成績都會自動同步到所有手機，每 20 秒更新一次。<br>
@@ -1300,6 +1314,12 @@ function renderSub(g){
     };
     document.getElementById('CL-pull').onclick=async()=>{
       const ok=await Cloud.pull(); toast(ok?'已由雲端拉取':'拉取失敗（未設定或連線錯誤）'); renderSub('cloud');
+    };
+    document.getElementById('CL-overwrite').onclick=async()=>{
+      if(!confirm('確定用雲端資料**覆蓋本機現有檔案**？本機嘅班次／學生／考卷／題庫／版本會被雲端那份取代，無法還原。')) return;
+      const r=await Cloud.forceDownload();
+      toast(r.ok?('已用雲端覆蓋本機（同步 '+r.n+' 項）'):'覆蓋失敗（雲端空白或連線錯誤）');
+      renderSub('cloud'); cloudRefreshView();
     };
     document.getElementById('CL-push').onclick=async()=>{
       if(!confirm('確定把本機（此裝置）全部資料上傳並覆蓋雲端？')) return;
