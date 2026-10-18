@@ -68,7 +68,15 @@
 <body>
 <!-- 進場封面：封鎖整個畫面，輕觸一下同時讀取雲端並刷新，然後進入學生介面 -->
 <div id="splash" onclick="splashEnter()" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(160deg,#0d2a5e 0%,#1e468c 60%,#2563b8 100%);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;text-align:center;padding:24px">
-  <div style="font-size:38px;font-weight:800;letter-spacing:6px">飛躍教育中心</div>
+  <!-- 預設徽章標誌；之後收到真 logo 圖可直接換成 <img> -->
+  <svg width="150" height="150" viewBox="0 0 150 150" style="margin-bottom:24px;filter:drop-shadow(0 8px 20px rgba(0,0,0,.35))" role="img" aria-label="飛躍教育中心標誌">
+    <circle cx="75" cy="75" r="70" fill="#ffffff" opacity="0.12"/>
+    <circle cx="75" cy="75" r="65" fill="none" stroke="#f5c65b" stroke-width="3"/>
+    <circle cx="75" cy="75" r="56" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.35"/>
+    <text x="75" y="74" text-anchor="middle" font-size="38" font-weight="800" fill="#ffffff" font-family="sans-serif" letter-spacing="4">飛躍</text>
+    <text x="75" y="102" text-anchor="middle" font-size="15" fill="#f5c65b" font-family="sans-serif" letter-spacing="4">教育中心</text>
+  </svg>
+  <div style="font-size:34px;font-weight:800;letter-spacing:5px">飛躍教育中心</div>
   <div style="margin-top:14px;font-size:16px;opacity:.9">初級維修電工課程 · 電工答題系統</div>
   <div id="splash-tip" style="margin-top:42px;font-size:14px;opacity:.75;animation:blink 1.6s infinite">輕觸螢幕進入</div>
 </div>
