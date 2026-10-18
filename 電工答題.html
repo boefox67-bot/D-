@@ -803,6 +803,16 @@ function renderSub(g){
     }
     document.getElementById('C-search').oninput=applyStuFilter;
     document.getElementById('C-filterCls').onchange=applyStuFilter;
+    // 點學生列一次即展開改班，唔使按兩下
+    document.querySelectorAll('#C-stuList details').forEach(det=>{
+      const sum=det.querySelector('summary');
+      if(sum) sum.addEventListener('click',e=>{ if(!det.open){ det.open=true; e.preventDefault(); } });
+    });
+    // 點選班文字格即勾選，用 cb.click() 觸發 change，確保改班會儲存
+    document.querySelectorAll('#C-stuClsBox2 label, #C-stuList label').forEach(lb=>{
+      const cb=lb.querySelector('input[type=checkbox]');
+      if(cb) lb.addEventListener('click',e=>{ if(e.target===cb) return; e.preventDefault(); cb.click(); });
+    });
     document.getElementById('C-addBtn').onclick=()=>{
       const n=document.getElementById('C-add').value.trim();
       if(!n) return toast('輸入班次名');
@@ -945,7 +955,7 @@ function renderSub(g){
     };
   }
   if(g==='papers'){
-    const papers=getPapers();
+    const papers=getPapers().slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'zh-Hans-CN'));
     el.innerHTML=subHead('考卷管理')+`
       <div>${papers.map(p=>`<div style="padding:12px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px">
         <b>${esc(p.name)}</b> <span class="muted">（${p.questions.length} 題）</span>
