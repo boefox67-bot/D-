@@ -152,7 +152,7 @@
     <div class="topbar">
       <h1>老師管理</h1>
       <p>登入成功先見到功能</p>
-      <button class="btn secondary" style="position:fixed;right:12px;top:12px;width:auto;padding:6px 14px;margin:0;font-size:13px;z-index:100" onclick="const _y=window.scrollY;renderSub(curSub);window.scrollTo(0,_y);toast('已刷新')">刷新</button>
+      <button class="btn secondary" style="position:fixed;right:12px;top:12px;width:auto;padding:6px 14px;margin:0;font-size:13px;z-index:100" onclick="quickRefresh()">刷新</button>
       <div id="verBadge" style="position:fixed;right:12px;top:48px;width:auto;padding:4px 12px;margin:0;font-size:11px;z-index:100;background:#1e293b;color:#fff;border-radius:6px">版本 V4.4</div>
     </div>
     <div class="card" id="teacher-loginCard">
@@ -797,6 +797,13 @@ async function cloudSaveAll(){
   if(!confirm('確定把本機（此裝置）全部資料上傳，覆蓋雲端同其他裝置？')) return;
   await Cloud.pushAll();
   toast('已儲存到雲端');
+}
+// 右上角「刷新」：即時由雲端拉最新資料并重画当前页，不用定时器、不覆盖本机独有数据
+async function quickRefresh(){
+  const y=window.scrollY;
+  try{ await Cloud.pull(); }catch(e){}
+  updateVerDisplay(); renderSub(curSub); window.scrollTo(0,y);
+  toast('已由雲端刷新');
 }
 async function cloudRefreshAll(){
   if(!Cloud.enabled()) return toast('未設定雲端網址');
