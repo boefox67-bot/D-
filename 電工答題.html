@@ -520,7 +520,7 @@ function reloadNameList(){
 }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-document.getElementById('btn-start').onclick = function(){
+document.getElementById('btn-start').onclick = async function(){
   const warn=document.getElementById('home-warn'); warn.style.display='none';
   const code=document.getElementById('in-code').value.trim();
   const cls1=document.getElementById('in-classSelect').value;
@@ -528,6 +528,8 @@ document.getElementById('btn-start').onclick = function(){
   const si=Number(document.getElementById('in-nameSelect').value);
   const name=document.getElementById('in-nameType').value.trim();
   if(!code){ warnMsg('請輸入考試碼'); return; }
+  // 入場前先由雲端拉最新考試碼同考卷，避免本機未同步就誤判無效
+  try{ await Cloud.pull(); }catch(e){}
   const exam=examByCode(code);
   if(!exam){ warnMsg('考試碼唔啱或者已過期'); return; }
   // 只認有效考卷：連結嘅卷要存在且有題，否則拒絕入場
