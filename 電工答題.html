@@ -156,9 +156,11 @@
     <div class="topbar">
       <h1>老師管理</h1>
       <p>登入成功先見到功能</p>
-      <p id="t-online" class="muted" style="font-size:13px;margin:4px 0 0"></p>
-      <button class="btn secondary" id="t-signout" style="width:auto;padding:6px 12px;margin:6px 0 0;font-size:13px" onclick="fireTeacherSignout()">通知其他老師30秒後登出</button>
-      <div id="t-countdown" style="display:none;margin:6px 0;padding:8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;font-size:13px"></div>
+      <div id="t-only" style="display:none">
+        <p id="t-online" class="muted" style="font-size:13px;margin:4px 0 0"></p>
+        <button class="btn secondary" id="t-signout" style="width:auto;padding:6px 12px;margin:6px 0 0;font-size:13px" onclick="fireTeacherSignout()">通知其他老師30秒後登出</button>
+        <div id="t-countdown" style="display:none;margin:6px 0;padding:8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;font-size:13px"></div>
+      </div>
       <button class="btn secondary" style="position:fixed;right:12px;top:12px;width:auto;padding:6px 14px;margin:0;font-size:13px;z-index:100" onclick="quickRefresh()">刷新</button>
       <div id="verBadge" style="position:fixed;right:12px;top:48px;width:auto;padding:4px 12px;margin:0;font-size:11px;z-index:100;background:#1e293b;color:#fff;border-radius:6px">版本 V4.4</div>
     </div>
@@ -811,16 +813,22 @@ document.getElementById('t-login').onclick=()=>{
   renderTeacher();
   Cloud.seedMissing();
 };
+function teacherDevId(){
+  let id=localStorage.getItem('quiz_teacher_dev');
+  if(!id){ id='t'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); localStorage.setItem('quiz_teacher_dev',id); }
+  return id;
+}
 function renderTeacher(){
   const logged=DB.get(K.isTeacher,false)===true;
   document.getElementById('teacher-loginCard').style.display=logged?'none':'block';
   document.getElementById('teacher-panel').style.display=logged?'block':'none';
-  if(logged){ renderSub(''); refreshTeacherOnline(); if(DB.get(K.tsesh,null)) armLocalLogout(); }
+  const only=document.getElementById('t-only'); if(only) only.style.display=logged?'block':'none';
+  if(logged){ renderSub(''); registerOnline(); refreshTeacherOnline(); checkCloudSignout(); }
 }
 document.querySelectorAll('#t-grid1 button, #t-grid2 button').forEach(b=>{
   b.onclick=()=>{
     const g=b.dataset.go;
-    if(g==='logout'){ DB.remove(K.isTeacher); renderTeacher(); return; }
+    if(g==='logout'){ DB.remove(K.isTeacher); deregisterOnline(); renderTeacher(); return; }
     renderSub(g);
   };
 });
@@ -834,6 +842,7 @@ async function cloudSaveAll(){
 async function quickRefresh(){
   const y=window.scrollY;
   try{ await Cloud.pull(); }catch(e){}
+  registerOnline(); checkCloudSignout();
   updateVerDisplay(); renderSub(curSub); refreshTeacherOnline(); window.scrollTo(0,y);
   toast('已由雲端刷新');
 }
@@ -1553,17 +1562,49 @@ function renderSub(g){
     };
   }
 }
-// 30秒无动作本地闲置自动登出：只在本机倒计时，不做云端定时刷新；发信号通知其他老师
-function fireTeacherSignout(){
-  DB.set(K.tsesh,{start:Date.now(), signoutAt:Date.now()+30000});
-  armLocalLogout();
-  toast('已通知，30秒無動作將自動登出');
+// 在线老师登记：只记录已登入老师，唔系考场学生；手动刷新时更新，不开定时器
+async function registerOnline(){
+  if(!Cloud.enabled()) return;
+  try{ await Cloud.raw('online/'+teacherDevId(),'PUT',{at:Date.now()}); }catch(e){}
 }
-function cancelTeacherSignout(){
+async function deregisterOnline(){
+  if(!Cloud.enabled()) return;
+  try{ await Cloud.raw('online/'+teacherDevId(),'DELETE'); }catch(e){}
+}
+// 老师左上角：显示「已登入老师人数」，唔系考场作答学生
+async function refreshTeacherOnline(){
+  const el=document.getElementById('t-online'); if(!el) return;
+  el.textContent='在線老師 …';
+  if(!Cloud.enabled()){ el.textContent='在線老師 1 人（本機）'; return; }
+  try{
+    const all=await Cloud.raw('online','GET');
+    const now=Date.now(); let n=0;
+    if(all&&typeof all==='object'){ for(const k in all){ const o=all[k]; if(o&&o.at&&now-Number(o.at)<180000) n++; } }
+    el.textContent='在線老師 '+Math.max(1,n)+' 人';
+  }catch(e){ el.textContent='在線老師 1 人（本機）'; }
+}
+// 30秒无动作自动登出：发云端信号，其他已登入老师手动刷新即收到通知；本机倒计时，不开云端定时刷新
+function fireTeacherSignout(){
+  const payload={start:Date.now(), signoutAt:Date.now()+30000, by:teacherDevId()};
+  DB.set(K.tsesh,payload);
+  if(Cloud.enabled()){ Cloud.raw('tsesh','PUT',payload).catch(()=>{}); }
+  armLocalLogout();
+  toast('已通知其他老師，30秒無動作將自動登出');
+}
+async function cancelTeacherSignout(){
   DB.remove(K.tsesh);
+  if(Cloud.enabled()){ try{ await Cloud.raw('tsesh','DELETE'); }catch(e){} }
   if(window._act){ ['mousemove','keydown','click','touchstart'].forEach(ev=>document.removeEventListener(ev,window._act,true)); window._act=null; }
   if(window._lt){ clearInterval(window._lt); window._lt=null; }
   const box=document.getElementById('t-countdown'); if(box) box.style.display='none';
+}
+// 登入／刷新时检查云端有冇收到登出通知
+async function checkCloudSignout(){
+  if(!Cloud.enabled()) return;
+  try{
+    const sig=await Cloud.raw('tsesh','GET');
+    if(sig&&sig.signoutAt&&sig.signoutAt>Date.now()){ DB.set(K.tsesh,sig); armLocalLogout(); toast('收到老師登出通知，30秒無動作將登出'); }
+  }catch(e){}
 }
 function armLocalLogout(){
   cancelTeacherSignout();
@@ -1575,22 +1616,21 @@ function armLocalLogout(){
     const left=logoutAt-Date.now();
     if(box){
       box.style.display='block';
-      box.innerHTML=`30秒無動作將登出，剩 <b>${Math.ceil(left/1000)}</b> 秒　<button class="btn secondary" style="width:auto;padding:4px 10px;margin:0;font-size:12px" onclick="cancelTeacherSignout()">取消</button>`;
+      box.innerHTML=`收到登出通知：30秒無動作將登出，剩 <b>${Math.ceil(left/1000)}</b> 秒　<button class="btn secondary" style="width:auto;padding:4px 10px;margin:0;font-size:12px" onclick="cancelTeacherSignout()">取消，我仲喺度</button>`;
     }
     if(left<=0){
       cancelTeacherSignout();
+      deregisterOnline();
       DB.remove(K.isTeacher);
       renderTeacher();
       alert('30秒無動作，已自動登出');
     }
   },1000);
 }
-// 老师左上角：当前有效考场内作答中/已完成人数
-function refreshTeacherOnline(){
-  const el=document.getElementById('t-online'); if(!el) return;
-  const locks=getLocks(); let act=0,done=0;
-  for(const n in locks){ const lk=locks[n]; if(!lk||!examByCode(lk.code)) continue; if(lk.state==='active') act++; else if(lk.state==='submitted') done++; }
-  el.textContent='作答中 '+act+' 人 · 已完成 '+done+' 人';
+function toggleExamPapers(code){
+  window._expExams=window._expExams||{};
+  window._expExams[code]=!window._expExams[code];
+  renderActiveExams();
 }
 function renderActiveExams(){
   refreshTeacherOnline();
@@ -1621,7 +1661,17 @@ function renderActiveExams(){
       const txt=st==='done'?'已完成':st==='active'?'作答中':'未開始';
       return `<span style="display:inline-block;margin:2px;padding:2px 8px;border-radius:12px;background:${col};color:#fff;font-size:12px">${esc(n)} · ${txt}</span>`;
     }).join('');
-    const pname=e.useAll||(!e.paperIds?.length&&!e.paperId)?'全部題庫':(e.paperIds&&e.paperIds.length>1?'混合卷('+e.paperIds.length+'張)':(paperById(e.paperId)?.name||'考卷'));
+    const isMixed=e.paperIds&&e.paperIds.length>1;
+    const pname=e.useAll||(!e.paperIds?.length&&!e.paperId)?'全部題庫':(isMixed?'混合卷('+e.paperIds.length+'張)':(paperById(e.paperId)?.name||'考卷'));
+    window._expExams=window._expExams||{};
+    const expanded=!!window._expExams[e.code];
+    // 混合卷组成清单（可折叠展开）
+    let paperList='';
+    if(isMixed){
+      const rows=e.paperIds.map(pid=>{ const p=paperById(pid); const qn=p&&p.questions?p.questions.length:0; return `<div style="font-size:13px;padding:2px 0">· ${esc(p?p.name:'卷'+pid)}（${qn}題）</div>`; }).join('');
+      paperList=`<button class="btn secondary" style="width:auto;padding:5px 12px;margin:4px 0;font-size:12px" onclick="toggleExamPapers('${e.code}')">${expanded?'收起考卷':'展開混合卷（'+e.paperIds.length+'張）'}</button>
+      <div id="papers-${e.code}" style="display:${expanded?'block':'none'};margin:4px 0 8px 8px;padding:6px 10px;background:#f1f5f9;border-radius:8px">${rows}</div>`;
+    }
     // 計應考題數：抽指定題數就顯示抽數，否則顯示總題數
     let poolN=0;
     if(e.useAll){ poolN=getQuestions().length; }
@@ -1632,6 +1682,7 @@ function renderActiveExams(){
     const ordTxt=e.order==='rand'?'隨機出題':'順序出題';
     return `<div style="padding:8px;border-bottom:1px solid var(--line)">
       <b>碼 ${e.code}</b> · ${esc(e.className)} · ${esc(pname)} · ${ordTxt} · ${showN}題 · 剩餘 ${Math.max(0,Math.round((e.expireAt-Date.now())/3600000*10)/10)}小時
+      ${paperList}
       <div style="margin:6px 0;font-size:13px">
         <span style="color:#16a34a">已完成 ${done}</span> ·
         <span style="color:#ca8a04">作答中 ${active}</span> ·
