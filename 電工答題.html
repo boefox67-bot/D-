@@ -737,7 +737,7 @@ document.getElementById('btn-submit').onclick=()=>{
   else if(exam.paperId){ const p=paperById(exam.paperId); pn=p?p.name:'考卷#'+exam.paperId; }
   const attempt={
     name, className:exam.className||'', paperName:pn,
-    score:Math.round(gotScore*10)/10, total:list.length, totalScore,
+    score:Math.round(gotScore*10)/10, total:list.length, totalScore:Math.round(totalScore*10)/10,
     score100: totalScore?Math.min(100, Math.round(gotScore/totalScore*100)):0,
     order:exam.order==='rand'?'随机':'順序',
     date:new Date().toLocaleString('zh-HK'),
@@ -1086,13 +1086,19 @@ function renderSub(g){
         const dt=String(a.date||'').split(/\s+/);
         const dateStr=dt[0]||'';
         const timeStr=dt.slice(1).join(' ')||'';
+        // 错题按卷一组：卷名一行，下面写该卷错题号，卷名唔重复写
+        const groups={};
+        (a.wrong||[]).forEach(w=>{ const pk=w.paper||'全部題庫'; (groups[pk]=groups[pk]||[]).push(w.orig||w.i); });
+        const wrongTxt=Object.keys(groups).length
+          ? Object.keys(groups).map(pk=>`<div style="margin:4px 0;padding:6px 8px;background:#f8fafc;border:1px solid var(--line);border-radius:8px"><div style="font-weight:600">${esc(pk)}</div><div style="margin-top:2px">錯題：${groups[pk].join('、')}</div></div>`).join('')
+          : '—';
         return `<tr>
         <td><button class="btn danger" style="width:auto;padding:4px 10px;margin:0;font-size:12px" data-del-attempt="${ri}">拆除</button></td>
         <td style="white-space:nowrap">${esc(dateStr)}<br><span class="muted" style="font-size:11px">${esc(timeStr)}</span></td>
         <td>${esc(a.className)}</td><td><b>${esc(a.name)}</b></td>
-        <td>${esc(a.paperName)}</td><td>${a.score}/${a.totalScore}</td>
+        <td>${esc(a.paperName)}</td><td>${a.score100}/100</td>
         <td><span class="tag ${a.score100>=60?'ok':'bad'}">${a.score100}%</span></td>
-        <td>${(a.wrong||[]).map(w=>`${w.paper||''}#${w.orig||w.i}`).join('、')||'—'}</td></tr>`;
+        <td style="font-size:13px">${wrongTxt}</td></tr>`;
       }).join('')||'<tr><td colspan="8" class="muted">暫無成績</td></tr>';
     }
     let curList=sortedAll;
@@ -1139,7 +1145,7 @@ function renderSub(g){
         const gKeys=Object.keys(groups).slice(0,5);
         const row={
           日期:a.date,班次:a.className,姓名:a.name,卷名:a.paperName,
-          得分:a.score,總分:a.totalScore,正確率:a.score100+'%',
+          得分:a.score100,總分:100,正確率:a.score100+'%',
           答對:(a.total-(a.wrong||[]).length)+'/'+a.total,
           次序:a.order||'',狀態:a.score100>=60?'合格':'不合格'
         };
