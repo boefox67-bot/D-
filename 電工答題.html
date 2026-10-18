@@ -1764,9 +1764,9 @@ document.getElementById('view-home').classList.add('active');
 updateVerBadge();
 updateVerDisplay();
 renderHome();
-// 開機先由雲端拉取最新資料，再每 5 秒同步一次（靜默同步唔會清空學生已填內容）
+// 開機先由雲端拉取最新資料，再每 30 秒同步一次（靜默同步唔會清空學生已填內容）
 Cloud.pull().then(ok=>{ if(ok){ cloudRefreshView(); updateVerDisplay(); } });
-setInterval(()=>{ Cloud.pull().then(ok=>{ if(ok){ cloudRefreshView(); updateVerDisplay(); } }); },5000);
+setInterval(()=>{ Cloud.pull().then(ok=>{ if(ok){ cloudRefreshView(); updateVerDisplay(); } }); },30000);
 </script>
 </body>
 </html>
