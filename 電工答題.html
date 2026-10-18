@@ -212,7 +212,7 @@ const Cloud={
     const bare=this.bareOf(key);
     if(!this.enabled() || !bare) return;
     clearTimeout(this._timers[bare]);
-    this._timers[bare]=setTimeout(()=>this.pushKey(bare,val), bare==='attempts'?800:400);
+    this._timers[bare]=setTimeout(()=>this.pushKey(bare,val), bare==='attempts'?800:150);
   },
   async pushKey(bare,val){
     try{
@@ -251,6 +251,18 @@ const Cloud={
       else { localStorage.removeItem(lk); }
     });
     return {ok:true, n};
+  },
+  // 非破壞性補種：雲端某節點為空、但本機有資料，就把本機補傳上去；雲端已有就唔掂（唔覆蓋）
+  async seedMissing(){
+    if(!this.enabled()) return;
+    for(const b of SERVER_KEYS){
+      let cloudVal;
+      try{ cloudVal=await this.raw(b,'GET'); }catch(e){ continue; }
+      if(cloudVal!==undefined && cloudVal!==null) continue;
+      const local=DB.get(SERVER_MAP[b], undefined);
+      const empty = local===undefined || local===null || (Array.isArray(local)&&local.length===0) || (typeof local==='string'&&!local.trim());
+      if(!empty){ try{ await this.raw(b,'PUT',local); }catch(e){ console.warn('補種失敗',b,e); } }
+    }
   }
 };
 window.Cloud=Cloud;
@@ -656,6 +668,7 @@ document.getElementById('t-login').onclick=()=>{
   if(p!==DB.get(K.pwd,'20261010')){ toast('密碼唔啱'); return; }
   DB.set(K.isTeacher, true);
   renderTeacher();
+  Cloud.seedMissing();
 };
 function renderTeacher(){
   const logged=DB.get(K.isTeacher,false)===true;
@@ -1708,7 +1721,7 @@ document.getElementById('footer-ver').textContent=getVersion();
 renderHome();
 // 開機先由雲端拉取最新資料，再每 20 秒同步一次
 Cloud.pull().then(ok=>{ if(ok) cloudRefreshView(); });
-setInterval(()=>{ Cloud.pull().then(ok=>{ if(ok) cloudRefreshView(); }); },20000);
+setInterval(()=>{ Cloud.pull().then(ok=>{ if(ok) cloudRefreshView(); }); },5000);
 </script>
 </body>
 </html>
