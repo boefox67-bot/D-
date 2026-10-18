@@ -266,10 +266,43 @@ const Cloud={
   }
 };
 window.Cloud=Cloud;
+// 同步後更新版本顯示（頁腳版本號 + 左下 v 標），唔使整頁重載
+function updateVerDisplay(){
+  const v=getVersion();
+  const fv=document.getElementById('footer-ver'); if(fv) fv.textContent=v;
+  const tag=document.getElementById('ver-tag'); if(tag) tag.textContent='v'+v;
+}
+// 雲端靜默同步後用：只更新下拉選項，保留學生已輸入嘅考試碼／班次／姓名，唔好清空
+let currentRoster=[];
+function refreshHomeOptions(){
+  const codeBox=document.getElementById('in-code');
+  const clsSel=document.getElementById('in-classSelect');
+  const clsType=document.getElementById('in-classType');
+  const nameSel=document.getElementById('in-nameSelect');
+  const nameType=document.getElementById('in-nameType');
+  const keepCode=codeBox?codeBox.value:'';
+  const keepCls=clsSel?clsSel.value:'';
+  const keepName=nameType?nameType.value:'';
+  const classes=getClasses();
+  if(clsSel){
+    clsSel.innerHTML='<option value="">— 請揀班 —</option>'+classes.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    if(classes.includes(keepCls)) clsSel.value=keepCls;
+  }
+  reloadNameList(); // 按考試碼自動補班、重建名單（內部保留 codeBox 現值）
+  if(codeBox) codeBox.value=keepCode;
+  if(clsType) clsType.value=clsSel?clsSel.value:keepCls;
+  // 名單重出後，嘗試還原原本揀嘅名
+  if(nameSel && keepName){
+    const idx=currentRoster.findIndex(s=>stuName(s)===keepName);
+    nameSel.value=idx>=0?String(idx):'-1';
+    nameType.value=keepName;
+  }
+  updateVerDisplay();
+}
 function cloudRefreshView(){
   const active=document.querySelector('.view.active');
   const id=active?active.id:'';
-  if(id==='view-home') renderHome();
+  if(id==='view-home') refreshHomeOptions();
   else if(id==='view-teacher' && DB.get(K.isTeacher,false)===true) renderSub(curSub);
 }
 const EXAM_HOURS = 4, MAX_CLASSES = 6;
@@ -385,6 +418,7 @@ function renderHome(){
   document.getElementById('in-code').value='';
   document.getElementById('in-classType').value='';
   document.getElementById('in-nameType').value='';
+  currentRoster=[];
   const classes=getClasses();
   const clsSel=document.getElementById('in-classSelect');
   clsSel.innerHTML='<option value="">— 請揀班 —</option>'+classes.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
@@ -392,13 +426,13 @@ function renderHome(){
   const sel=document.getElementById('in-nameSelect');
   sel.innerHTML='<option value="-1">— 輸入考試碼同揀班先 —</option>';
   sel.onchange=()=>{
-    const sts=filteredStudents();
     const i=Number(sel.value);
-    document.getElementById('in-nameType').value = (i>=0 && sts[i]) ? stuName(sts[i]) : '';
+    document.getElementById('in-nameType').value = (i>=0 && currentRoster[i]) ? stuName(currentRoster[i]) : '';
   };
   document.getElementById('in-code').oninput=()=>{
     reloadNameList();
   };
+  updateVerDisplay();
 }
 let currentExamClass='';
 function reloadClassList(){
@@ -429,11 +463,12 @@ function reloadNameList(){
   const clsWant = exam ? exam.className : clsSel.value;
   const sel=document.getElementById('in-nameSelect');
   if(!clsWant){
+    currentRoster=[];
     sel.innerHTML='<option value="-1">— 請揀班 —</option>';
     return;
   }
-  const sts=getStudents().filter(s=>hasClass(s, clsWant));
-  sel.innerHTML='<option value="-1">— 請揀名 —</option>'+sts.map((s,i)=>`<option value="${i}">${esc(stuName(s))}</option>`).join('');
+  currentRoster=getStudents().filter(s=>hasClass(s, clsWant));
+  sel.innerHTML='<option value="-1">— 請揀名 —</option>'+currentRoster.map((s,i)=>`<option value="${i}">${esc(stuName(s))}</option>`).join('');
 }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -450,7 +485,9 @@ document.getElementById('btn-start').onclick = function(){
   if(!cls1){ warnMsg('請揀班'); return; }
   if(cls1!==exam.className){ warnMsg('呢個考試碼唔屬於「'+cls1+'」，請揀返「'+exam.className+'」'); return; }
   if(cls2!==cls1){ warnMsg('班次第二欄要同第一欄一致'); return; }
-  const sts=getStudents().filter(s=>hasClass(s, exam.className));
+  // 按考試碼重建名單，保證下拉 index 同實際名單一致
+  reloadNameList();
+  const sts=currentRoster;
   if(si<0){ warnMsg('請先從名單揀名'); return; }
   const chosen=sts[si]?stuName(sts[si]):'';
   if(chosen!==name){ warnMsg('填寫姓名同名單唔一致，請重新揀'); return; }
@@ -1725,13 +1762,11 @@ function rowsToQuestions(rows, col){
 // 初始化：首頁顯示
 document.getElementById('view-home').classList.add('active');
 updateVerBadge();
-const _v='v'+getVersion();
-document.getElementById('ver-tag').textContent=_v;
-document.getElementById('footer-ver').textContent=getVersion();
+updateVerDisplay();
 renderHome();
-// 開機先由雲端拉取最新資料，再每 20 秒同步一次
-Cloud.pull().then(ok=>{ if(ok) cloudRefreshView(); });
-setInterval(()=>{ Cloud.pull().then(ok=>{ if(ok) cloudRefreshView(); }); },5000);
+// 開機先由雲端拉取最新資料，再每 5 秒同步一次（靜默同步唔會清空學生已填內容）
+Cloud.pull().then(ok=>{ if(ok){ cloudRefreshView(); updateVerDisplay(); } });
+setInterval(()=>{ Cloud.pull().then(ok=>{ if(ok){ cloudRefreshView(); updateVerDisplay(); } }); },5000);
 </script>
 </body>
 </html>
