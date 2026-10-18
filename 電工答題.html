@@ -92,6 +92,7 @@
     </div>
     <div class="card">
       <h2>輸入考試碼入場</h2>
+      <button class="btn secondary" style="padding:8px;font-size:13px;margin-bottom:10px" onclick="syncHomeNow()">同步最新考試資料</button>
       <label>考試碼（老師派發嘅數字）</label>
       <input id="in-code" inputmode="numeric" placeholder="例如 1234">
       <label>班次（第一欄揀、第二欄自動同步）</label>
@@ -314,6 +315,16 @@ function refreshHomeOptions(){
     nameType.value=keepName;
   }
   updateVerDisplay();
+}
+// 学生页手动同步：老师开完码，学生按一下就拉最新（无定时器）
+async function syncHomeNow(){
+  try{ await Cloud.pull(); }catch(e){}
+  try{
+    const pp=await Cloud.raw('papers','GET'); if(Array.isArray(pp)) DB.set(K.papers,pp);
+    const ee=await Cloud.raw('exams','GET'); if(Array.isArray(ee)) DB.set(K.exams,ee);
+  }catch(e){}
+  refreshHomeOptions(); updateVerDisplay();
+  toast('已同步最新考試資料');
 }
 // 輕觸封面：同時由雲端讀取最新資料並刷新，然後淡出進入學生介面（學生介面唔做任何自動刷新）
 async function splashEnter(){
