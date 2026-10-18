@@ -512,6 +512,8 @@ document.getElementById('btn-start').onclick = function(){
   if(!code){ warnMsg('請輸入考試碼'); return; }
   const exam=examByCode(code);
   if(!exam){ warnMsg('考試碼唔啱或者已過期'); return; }
+  // 只認有效考卷：連結嘅卷要存在且有題，否則拒絕入場
+  if(!questionsForExam(exam).length){ warnMsg('呢場考試連結嘅考卷無效或者冇題目'); return; }
   if(!cls1){ warnMsg('請揀班'); return; }
   if(cls1!==exam.className){ warnMsg('呢個考試碼唔屬於「'+cls1+'」，請揀返「'+exam.className+'」'); return; }
   if(cls2!==cls1){ warnMsg('班次第二欄要同第一欄一致'); return; }
@@ -521,13 +523,19 @@ document.getElementById('btn-start').onclick = function(){
   if(si<0){ warnMsg('請先從名單揀名'); return; }
   const chosen=sts[si]?stuName(sts[si]):'';
   if(chosen!==name){ warnMsg('填寫姓名同名單唔一致，請重新揀'); return; }
-  const lock=getLocks()[name];
+  let lock=getLocks()[name];
+  // 舊碼已被老師關閉或過期＝無效，自動解鎖，唔再擋學生
+  if(lock && !examByCode(lock.code)){
+    const L=getLocks(); delete L[name]; DB.set(K.locks,L); lock=null;
+  }
   if(lock && lock.state==='submitted'){ warnMsg('呢個名已經交卷，唔可以再入考場'); return; }
   if(lock && lock.state==='active' && lock.code!==code){
     // 同一個學生由第一場直入第二場：先問登出舊場，再開新場；已交卷成績唔受影響
     if(!confirm('你正在第「'+lock.code+'」場，要登出並直接入新考場「'+code+'」嗎？\n未交卷嘅作答唔會保留，已經交卷嘅成績唔受影響。')) return;
     QZ=null; // 丟棄舊場未交卷草稿
   }
+  // 只認有效考卷：無效／空卷唔准入
+  if(!questionsForExam(exam).length){ warnMsg('呢場考卷無效或者冇題目，請聯絡老師'); return; }
   DB.set(K.curExam, exam);
   DB.set(K.userName, name);
   const locks=getLocks(); locks[name]={code,state:'active',at:Date.now()}; DB.set(K.locks, locks);
@@ -824,10 +832,17 @@ function renderSub(g){
       if(hours>168) hours=168;
       const paperId=Number(document.getElementById('L-paper').value);
       const className=document.getElementById('L-cls').value;
+      // 只認有效考卷：空卷／已拆除嘅卷唔可以開碼
+      let pValid;
+      if(paperId>0){ const p=paperById(paperId); pValid=!!(p&&p.questions&&p.questions.length); }
+      else { pValid=getQuestions().length>0; }
+      if(!pValid){ toast('揀嘅考卷無效或者冇題目'); return; }
       const now=Date.now();
       const list=getExams().filter(e=>!(e.code===code));
       list.push({code,paperId,durationMin:hours*60,className,launchedAt:now,expireAt:now+hours*3600*1000});
       DB.set(K.exams, list);
+      // 用同一個號碼重開：清走該碼舊嘅進場／交卷鎖，等學生可以重新刷題；舊成績歷史保留
+      const locks=getLocks(); for(const k in locks) if(locks[k].code===code) delete locks[k]; DB.set(K.locks,locks);
       toast('已生成考試碼 '+code+'（'+hours+' 小時有效）');
       renderSub('launch');
     };
