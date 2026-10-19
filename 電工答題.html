@@ -782,7 +782,8 @@ function startQuiz(exam, name){
 }
 function wmHtml(){
   const wmSpans=Array.from({length:14},()=>'<span>飛躍教育中心 · LEAP EDUCATION CENTER</span>').join('');
-  const wmStyle=LEAP_LOGO_URL?`style="background-image:url('${LEAP_LOGO_URL}')"`:'';
+  const logo=localStorage.getItem('quiz_logo_custom')||LEAP_LOGO_URL;
+  const wmStyle=logo?`style="background-image:url('${logo}')"`:'';
   return `<div class="wm" ${wmStyle}>${wmSpans}</div>`;
 }
 function renderQuiz(){
@@ -1061,6 +1062,44 @@ function zoomLogo(img){
   if(big) big.src=img.src||'';
   ov.style.display='flex';
 }
+let _newLogoImg='';
+function onLogoFile(input){
+  const f=input.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement('canvas');
+      const max=400;
+      let w=img.width,h=img.height;
+      if(w>max){ h=Math.round(h*max/w); w=max; }
+      c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      _newLogoImg=c.toDataURL('image/png');
+      const pv=document.getElementById('Lg-preview');
+      if(pv) pv.innerHTML=`<img src="${_newLogoImg}" style="max-width:200px;max-height:100px;background:#fff;border-radius:8px;padding:6px;border:1px solid var(--line)">`;
+      toast('已載入新 Logo，撳「儲存並覆蓋」生效');
+    };
+    img.src=e.target.result;
+  };
+  rd.readAsDataURL(f);
+}
+function saveLogo(){
+  if(!_newLogoImg) return toast('未揀新 Logo 圖');
+  localStorage.setItem('quiz_logo_custom',_newLogoImg);
+  document.querySelectorAll('.brand-logo').forEach(im=>{ im.src=_newLogoImg; });
+  const sp=document.querySelector('#splash img'); if(sp) sp.src=_newLogoImg;
+  toast('已儲存並覆蓋所有界面 Logo');
+  renderSub('logo');
+}
+function resetLogo(){
+  if(!confirm('回復預設 Logo？')) return;
+  localStorage.removeItem('quiz_logo_custom');
+  document.querySelectorAll('.brand-logo').forEach(im=>{ if(LEAP_LOGO_URL) im.src=LEAP_LOGO_URL; });
+  const sp=document.querySelector('#splash img'); if(sp&&LEAP_LOGO_URL) sp.src=LEAP_LOGO_URL;
+  toast('已回復預設 Logo');
+  renderSub('logo');
+}
 function refreshBrandLogo(){
   const all=document.querySelectorAll('.brand-logo');
   all.forEach(img=>{ if(LEAP_LOGO_URL) img.src=LEAP_LOGO_URL; });
@@ -1128,6 +1167,16 @@ function renderSub(g){
           <img class="brand-logo" style="width:96px;cursor:zoom-in" alt="目前 Logo" onclick="zoomLogo(this)" title="撳一下放大查看，再撳一下退回">
           <div class="muted" style="font-size:12px">目前 Logo 預覽（撳一下放大查看，再撳一下退回）</div>
         </div>
+      </div>
+      <div class="card" style="padding:16px;margin-top:12px">
+        <h2>插入新 Logo（覆蓋而家嗰張）</h2>
+        <label>揀圖片（PNG／JPG）</label>
+        <input type="file" id="Lg-file" accept="image/*" onchange="onLogoFile(this)" style="margin:8px 0">
+        <div id="Lg-preview" style="padding:10px;background:#fff;border:1px dashed var(--line);border-radius:10px;text-align:center;min-height:70px;margin-bottom:10px">
+          <span class="muted" style="font-size:13px">新圖預覽會喺度顯示</span>
+        </div>
+        <button class="btn" onclick="saveLogo()">儲存並覆蓋所有界面 Logo</button>
+        <button class="btn secondary" onclick="resetLogo()" style="margin-top:8px">回復預設 Logo</button>
       </div>`;
     return;
   }
@@ -2370,7 +2419,15 @@ function rowsToQuestions(rows, col){
 }
 
 // 初始化：首頁顯示
-document.querySelectorAll('.brand-logo').forEach(img=>{ if(LEAP_LOGO_URL) img.src=LEAP_LOGO_URL; });
+document.querySelectorAll('.brand-logo').forEach(img=>{
+  const u=localStorage.getItem('quiz_logo_custom')||LEAP_LOGO_URL;
+  if(u) img.src=u;
+});
+const _splashImg=document.querySelector('#splash img');
+if(_splashImg){
+  const _cu=localStorage.getItem('quiz_logo_custom');
+  if(_cu) _splashImg.src=_cu;
+}
 document.getElementById('view-home').classList.add('active');
 updateVerBadge();
 updateVerDisplay();
