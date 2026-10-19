@@ -783,6 +783,26 @@ function startQuiz(exam, name){
   }
   QZ={ exam, name, list, answers, idx, startAt };
   sessRegister(exam,name);
+  // 自動偵測被清場：老師清空／關閉考場時自動退出（草稿保留），手機同網頁都會生效
+  if(Cloud.enabled()){
+    if(window._kickT) clearInterval(window._kickT);
+    window._kickT=setInterval(async ()=>{
+      try{
+        if(!QZ||QZ.name!==name) return;
+        const open=await Cloud.raw('exopen','GET');
+        if(String(open)==='0'){
+          const nm=name, ex=exam;
+          sessClear(ex,nm);
+          saveDraft();
+          kickClearLock(nm, ex.code);
+          QZ=null;
+          if(window._kickT){ clearInterval(window._kickT); window._kickT=null; }
+          alert('考場已被老師清空，你已退出考場（作答草稿已保留）');
+          go('home');
+        }
+      }catch(e){}
+    },12000);
+  }
   let pname='全部題庫';
   if(exam.paperIds&&exam.paperIds.length>1) pname='混合卷（'+exam.paperIds.length+'張）';
   else if(exam.paperId){ const p=paperById(exam.paperId); pname=p?p.name:'考卷'; }
@@ -933,6 +953,7 @@ document.getElementById('btn-exit').onclick=()=>{
   if(!QZ){ go('home'); return; }
   if(!confirm('未交卷離開，草稿會保留；返入本場可以由原題繼續。確定離開返首頁？')) return;
   sessClear(QZ.exam,QZ.name);
+  if(window._kickT){ clearInterval(window._kickT); window._kickT=null; }
   saveDraft();
   QZ=null; go('home');
 };
@@ -990,6 +1011,7 @@ document.getElementById('btn-submit').onclick=()=>{
   const L=getLocks(); const rec=lockRec(L,name); rec.code=exam.code; rec.state='submitted'; rec.at=Date.now(); rec.history[exam.code]='submitted'; L[name]=rec; DB.set(K.locks,L);
   clearDraft(name,exam.code);
   sessClear(exam,name);
+  if(window._kickT){ clearInterval(window._kickT); window._kickT=null; }
   DB.remove(K.curExam);
   showResult(attempt);
 };
@@ -2087,15 +2109,52 @@ async function refreshTeacherOnline(){
 async function toggleExamOpen(){
   const closed=DB.get(K.examOpen,'1')==='0';
   if(!closed){
-    if(!confirm('確定清空考場？\n會清走所有在線學生，同時關閉考場，學生暫時唔可以入場。')) return;
+    if(!confirm('確定清空考場？\n所有作答中嘅學生會被強制退出，狀態轉為未開始；已完成成績保留。')) return;
+    // 1) 所有作答中(active)鎖轉為未開始，已完成(submitted)保留
+    try{
+      let cloudLocks=await Cloud.raw('locks','GET');
+      cloudLocks=(cloudLocks&&typeof cloudLocks==='object')?cloudLocks:{};
+      let changed=false;
+      for(const k in cloudLocks){
+        const r=cloudLocks[k]; if(!r||typeof r!=='object') continue;
+        if(r.history&&typeof r.history==='object'){
+          for(const c in r.history){ if(r.history[c]==='active'){ delete r.history[c]; changed=true; } }
+          if(r.code&&!r.history[r.code]){ delete r.code; changed=true; }
+          if(!Object.keys(r.history).length&&!r.code){ delete cloudLocks[k]; changed=true; }
+        } else if(r.state==='active'){
+          delete cloudLocks[k]; changed=true;
+        }
+      }
+      if(changed){
+        DB.set(K.locks, cloudLocks);
+        try{ await Cloud.raw('locks','PUT',cloudLocks); }catch(e){}
+      }
+    }catch(e){}
+    // 2) 清走所有在線考生
     if(Cloud.enabled()){ try{ await Cloud.raw('sess','DELETE'); }catch(e){} }
     DB.set(K.examOpen,'0');
-    toast('考場已清空並關閉，學生唔可以入場');
+    toast('考場已清空並關閉：作答中學生已退出（轉為未開始），已完成成績保留');
   } else {
     DB.set(K.examOpen,'1');
     toast('考場已開啟，學生可以入場');
   }
   refreshTeacherOnline();
+}
+// 被清場時將本機鎖改為未開始（已完成保留）
+function kickClearLock(name,code){
+  const L=getLocks(); const r=L[name]; if(!r) return;
+  if(r.history&&typeof r.history==='object'){
+    if(r.history[code]==='active') delete r.history[code];
+    if(r.code===code){
+      const keys=Object.keys(r.history);
+      r.code=keys[0]||null;
+      r.state=r.code?r.history[r.code]:null;
+      if(!r.code&&!keys.length) delete L[name];
+    }
+  } else if(r.code===code&&r.state!=='submitted'){
+    delete L[name];
+  }
+  DB.set(K.locks,L);
 }
 // 通知其他老师：自己界面不弹倒计时，只发云端信号；其他老师刷新收到后30秒登出；自己30秒后做一次更新
 function fireTeacherSignout(){
