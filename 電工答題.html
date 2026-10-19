@@ -74,6 +74,17 @@
   table{width:100%;border-collapse:collapse;font-size:13px}
   th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left}
   th{color:var(--muted);font-weight:600;background:#f8fafc}
+  @media(max-width:760px){
+    .grade-wrap{overflow:visible}
+    .grade-table thead{display:none}
+    .grade-table tr{display:block;border:1px solid var(--line);border-radius:12px;margin:10px 0;padding:10px 12px;background:#fff}
+    .grade-table td{display:flex;justify-content:space-between;gap:14px;align-items:center;border:0;border-bottom:1px dashed var(--line);padding:7px 0;text-align:right}
+    .grade-table td:last-child{border-bottom:0}
+    .grade-table td::before{content:attr(data-label);font-weight:600;color:var(--muted);text-align:left;flex-shrink:0}
+    .grade-table td.grade-wrong{display:block;text-align:left}
+    .grade-table td.grade-wrong::before{display:block;margin-bottom:4px}
+    .grade-table td.grade-op{justify-content:flex-end}
+  }
   .tag{display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:600}
   .tag.ok{background:#dcfce7;color:var(--green)}
   .tag.bad{background:#fde8e8;color:var(--red)}
@@ -1238,8 +1249,8 @@ function renderSub(g){
         <button class="btn secondary" id="A-filter">篩選時段</button>
         <button class="btn" id="A-export">提取時段成績生成 X 檔</button>
       </div>
-      <div style="overflow-x:auto"><table>
-      <tr><th>操作</th><th>日期</th><th>班次</th><th>姓名</th><th>卷名</th><th>得分</th><th>正確率</th><th>用時</th><th>錯題</th></tr>
+      <div class="grade-wrap"><table class="grade-table">
+      <thead><tr><th>操作</th><th>日期</th><th>班次</th><th>姓名</th><th>卷名</th><th>得分</th><th>正確率</th><th>用時</th><th>錯題</th></tr></thead>
       <tbody id="A-tbody"></tbody>
       </table></div>`;
     function renderTable(list){
@@ -1256,13 +1267,13 @@ function renderSub(g){
           : '—';
         const pct=a.pct!=null?a.pct:(a.totalScore?Math.round(a.score/a.totalScore*1000)/10:a.score100);
         return `<tr>
-        <td><button class="btn danger" style="width:auto;padding:4px 10px;margin:0;font-size:12px" data-del-attempt="${ri}">拆除</button></td>
-        <td style="white-space:nowrap">${esc(dateStr)}<br><span class="muted" style="font-size:11px">${esc(timeStr)}</span></td>
-        <td>${esc(a.className)}</td><td><b>${esc(a.name)}</b></td>
-        <td>${esc(a.paperName)}</td><td>${pct}/100</td>
-        <td><span class="tag ${a.score100>=60?'ok':'bad'}">${pct}%</span></td>
-        <td style="white-space:nowrap;font-size:12px">${esc(a.durationText||formatDuration(a.durationMs)||'—')}${a.durationHours!=null&&a.durationHours!==''?`<br><span class="muted">${a.durationHours}小時</span>`:''}</td>
-        <td style="font-size:13px">${wrongTxt}</td></tr>`;
+        <td class="grade-op" data-label="操作"><button class="btn danger" style="width:auto;padding:4px 10px;margin:0;font-size:12px" data-del-attempt="${ri}">拆除</button></td>
+        <td data-label="日期" style="white-space:nowrap">${esc(dateStr)}<br><span class="muted" style="font-size:11px">${esc(timeStr)}</span></td>
+        <td data-label="班次">${esc(a.className)}</td><td data-label="姓名"><b>${esc(a.name)}</b></td>
+        <td data-label="卷名">${esc(a.paperName)}</td><td data-label="得分">${pct}/100</td>
+        <td data-label="正確率"><span class="tag ${a.score100>=60?'ok':'bad'}">${pct}%</span></td>
+        <td data-label="用時" style="white-space:nowrap;font-size:12px">${esc(a.durationText||formatDuration(a.durationMs)||'—')}${a.durationHours!=null&&a.durationHours!==''?`<br><span class="muted">${a.durationHours}小時</span>`:''}</td>
+        <td class="grade-wrong" data-label="錯題" style="font-size:13px">${wrongTxt}</td></tr>`;
       }).join('')||'<tr><td colspan="9" class="muted">暫無成績</td></tr>';
     }
     let curList=sortedAll;
