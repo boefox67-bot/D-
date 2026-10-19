@@ -157,6 +157,7 @@
     <button class="btn secondary" id="btn-calc" style="padding:8px;font-size:13px;margin:10px 0 0">計算機</button>
     <div id="calc-panel" style="display:none;margin:10px 0 0">
       <div class="card" style="margin:0;padding:12px">
+        <div id="calc-formula" style="font-size:13px;color:#64748b;text-align:right;min-height:18px;background:#f8fafc;padding:4px 8px;border-radius:6px 6px 0 0;border:1px solid var(--line);border-bottom:none">&nbsp;</div>
         <input id="calc-screen" readonly value="0" style="font-size:22px;text-align:right;background:#f8fafc">
         <div class="calc-grid">
           <button class="calc-btn danger" onclick="calcClear()">C</button>
@@ -849,17 +850,28 @@ function renderQuiz(){
   document.getElementById('btn-submit').style.display = (idx===list.length-1)?'block':'none';
 }
 const calcState={entry:'0',prev:null,op:null};
-function calcShow(v){ document.getElementById('calc-screen').value=String(v); }
+function calcOpSym(op){ return op==='*'?'×':op==='/'?'÷':op; }
+function calcFormula(){
+  const f=document.getElementById('calc-formula');
+  if(!f) return;
+  let s='';
+  if(calcState.prev!=null&&calcState.op) s=String(calcState.prev)+' '+calcOpSym(calcState.op)+' '+(calcState.entry?calcState.entry:'');
+  else if(calcState.prev!=null) s=String(calcState.prev);
+  else s=calcState.entry==='0'?'':calcState.entry;
+  f.textContent=s||'\u00a0';
+}
+function calcShow(v){ document.getElementById('calc-screen').value=String(v); calcFormula(); }
 window.calcNum=d=>{
   if(calcState.entry==='0') calcState.entry=d; else calcState.entry+=d;
   calcShow(calcState.entry);
 };
 window.calcDot=()=>{ if(!calcState.entry.includes('.')) calcState.entry+='.'; calcShow(calcState.entry); };
 window.calcBack=()=>{ calcState.entry=calcState.entry.length>1?calcState.entry.slice(0,-1):'0'; calcShow(calcState.entry); };
-window.calcClear=()=>{ calcState.entry='0';calcState.prev=null;calcState.op=null;calcShow(0); };
+window.calcClear=()=>{ calcState.entry='0';calcState.prev=null;calcState.op=null;const f=document.getElementById('calc-formula');if(f) f.textContent='\u00a0';calcShow(0); };
 window.calcSetOp=op=>{
   if(calcState.prev!=null&&calcState.op) calcEquals();
   calcState.prev=parseFloat(calcState.entry||'0'); calcState.op=op; calcState.entry='';
+  calcShow(calcState.prev);
 };
 window.calcEquals=()=>{
   if(calcState.prev==null||!calcState.op) return;
@@ -869,7 +881,10 @@ window.calcEquals=()=>{
   else if(calcState.op==='*') r=calcState.prev*cur;
   else if(calcState.op==='/') r=cur===0?0:calcState.prev/cur;
   r=Math.round(r*1e10)/1e10;
+  const full=String(calcState.prev)+' '+calcOpSym(calcState.op)+' '+String(cur)+' =';
   calcState.entry=String(r);calcState.prev=null;calcState.op=null;calcShow(r);
+  const f=document.getElementById('calc-formula');
+  if(f) f.textContent=full;
 };
 document.getElementById('btn-calc').onclick=()=>{
   const p=document.getElementById('calc-panel');
