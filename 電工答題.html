@@ -311,8 +311,15 @@ const Cloud={
     return changed;
   },
   async pushAll(){
-    if(!this.enabled()) return;
-    for(const b of SERVER_KEYS){ const v=DB.get(SERVER_MAP[b], undefined); if(v!==undefined) await this.raw(b,'PUT',v); }
+    if(!this.enabled()) return {ok:true, n:0, errors:[]};
+    let n=0; const errors=[];
+    for(const b of SERVER_KEYS){
+      const v=DB.get(SERVER_MAP[b], undefined);
+      if(v===undefined) continue;
+      try{ await this.raw(b,'PUT',v,30000); n++; }
+      catch(e){ errors.push(b+':'+(e&&e.message||e)); }
+    }
+    return {ok:errors.length===0, n, errors};
   },
   // 用雲端整份資料覆蓋本機現有檔案：雲端有就寫入，雲端冇就清除本機，令兩邊完全一致
   async forceDownload(){
@@ -950,8 +957,8 @@ document.querySelectorAll('#t-grid1 button, #t-grid2 button').forEach(b=>{
 async function cloudSaveAll(){
   if(!Cloud.enabled()) return toast('未設定雲端網址');
   if(!confirm('確定把本機（此裝置）全部資料上傳，覆蓋雲端同其他裝置？')) return;
-  await Cloud.pushAll();
-  toast('已儲存到雲端');
+  const r=await Cloud.pushAll();
+  toast(r.ok?('已儲存到雲端（'+r.n+' 項）'):'部分上傳失敗：'+r.errors.slice(0,3).join('、'));
 }
 // 右上角「刷新」：即時由雲端拉最新資料并重画当前页，不用定时器、不覆盖本机独有数据
 async function quickRefresh(){
@@ -1712,7 +1719,7 @@ function renderSub(g){
     };
     document.getElementById('CL-push').onclick=async()=>{
       if(!confirm('確定把本機（此裝置）全部資料上傳並覆蓋雲端？')) return;
-      await Cloud.pushAll(); toast('已上傳本機資料到雲端'); renderSub('cloud');
+      const r=await Cloud.pushAll(); toast(r.ok?('已上傳本機資料到雲端（'+r.n+' 項）'):'部分上傳失敗：'+r.errors.slice(0,3).join('、')); renderSub('cloud');
     };
   }
   if(g==='chgpwd'){
