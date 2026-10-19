@@ -47,7 +47,7 @@
   .qtext{font-size:16px;line-height:1.6;margin-bottom:6px}
   #quiz-card{position:relative;overflow:hidden}
   #quiz-card > *:not(.wm){position:relative;z-index:1}
-  .wm{position:absolute;inset:-24px;z-index:0;opacity:.10;pointer-events:none;transform:rotate(-18deg);display:flex;flex-wrap:wrap;align-content:space-around;justify-content:space-around;gap:28px 46px;overflow:hidden;color:#0f172a;font-weight:700;font-size:14px;line-height:1.4;white-space:nowrap}
+  .wm{position:absolute;inset:-24px;z-index:0;opacity:.10;pointer-events:none;transform:rotate(-18deg);display:flex;flex-wrap:wrap;align-content:space-around;justify-content:space-around;gap:28px 46px;overflow:hidden;color:#0f172a;font-weight:700;font-size:14px;line-height:1.4;white-space:nowrap;background-repeat:repeat;background-size:92px 104px;background-position:center}
   .content-img{display:block;max-width:min(100%,260px);max-height:220px;height:auto;margin:8px 0;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
   .admin-imgbox{padding:10px;overflow-x:auto;overflow-y:hidden;background:#fff;border:1px solid var(--line);border-radius:8px;margin:6px 0}
   .admin-imgbox .content-img{max-width:100%;max-height:260px}
@@ -130,8 +130,14 @@
       <p id="quiz-className"></p>
     </div>
     <div class="progress" id="quiz-progress"></div>
-    <button class="btn secondary" id="btn-calc" style="padding:8px;font-size:13px;margin:0 0 10px">計算機</button>
-    <div id="calc-panel" style="display:none;margin-bottom:14px">
+    <button class="btn secondary" id="btn-exit" style="padding:8px;font-size:13px;margin:0 0 10px">換考場（未交卷離開，草稿保留）</button>
+    <div class="card" id="quiz-card"></div>
+    <div class="row">
+      <button class="btn secondary" id="btn-prev">上一題</button>
+      <button class="btn orange" id="btn-next">下一題</button>
+    </div>
+    <button class="btn secondary" id="btn-calc" style="padding:8px;font-size:13px;margin:10px 0 0">計算機</button>
+    <div id="calc-panel" style="display:none;margin:10px 0 0">
       <div class="card" style="margin:0;padding:12px">
         <input id="calc-screen" readonly value="0" style="font-size:22px;text-align:right;background:#f8fafc">
         <div class="calc-grid">
@@ -156,13 +162,7 @@
         </div>
       </div>
     </div>
-    <div class="card" id="quiz-card"></div>
-    <div class="row">
-      <button class="btn secondary" id="btn-prev">上一題</button>
-      <button class="btn orange" id="btn-next">下一題</button>
-    </div>
     <button class="btn danger" id="btn-submit" style="display:none">交卷</button>
-    <button class="btn secondary" id="btn-exit" style="margin-top:8px;font-size:13px;padding:10px">換考場（未交卷離開，草稿唔保留）</button>
   </div>
 
   <!-- ========== 頁面：成績 ========== -->
@@ -254,8 +254,9 @@ const K = {
   students:'quiz_students_v1', locks:'quiz_name_locks', attempts:'quiz_attempts_v1',
   lastAttempt:'quiz_last_attempt', isTeacher:'quiz_is_teacher', pwd:'quiz_teacher_pwd',
   curClass:'quiz_cur_class', userName:'quiz_user_name', ver:'quiz_paper_version',
-  tsesh:'quiz_teacher_session'
+  tsesh:'quiz_teacher_session', draft:'quiz_draft_v1'
 };
+const LEAP_LOGO_URL=(document.querySelector('#splash img')||{}).src||'';
 
 /* ================= 雲端同步（Firebase Realtime Database REST，可選；唔設網址就退回純本機） ================= */
 const CLOUD_KEY='quiz_cloud_url';
@@ -515,6 +516,25 @@ function getActiveExams(){ const now=Date.now(); return getExams().filter(e=>e.e
 function getClasses(){ const c=DB.get(K.classes, []); return Array.isArray(c)?c.map(String):[]; }
 function getStudents(){ return DB.get(K.students, []); }
 function getLocks(){ return DB.get(K.locks, {}); }
+function getDrafts(){ const d=DB.get(K.draft,{}); return d&&typeof d==='object'?d:{}; }
+function draftKey(name,code){ return String(name)+'__'+String(code).trim(); }
+function saveDraft(){
+  if(!QZ||!QZ.exam||!QZ.name) return;
+  const all=getDrafts();
+  all[draftKey(QZ.name,QZ.exam.code)]={name:QZ.name,code:QZ.exam.code,exam:QZ.exam,list:QZ.list,answers:QZ.answers,idx:QZ.idx,startAt:QZ.startAt};
+  DB.set(K.draft,all);
+}
+function loadDraft(name,code){
+  const all=getDrafts();
+  const d=all[draftKey(name,code)];
+  if(!d||d.name!==name||String(d.code)!==String(code)) return null;
+  if(!Array.isArray(d.list)||!Array.isArray(d.answers)) return null;
+  return d;
+}
+function clearDraft(name,code){
+  const all=getDrafts(); const k=draftKey(name,code);
+  if(all[k]){ delete all[k]; DB.set(K.draft,all); }
+}
 // 锁定按考试码保存：入新场唔会抹走另一场已完成状态
 function lockRec(L,name){ const r=L[name]||{}; r.history=r.history||{};
   // 兼容旧版扁平锁定：把旧 code/state 迁入历史，入新场唔会丢旧场已完成
@@ -671,8 +691,8 @@ document.getElementById('btn-start').onclick = async function(){
   if(lockState(L,name,code)==='submitted'){ warnMsg('呢個名已經交卷，唔可以再入考場'); return; }
   const curActive=lock && lock.code && lockState(L,name,lock.code)==='active' && lock.code!==code;
   if(curActive){
-    if(!confirm('你正在第「'+lock.code+'」場，要登出並直接入新考場「'+code+'」嗎？\n未交卷嘅作答唔會保留，已經交卷嘅成績唔受影響。')) return;
-    QZ=null;
+    if(!confirm('你正在第「'+lock.code+'」場，要離開並入新考場「'+code+'」嗎？\n未交卷草稿會保留，返入舊場可以繼續；已經交卷嘅成績唔受影響。')) return;
+    saveDraft(); QZ=null;
   }
   // 只認有效考卷：無效／空卷唔准入（沿用剛才雲端權威題數）
   if(!availQ){ warnMsg('呢場考卷無效或者冇題目，請聯絡老師'); return; }
@@ -686,10 +706,18 @@ document.getElementById('btn-teacherEntry').onclick=()=>go('teacher');
 
 /* ================= 答題頁 ================= */
 let QZ = null; // { exam, name, list, answers, idx }
+window.addEventListener('beforeunload', saveDraft);
 function startQuiz(exam, name){
-  const list=buildQuizList(exam);
-  if(!list.length){ toast('呢場考卷無效或者冇題目'); return; }
-  QZ={ exam, name, list, answers:list.map(()=>null), idx:0, startAt:Date.now() };
+  const saved=loadDraft(name,exam.code);
+  let list, answers, idx, startAt;
+  if(saved){
+    list=saved.list; answers=saved.answers; idx=Math.min(saved.idx||0,list.length-1); startAt=saved.startAt||Date.now();
+  } else {
+    list=buildQuizList(exam);
+    if(!list.length){ toast('呢場考卷無效或者冇題目'); return; }
+    answers=list.map(()=>null); idx=0; startAt=Date.now();
+  }
+  QZ={ exam, name, list, answers, idx, startAt };
   let pname='全部題庫';
   if(exam.paperIds&&exam.paperIds.length>1) pname='混合卷（'+exam.paperIds.length+'張）';
   else if(exam.paperId){ const p=paperById(exam.paperId); pname=p?p.name:'考卷'; }
@@ -706,7 +734,8 @@ function renderQuiz(){
   document.getElementById('quiz-progress').textContent=`第 ${idx+1} / ${list.length} 題 · ${TYPE_LABELS[q.type-1]||''}`+(q.score?` · ${q.score}分`:'');
   let html='';
   const wmSpans=Array.from({length:14},()=>'<span>飛躍教育中心 · LEAP EDUCATION CENTER</span>').join('');
-  html+=`<div class="wm">${wmSpans}</div>`;
+  const wmStyle=LEAP_LOGO_URL?`style="background-image:url('${LEAP_LOGO_URL}')"`:'';
+  html+=`<div class="wm" ${wmStyle}>${wmSpans}</div>`;
   html+=`<span class="qmeta">${TYPE_LABELS[q.type-1]||''}</span>`;
   html+=`<div class="qtext">${idx+1}. ${renderOptContent(q.question)}</div>`;
   if(q.type===4){
@@ -757,7 +786,7 @@ function renderQuiz(){
           QZ.answers[QZ.idx]=arr;
         } else { QZ.answers[QZ.idx]=[oi]; }
       }
-      renderQuiz();
+      renderQuiz(); saveDraft();
     };
   });
   document.querySelectorAll('#quiz-card .fill-input').forEach(el=>{
@@ -768,6 +797,7 @@ function renderQuiz(){
         if(!QZ.answers[QZ.idx]||!QZ.answers[QZ.idx].parts) QZ.answers[QZ.idx]={parts:qq.parts.map((p,i)=>p.kind==='fill'?'':[])};
         QZ.answers[QZ.idx].parts[pi]=el.value;
       } else { QZ.answers[QZ.idx]=el.value; }
+      saveDraft();
     };
   });
   document.getElementById('btn-next').textContent = idx===list.length-1 ? '完成作答' : '下一題';
@@ -800,12 +830,13 @@ document.getElementById('btn-calc').onclick=()=>{
   const p=document.getElementById('calc-panel');
   p.style.display=p.style.display==='none'?'block':'none';
 };
-document.getElementById('btn-prev').onclick=()=>{ if(QZ.idx>0){ QZ.idx--; renderQuiz(); } };
-document.getElementById('btn-next').onclick=()=>{ if(QZ.idx<QZ.list.length-1){ QZ.idx++; renderQuiz(); } };
+document.getElementById('btn-prev').onclick=()=>{ if(QZ.idx>0){ QZ.idx--; renderQuiz(); saveDraft(); } };
+document.getElementById('btn-next').onclick=()=>{ if(QZ.idx<QZ.list.length-1){ QZ.idx++; renderQuiz(); saveDraft(); } };
 document.getElementById('btn-exit').onclick=()=>{
   if(!QZ){ go('home'); return; }
-  if(!confirm('未交卷離開，呢場作答唔會保留，確定離開返首頁？已經交卷嘅成績唔受影響。')) return;
-  QZ=null; DB.remove(K.curExam); go('home');
+  if(!confirm('未交卷離開，草稿會保留；返入本場可以由原題繼續。確定離開返首頁？')) return;
+  saveDraft();
+  QZ=null; go('home');
 };
 document.getElementById('btn-submit').onclick=()=>{
   const {list, answers}=QZ;
@@ -859,6 +890,7 @@ document.getElementById('btn-submit').onclick=()=>{
   const att=getAttempts(); att.push(attempt); DB.set(K.attempts, att);
   DB.set(K.lastAttempt, attempt);
   const L=getLocks(); const rec=lockRec(L,name); rec.code=exam.code; rec.state='submitted'; rec.at=Date.now(); rec.history[exam.code]='submitted'; L[name]=rec; DB.set(K.locks,L);
+  clearDraft(name,exam.code);
   DB.remove(K.curExam);
   showResult(attempt);
 };
