@@ -634,6 +634,24 @@ function compressImg(file, maxW, cb){
   };
   rd.readAsDataURL(file);
 }
+function onLogoFile(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  compressImg(f,400,d=>{
+    window._newLogoImg=d;
+    const pv=document.getElementById('logo-prev');
+    if(pv) pv.innerHTML='<img src="'+d+'" style="max-height:64px;max-width:80%;object-fit:contain">';
+    toast('Logo 圖片已載入，按「儲存 Logo」生效');
+  });
+}
+function onWmFile(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  compressImg(f,300,d=>{
+    window._newWmImg=d;
+    const pv=document.getElementById('wm-prev');
+    if(pv) pv.innerHTML='<img src="'+d+'" style="max-height:64px;max-width:80%;object-fit:contain">';
+    toast('水印圖片已載入，按「儲存水印」生效');
+  });
+}
 function applyBranding(){
   const L=DB.get(K.logo,null);
   const logged=DB.get(K.isTeacher,false)===true;
@@ -671,7 +689,7 @@ function renderSub(g){
           ${L.img?`<img src="${L.img}" style="max-height:64px;max-width:80%;object-fit:contain">`:'<span class="muted">未設定 Logo</span>'}
         </div>
         <button class="btn secondary" style="width:auto;padding:6px 14px;margin:0;font-size:13px" onclick="document.getElementById('logo-file').click()">＋上傳 Logo 圖片</button>
-        <input type="file" id="logo-file" accept="image/*" style="display:none" onchange="compressImg(this.files[0],400,d=>{window._newLogoImg=d;document.getElementById('logo-prev').innerHTML='<img src=\\"'+d+'\\" style=\\"max-height:64px;max-width:80%;object-fit:contain\\">';toast('Logo 圖片已載入，按「儲存 Logo」生效');})">
+        <input type="file" id="logo-file" accept="image/*" style="display:none" onchange="onLogoFile(this)">
         <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
           <button class="btn" style="width:auto;padding:8px 18px;margin:0" onclick="saveLogo()">儲存 Logo</button>
           <button class="btn danger" style="width:auto;padding:8px 18px;margin:0" onclick="clearLogo()">清除 Logo</button>
@@ -696,7 +714,7 @@ function renderSub(g){
           ${WM.img?`<img src="${WM.img}" style="max-height:64px;max-width:80%;object-fit:contain">`:'<span class="muted">未設定水印</span>'}
         </div>
         <button class="btn secondary" style="width:auto;padding:6px 14px;margin:0;font-size:13px" onclick="document.getElementById('wm-file').click()">＋上傳水印圖片</button>
-        <input type="file" id="wm-file" accept="image/*" style="display:none" onchange="compressImg(this.files[0],300,d=>{window._newWmImg=d;document.getElementById('wm-prev').innerHTML='<img src=\\"'+d+'\\" style=\\"max-height:64px;max-width:80%;object-fit:contain\\">';toast('水印圖片已載入，按「儲存水印」生效');})">
+        <input type="file" id="wm-file" accept="image/*" style="display:none" onchange="onWmFile(this)">
         <label style="margin-top:14px">水印透明度（0.05～0.5）</label>
         <input id="wm-opacity" type="number" min="0.05" max="0.5" step="0.01" style="width:90px;padding:6px;border:1px solid var(--line);border-radius:4px" value="${WM.opacity!=null?WM.opacity:0.12}">
         <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
@@ -937,11 +955,18 @@ function renderSub(g){
     const roots=[];
     papers.forEach(p=>{ const f=folderOf(p); if(f){ (groups[f]=groups[f]||[]).push(p); } else { roots.push(p); } });
     const folderKeys=Object.keys(groups).sort((a,b)=>a.localeCompare(b,'zh-HK'));
+    window._fColl=window._fColl||{};
+    const fOpen=fi=>window._fColl['f'+fi]===true;
     let h=subHead('考卷管理')+`
-      <p class="muted">資料夾最多三層（例如：電工基礎/第一章）。卷可以隨時移動、資料夾可以改名。</p>
+      <p class="muted">資料夾最多三層（例如：電工基礎/第一章）。卷可以隨時移動、資料夾可以改名。資料夾默認摺疊，撳「▶」展開。</p>
       <div>`;
-    if(roots.length) h+=`<div style="padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;background:#f8fafc">
-        <b>📁 根目錄</b> <span class="muted">（${roots.length} 卷）</span>
+    if(roots.length){
+      const ro=0; // 根目錄固定 index 0
+      h+=`<div style="padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;background:#f8fafc">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+          <b><button class="btn secondary" style="width:auto;padding:3px 10px;margin:0;font-size:11px" onclick="toggleFColl(0)">${fOpen(0)?'▼ 摺疊':'▶ 展開'}</button> 📁 根目錄 <span class="muted">（${roots.length} 卷）</span></b>
+        </div>
+        <div style="${fOpen(0)?'':'display:none'}">
         ${roots.map(p=>`<div style="margin-top:8px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:8px">
           <b>${esc(p.name)}</b> <span class="muted">（${p.questions.length} 題）</span>
           <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
@@ -949,14 +974,20 @@ function renderSub(g){
             <button class="btn secondary" style="width:auto;padding:3px 10px;margin:0;font-size:11px" onclick="renamePaper(${p.id})">改名</button>
             <button class="btn danger" style="width:auto;padding:3px 10px;margin:0;font-size:11px" onclick="delPaper(${p.id})">拆除</button>
           </div></div>`).join('')}
-      </div>`;
-    folderKeys.forEach(f=>{
-      h+=`<div style="padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;background:#f8fafc">
-        <b>📁 ${esc(f)}</b> <span class="muted">（${groups[f].length} 卷）</span>
-        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-          <button class="btn secondary" style="width:auto;padding:3px 10px;margin:0;font-size:11px" onclick="renameFolder('${esc(f)}')">資料夾改名</button>
-          <button class="btn danger" style="width:auto;padding:3px 10px;margin:0;font-size:11px" onclick="removeFolder('${esc(f)}')">移除資料夾</button>
         </div>
+      </div>`;
+    }
+    folderKeys.forEach((f,fi)=>{
+      const gi=fi+1; // 資料夾 index 由 1 開始
+      h+=`<div style="padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;background:#f8fafc">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+          <b><button class="btn secondary" style="width:auto;padding:3px 10px;margin:0;font-size:11px" onclick="toggleFColl(${gi})">${fOpen(gi)?'▼ 摺疊':'▶ 展開'}</button> 📁 ${esc(f)} <span class="muted">（${groups[f].length} 卷）</span></b>
+          <span style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn secondary" style="width:auto;padding:3px 10px;margin:0;font-size:11px" onclick="renameFolder('${esc(f)}')">資料夾改名</button>
+            <button class="btn danger" style="width:auto;padding:3px 10px;margin:0;font-size:11px" onclick="removeFolder('${esc(f)}')">移除資料夾</button>
+          </span>
+        </div>
+        <div style="${fOpen(gi)?'':'display:none'}">
         ${groups[f].map(p=>`<div style="margin-top:8px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:8px">
           <b>${esc(p.name)}</b> <span class="muted">（${p.questions.length} 題）</span>
           <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
@@ -964,6 +995,7 @@ function renderSub(g){
             <button class="btn secondary" style="width:auto;padding:3px 10px;margin:0;font-size:11px" onclick="renamePaper(${p.id})">改名</button>
             <button class="btn danger" style="width:auto;padding:3px 10px;margin:0;font-size:11px" onclick="delPaper(${p.id})">拆除</button>
           </div></div>`).join('')}
+        </div>
       </div>`;
     });
     h+=(papers.length===0)?'<span class="muted">未導入考卷</span>':'</div>';
@@ -1213,7 +1245,7 @@ function renderSub(g){
       let h=(p.questions||[]).map((q,i)=>{
         const isMix=q.type===4;
         const ckey=p.id+'|'+i;
-        const coll=window._qColl&&window._qColl[ckey];
+        const coll=window._qColl? !!window._qColl[ckey] : true;
         // 如果 q.parts 為空（舊數據），根據 q.type 預設勾選
         let cbs;
         if(q.parts&&q.parts.length>0){
@@ -1454,6 +1486,29 @@ function removeFolder(path){
   DB.set(K.papers,papers);
   toast('資料夾已移除，卷移去根目錄');
   renderSub('papers');
+}
+function toggleFColl(fi){
+  window._fColl=window._fColl||{};
+  window._fColl['f'+fi]=!window._fColl['f'+fi];
+  renderSub('papers');
+}
+function onLogoFile(input){
+  const f=input&&input.files&&input.files[0]; if(!f) return;
+  compressImg(f,400,d=>{
+    window._newLogoImg=d;
+    const pv=document.getElementById('logo-prev');
+    if(pv) pv.innerHTML='<img src="'+d+'" style="max-height:64px;max-width:80%;object-fit:contain">';
+    toast('Logo 圖片已載入，按「儲存 Logo」生效');
+  });
+}
+function onWmFile(input){
+  const f=input&&input.files&&input.files[0]; if(!f) return;
+  compressImg(f,300,d=>{
+    window._newWmImg=d;
+    const pv=document.getElementById('wm-prev');
+    if(pv) pv.innerHTML='<img src="'+d+'" style="max-height:64px;max-width:80%;object-fit:contain">';
+    toast('水印圖片已載入，按「儲存水印」生效');
+  });
 }
 function saveLogo(){
   const L=DB.get(K.logo,null)||{};
