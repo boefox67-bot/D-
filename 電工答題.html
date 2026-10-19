@@ -1621,6 +1621,10 @@ function renderSub(g){
       ${papers.length===0?'<div class="muted" style="padding:20px;text-align:center">未導入考卷，請先去「導入 X 檔題庫」</div>':`
         <label>揀考卷</label>
         <select id="Q-paperSel">${papers.map(p=>`<option value="${p.id}">${esc(p.name)}（${p.questions?p.questions.length:0} 題）</option>`).join('')}</select>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn secondary" style="width:auto;padding:5px 12px;margin:0;font-size:12px" onclick="foldAllQ(true)">全部展開</button>
+          <button class="btn secondary" style="width:auto;padding:5px 12px;margin:0;font-size:12px" onclick="foldAllQ(false)">全部摺疊</button>
+        </div>
         <div id="Q-area" style="margin-top:12px"></div>`}
     `;
     const qArea=document.getElementById('Q-area');
@@ -1644,10 +1648,13 @@ function renderSub(g){
           else if(q.type===3) cbs=['fill'];
         }
         const chk=k=>cbs.includes(k)?'checked':'';
-        let x=`<details class="qfold" style="padding:12px;border-bottom:1px solid var(--line)">
-          <summary style="cursor:pointer;display:flex;align-items:center;gap:10px;list-style-position:inside">
+        const qk=p.id+'|'+i;
+        const qOpen=!!(window._qFold&&window._qFold[qk]);
+        let x=`<details class="qfold" data-qk="${qk}" ${qOpen?'open':''} style="padding:12px;border-bottom:1px solid var(--line)">
+          <summary style="cursor:pointer;display:flex;align-items:center;gap:10px;list-style-position:inside;flex-wrap:wrap">
             <b>第${i+1}題</b> <span class="qmeta">${TYPE_LABELS[q.type-1]||''}</span>
-            <span style="font-size:12px;color:var(--muted)">分數（%）：<input type="number" min="0" step="0.5" style="width:70px;padding:4px" value="${Number(q.score)||0}" onchange="editPaperQScore(${p.id},${i},this.value)"></span>
+            <button class="btn danger" style="width:auto;padding:3px 10px;margin:0;font-size:11px" onclick="event.stopPropagation();delQuestion(${p.id},${i})">拆除</button>
+            <span style="font-size:12px;color:var(--muted)">分數（%）：<input type="number" min="0" step="0.5" style="width:70px;padding:4px" value="${Number(q.score)||0}" onclick="event.stopPropagation()" onchange="editPaperQScore(${p.id},${i},this.value)"></span>
           </summary>
           <div style="padding:10px 4px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -1700,6 +1707,13 @@ function renderSub(g){
         </div>
       </div>`;
       qArea.innerHTML=h;
+      // 記住每題摺疊/展開狀態（改題型後保持）
+      qArea.querySelectorAll('details.qfold').forEach(d=>{
+        d.addEventListener('toggle',()=>{
+          window._qFold=window._qFold||{};
+          window._qFold[d.dataset.qk]=d.open;
+        });
+      });
       // 題型 toggle（D-G 直行對應 checkbox）
       qArea.querySelectorAll('[data-type-toggle]').forEach(cb=>{
         cb.onchange=()=>{
@@ -1975,6 +1989,24 @@ function saveQuestion(pid, i){
   DB.set(K.papers,papers);
   toast('第'+(i+1)+'題已儲存');
   renderSub('questions');
+}
+function delQuestion(pid, qi){
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid));
+  if(!p||!p.questions||!p.questions[qi]) return;
+  if(!confirm('確認拆除第'+(qi+1)+'題？')) return;
+  p.questions.splice(qi,1);
+  DB.set(K.papers,papers);
+  renderSub('questions');
+  toast('已拆除第'+(qi+1)+'題');
+}
+function foldAllQ(open){
+  window._qFold=window._qFold||{};
+  document.querySelectorAll('#Q-area details.qfold').forEach(d=>{
+    d.open=open;
+    window._qFold[d.dataset.qk]=open;
+  });
+  toast(open?'已全部展開':'已全部摺疊');
 }
 function editQText(pid, i, v){
   if(!confirm('確定要儲存呢項題目修改？')) return;
