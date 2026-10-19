@@ -267,6 +267,12 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<!-- Logo 放大查看：撳一下查看，再撳一下退回 -->
+<div id="logo-zoom" onclick="this.style.display='none'" style="display:none;position:fixed;inset:0;z-index:99995;background:rgba(10,20,40,.88);align-items:center;justify-content:center;cursor:zoom-out;flex-direction:column">
+  <img id="logo-zoom-img" style="max-width:92vw;max-height:80vh;background:#fff;border-radius:14px;padding:16px">
+  <div style="color:#cbd5e1;font-size:13px;margin-top:12px">撳一下退回上一頁</div>
+</div>
+
 <script>
 /* ================= 數據層（localStorage） ================= */
 const DB = {
@@ -1047,6 +1053,14 @@ function renderTeacher(){
   const only=document.getElementById('t-only'); if(only) only.style.display=logged?'block':'none';
   if(logged){ renderSub(''); registerOnline(); refreshTeacherOnline(); checkCloudSignout(); }
 }
+function zoomLogo(img){
+  const ov=document.getElementById('logo-zoom');
+  if(!ov) return;
+  if(ov.style.display==='flex'){ ov.style.display='none'; return; }
+  const big=document.getElementById('logo-zoom-img');
+  if(big) big.src=img.src||'';
+  ov.style.display='flex';
+}
 function refreshBrandLogo(){
   const all=document.querySelectorAll('.brand-logo');
   all.forEach(img=>{ if(LEAP_LOGO_URL) img.src=LEAP_LOGO_URL; });
@@ -1111,8 +1125,8 @@ function renderSub(g){
         <p class="muted" style="margin-bottom:10px">撳下面按鈕，所有界面嘅 Logo（首頁／答題頁／成績頁／水印）會即時刷新到最新位置。</p>
         <button class="btn" onclick="refreshBrandLogo()">刷新界面 Logo 位置</button>
         <div style="margin-top:16px;padding:12px;background:#f8fafc;border-radius:10px;text-align:center">
-          <img class="brand-logo" style="width:96px" alt="目前 Logo">
-          <div class="muted" style="font-size:12px">目前 Logo 預覽</div>
+          <img class="brand-logo" style="width:96px;cursor:zoom-in" alt="目前 Logo" onclick="zoomLogo(this)" title="撳一下放大查看，再撳一下退回">
+          <div class="muted" style="font-size:12px">目前 Logo 預覽（撳一下放大查看，再撳一下退回）</div>
         </div>
       </div>`;
     return;
