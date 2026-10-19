@@ -293,7 +293,7 @@ const K = {
   students:'quiz_students_v1', locks:'quiz_name_locks', attempts:'quiz_attempts_v1',
   lastAttempt:'quiz_last_attempt', isTeacher:'quiz_is_teacher', pwd:'quiz_teacher_pwd',
   curClass:'quiz_cur_class', userName:'quiz_user_name', ver:'quiz_paper_version',
-  tsesh:'quiz_teacher_session', draft:'quiz_draft_v1', logo:'quiz_logo_custom', btext:'quiz_brand_text', examOpen:'quiz_exam_open'
+  tsesh:'quiz_teacher_session', draft:'quiz_draft_v1', logo:'quiz_logo_custom', btext:'quiz_brand_text', examOpen:'quiz_exam_open', wm:'quiz_wm_custom'
 };
 const LEAP_LOGO_URL=(document.querySelector('#splash img')||{}).src||'';
 
@@ -301,12 +301,12 @@ const LEAP_LOGO_URL=(document.querySelector('#splash img')||{}).src||'';
 const CLOUD_KEY='quiz_cloud_url';
 // 部署前把 Firebase 網址填到下面引號內，所有手機會自動共用同一個雲端，唔使逐部機設定
 const DEFAULT_CLOUD_URL='https://project-3342944994395704108-default-rtdb.firebaseio.com';
-const SERVER_KEYS=['questions','papers','exams','classes','students','attempts','locks','pwd','ver','tsesh','logo','btext','exopen'];
+const SERVER_KEYS=['questions','papers','exams','classes','students','attempts','locks','pwd','ver','tsesh','logo','btext','exopen','wmkey'];
 // 云端裸名 -> 本机 localStorage 键（K 里带 quiz_ 前缀）
 const SERVER_MAP={
   questions:K.questions, papers:K.papers, exams:K.exams, classes:K.classes,
   students:K.students, attempts:K.attempts, locks:K.locks, pwd:K.pwd, ver:K.ver,
-  tsesh:K.tsesh, logo:K.logo, btext:K.btext, exopen:K.examOpen
+  tsesh:K.tsesh, logo:K.logo, btext:K.btext, exopen:K.examOpen, wmkey:K.wm
 };
 const Cloud={
   _timers:{},
@@ -805,7 +805,7 @@ function applyBranding(){
 }
 function wmHtml(){
   const wmSpans=Array.from({length:14},()=>'<span>飛躍教育中心 · LEAP EDUCATION CENTER</span>').join('');
-  const logo=DB.get(K.logo,'')||LEAP_LOGO_URL;
+  const logo=DB.get(K.wm,'')||DB.get(K.logo,'')||LEAP_LOGO_URL;
   const wmStyle=logo?`style="background-image:url('${logo}')"`:'';
   return `<div class="wm" ${wmStyle}>${wmSpans}</div>`;
 }
@@ -1131,6 +1131,41 @@ function onLogoFile(input){
   };
   rd.readAsDataURL(f);
 }
+let _newWmImg='';
+function onWmFile(input){
+  const f=input.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement('canvas');
+      const max=400;
+      let w=img.width,h=img.height;
+      if(w>max){ h=Math.round(h*max/w); w=max; }
+      c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      _newWmImg=c.toDataURL('image/png');
+      const pv=document.getElementById('Wm-preview');
+      if(pv) pv.innerHTML=`<img src="${_newWmImg}" style="max-width:200px;max-height:100px;background:#fff;border-radius:8px;padding:6px;border:1px solid var(--line)">`;
+      toast('已載入水印圖，撳「儲存水印 Logo」生效');
+    };
+    img.src=e.target.result;
+  };
+  rd.readAsDataURL(f);
+}
+function saveWm(){
+  if(!_newWmImg) return toast('未揀水印圖');
+  DB.set(K.wm, _newWmImg);
+  toast('已儲存水印 Logo 並上傳雲端');
+  renderSub('logo');
+}
+function resetWm(){
+  if(!confirm('水印還原用主 Logo？')) return;
+  localStorage.removeItem(K.wm);
+  DB.set(K.wm, '');
+  toast('水印已還原用主 Logo');
+  renderSub('logo');
+}
 function saveLogo(){
   if(!_newLogoImg) return toast('未揀新 Logo 圖');
   DB.set(K.logo, _newLogoImg);
@@ -1236,6 +1271,16 @@ function renderSub(g){
         </div>
         <button class="btn" onclick="saveLogo()">儲存並覆蓋所有界面 Logo</button>
         <button class="btn secondary" onclick="resetLogo()" style="margin-top:8px">回復預設 Logo</button>
+      </div>
+      <div class="card" style="padding:16px;margin-top:12px">
+        <h2>水印 Logo 上傳（答題框外水印用）</h2>
+        <p class="muted" style="font-size:13px;margin-bottom:8px">上傳一張圖做水印（唔設定就用主 Logo）。</p>
+        <input type="file" id="Wm-file" accept="image/*" onchange="onWmFile(this)" style="margin:8px 0">
+        <div id="Wm-preview" style="padding:10px;background:#fff;border:1px dashed var(--line);border-radius:10px;text-align:center;min-height:70px;margin-bottom:10px">
+          <span class="muted" style="font-size:13px">新水印圖預覽會喺度顯示</span>
+        </div>
+        <button class="btn" onclick="saveWm()">儲存水印 Logo</button>
+        <button class="btn secondary" onclick="resetWm()" style="margin-top:8px">水印還原用主 Logo</button>
       </div>
       <div class="card" style="padding:16px;margin-top:12px">
         <h2>課程名稱文字</h2>
