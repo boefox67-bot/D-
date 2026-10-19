@@ -141,9 +141,8 @@
         <input id="in-classType">
       </div>
       <div class="warn" id="home-warn" style="display:none"></div>
-      <button class="btn secondary" id="btn-teacherEntry" style="margin-top:12px;position:relative;z-index:100001">老師入口</button>
     </div>
-    <footer>© 2026 豆包工作 版權所有・飛躍教育中心 電工答題系統<br>換 X 檔就係新考試・考試碼 1 小時有效 版本 <span id="footer-ver">1.0</span></footer>
+    <footer>© 2026 豆包工作 版權所有・飛躍教育中心 電工答題系統<br>換 X 檔就係新考試・考試碼 1 小時有效 版本 <span id="footer-ver">1.0</span> ・<a id="link-teacher" onclick="go('teacher')" style="color:#94a3b8;cursor:pointer;text-decoration:underline;position:relative;z-index:100001">導師</a></footer>
     <div id="ver-tag" style="position:fixed;left:8px;bottom:8px;background:#0f172a;color:#fff;font-size:11px;padding:3px 8px;border-radius:10px;opacity:0.7;z-index:99">v1.0</div>
   </div>
 
@@ -778,7 +777,7 @@ document.getElementById('btn-enterStudent').onclick=function(){
   startQuiz(exam, name);
 };
 function warnMsg(m){ const w=document.getElementById('home-warn'); w.textContent=m; w.style.display='block'; }
-document.getElementById('btn-teacherEntry').onclick=()=>go('teacher');
+// 老師入口：頁尾「導師」連結直接 go('teacher')，主界面唔再顯示按鈕
 
 /* ================= 答題頁 ================= */
 let QZ = null; // { exam, name, list, answers, idx }
@@ -2714,10 +2713,18 @@ updateVerBadge();
 updateVerDisplay();
 renderHome();
 // 考場關閉偵測：老師按下清場／關閉考場時，學生界面（首頁／考試碼頁／答題頁）遮罩蓋住，顯示「系統維護中」；老師身份唔遮罩，老師入口可以正常撳入
-// 遮罩已停用（用戶要求）：唔再顯示「系統維護中」全屏遮罩阻住封面／主界面／老師入口；清場改由學生端自動偵測踢出
+// 考場關閉偵測：老師按下清場／關閉考場時，學生界面（首頁／考試碼頁／答題頁）遮罩蓋住顯示「系統維護中」；封面（撳入更新）同老師界面一律唔遮罩
 function checkExamMask(){
   const m=document.getElementById('exam-mask'); if(!m) return;
-  m.style.display='none';
+  // 封面（輕觸螢幕進入＝觸發雲端更新）仲未撳入時，一律唔遮罩，等用戶撳入更新
+  if(document.getElementById('splash')){ m.style.display='none'; return; }
+  const tv=document.getElementById('view-teacher');
+  // 老師界面（登入頁／後台）一律唔顯示遮罩；老師入口（頁尾「導師」）喺遮罩之上可以正常撳入
+  if((tv&&tv.classList.contains('active'))||DB.get(K.isTeacher,false)===true){ m.style.display='none'; return; }
+  if(!Cloud.enabled()){ m.style.display='none'; return; }
+  Cloud.raw('exopen','GET').then(v=>{
+    m.style.display=String(v)==='0'?'flex':'none';
+  }).catch(()=>{});
 }
 setInterval(checkExamMask,10000);
 checkExamMask();
