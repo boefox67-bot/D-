@@ -2716,6 +2716,8 @@ renderHome();
 // 考場關閉偵測：老師按下清場／關閉考場時，學生界面（首頁／考試碼頁／答題頁）遮罩蓋住，顯示「系統維護中」；老師身份唔遮罩，老師入口可以正常撳入
 function checkExamMask(){
   const m=document.getElementById('exam-mask'); if(!m) return;
+  // 封面（輕觸螢幕進入＝觸發雲端更新）仲未撳入時，一律唔遮罩，等用戶撳入更新
+  if(document.getElementById('splash')){ m.style.display='none'; return; }
   const tv=document.getElementById('view-teacher');
   // 老師界面（登入頁／後台）一律唔顯示遮罩；學生界面先睇考場開關
   if((tv&&tv.classList.contains('active'))||DB.get(K.isTeacher,false)===true){ m.style.display='none'; return; }
