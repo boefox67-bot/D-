@@ -786,6 +786,7 @@ function renderQuiz(){
   const q=list[idx];
   document.getElementById('quiz-progress').textContent=`第 ${idx+1} / ${list.length} 題 · ${TYPE_LABELS[q.type-1]||''}`+(q.score?` · ${q.score}分`:'');
   let html='';
+  html+=wmHtml();
   html+=`<div class="qbox">
   <span class="qmeta">${TYPE_LABELS[q.type-1]||''}</span>
   <div class="qtext">${idx+1}. ${renderOptContent(q.question)}</div>`;
