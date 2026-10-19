@@ -245,6 +245,7 @@
       <div class="link-grid" style="margin-top:10px" id="t-grid2">
         <button data-go="import">導入 X 檔題庫</button>
         <button data-go="questions">題庫管理（改題）</button>
+        <button data-go="logo">刷新界面 Logo</button>
         <button data-go="version">版本號設定</button>
         <button data-go="cloud">雲端同步設置</button>
         <button data-go="chgpwd">修改密碼</button>
@@ -1046,6 +1047,11 @@ function renderTeacher(){
   const only=document.getElementById('t-only'); if(only) only.style.display=logged?'block':'none';
   if(logged){ renderSub(''); registerOnline(); refreshTeacherOnline(); checkCloudSignout(); }
 }
+function refreshBrandLogo(){
+  const all=document.querySelectorAll('.brand-logo');
+  all.forEach(img=>{ if(LEAP_LOGO_URL) img.src=LEAP_LOGO_URL; });
+  toast('已刷新所有界面 Logo');
+}
 document.querySelectorAll('#t-grid1 button, #t-grid2 button').forEach(b=>{
   b.onclick=()=>{
     const g=b.dataset.go;
@@ -1099,6 +1105,18 @@ function renderSub(g){
   curSub=g||'';
   const el=document.getElementById('t-sub');
   if(!g){ el.innerHTML='<div class="card"><p class="muted">揀上面功能開始。</p></div>'; return; }
+  if(g==='logo'){
+    el.innerHTML=subHead('刷新界面 Logo')+`
+      <div class="card" style="padding:16px">
+        <p class="muted" style="margin-bottom:10px">撳下面按鈕，所有界面嘅 Logo（首頁／答題頁／成績頁／水印）會即時刷新到最新位置。</p>
+        <button class="btn" onclick="refreshBrandLogo()">刷新界面 Logo 位置</button>
+        <div style="margin-top:16px;padding:12px;background:#f8fafc;border-radius:10px;text-align:center">
+          <img class="brand-logo" style="width:96px" alt="目前 Logo">
+          <div class="muted" style="font-size:12px">目前 Logo 預覽</div>
+        </div>
+      </div>`;
+    return;
+  }
   if(g==='version'){
     el.innerHTML=subHead('版本號設定')+`
       <div class="card" style="padding:16px">
