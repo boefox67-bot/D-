@@ -54,6 +54,11 @@
   details.qfold{background:#fff;border-radius:10px}
   details.qfold[open]{box-shadow:0 1px 4px rgba(18,38,68,.08)}
   details.qfold summary::-webkit-details-marker{color:var(--blue)}
+  .calc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+  .calc-btn{padding:14px 8px;border:none;border-radius:10px;background:#e8eefc;color:var(--ink);font-size:18px;font-weight:700;cursor:pointer}
+  .calc-btn.op{background:#dbe7ff;color:var(--blue)}
+  .calc-btn.equal{background:var(--blue);color:#fff}
+  .calc-btn.danger{background:#fde8e8;color:var(--red)}
   .progress{font-size:13px;color:var(--muted);margin-bottom:8px}
   /* 成績 */
   .bigscore{font-size:44px;font-weight:800;color:var(--blue);text-align:center;margin:8px 0}
@@ -125,6 +130,32 @@
       <p id="quiz-className"></p>
     </div>
     <div class="progress" id="quiz-progress"></div>
+    <button class="btn secondary" id="btn-calc" style="padding:8px;font-size:13px;margin:0 0 10px">計算機</button>
+    <div id="calc-panel" style="display:none;margin-bottom:14px">
+      <div class="card" style="margin:0;padding:12px">
+        <input id="calc-screen" readonly value="0" style="font-size:22px;text-align:right;background:#f8fafc">
+        <div class="calc-grid">
+          <button class="calc-btn danger" onclick="calcClear()">C</button>
+          <button class="calc-btn op" onclick="calcBack()">⌫</button>
+          <button class="calc-btn op" onclick="calcSetOp('/')">÷</button>
+          <button class="calc-btn op" onclick="calcSetOp('*')">×</button>
+          <button class="calc-btn" onclick="calcNum('7')">7</button>
+          <button class="calc-btn" onclick="calcNum('8')">8</button>
+          <button class="calc-btn" onclick="calcNum('9')">9</button>
+          <button class="calc-btn op" onclick="calcSetOp('-')">−</button>
+          <button class="calc-btn" onclick="calcNum('4')">4</button>
+          <button class="calc-btn" onclick="calcNum('5')">5</button>
+          <button class="calc-btn" onclick="calcNum('6')">6</button>
+          <button class="calc-btn op" onclick="calcSetOp('+')">＋</button>
+          <button class="calc-btn" onclick="calcNum('1')">1</button>
+          <button class="calc-btn" onclick="calcNum('2')">2</button>
+          <button class="calc-btn" onclick="calcNum('3')">3</button>
+          <button class="calc-btn equal" onclick="calcEquals()">＝</button>
+          <button class="calc-btn" onclick="calcNum('0')" style="grid-column:span 2">0</button>
+          <button class="calc-btn" onclick="calcDot()">.</button>
+        </div>
+      </div>
+    </div>
     <div class="card" id="quiz-card"></div>
     <div class="row">
       <button class="btn secondary" id="btn-prev">上一題</button>
@@ -735,6 +766,33 @@ function renderQuiz(){
   document.getElementById('btn-next').textContent = idx===list.length-1 ? '完成作答' : '下一題';
   document.getElementById('btn-submit').style.display = (idx===list.length-1)?'block':'none';
 }
+const calcState={entry:'0',prev:null,op:null};
+function calcShow(v){ document.getElementById('calc-screen').value=String(v); }
+window.calcNum=d=>{
+  if(calcState.entry==='0') calcState.entry=d; else calcState.entry+=d;
+  calcShow(calcState.entry);
+};
+window.calcDot=()=>{ if(!calcState.entry.includes('.')) calcState.entry+='.'; calcShow(calcState.entry); };
+window.calcBack=()=>{ calcState.entry=calcState.entry.length>1?calcState.entry.slice(0,-1):'0'; calcShow(calcState.entry); };
+window.calcClear=()=>{ calcState.entry='0';calcState.prev=null;calcState.op=null;calcShow(0); };
+window.calcSetOp=op=>{
+  if(calcState.prev!=null&&calcState.op) calcEquals();
+  calcState.prev=parseFloat(calcState.entry||'0'); calcState.op=op; calcState.entry='';
+};
+window.calcEquals=()=>{
+  if(calcState.prev==null||!calcState.op) return;
+  const cur=parseFloat(calcState.entry||'0'); let r=0;
+  if(calcState.op==='+') r=calcState.prev+cur;
+  else if(calcState.op==='-') r=calcState.prev-cur;
+  else if(calcState.op==='*') r=calcState.prev*cur;
+  else if(calcState.op==='/') r=cur===0?0:calcState.prev/cur;
+  r=Math.round(r*1e10)/1e10;
+  calcState.entry=String(r);calcState.prev=null;calcState.op=null;calcShow(r);
+};
+document.getElementById('btn-calc').onclick=()=>{
+  const p=document.getElementById('calc-panel');
+  p.style.display=p.style.display==='none'?'block':'none';
+};
 document.getElementById('btn-prev').onclick=()=>{ if(QZ.idx>0){ QZ.idx--; renderQuiz(); } };
 document.getElementById('btn-next').onclick=()=>{ if(QZ.idx<QZ.list.length-1){ QZ.idx++; renderQuiz(); } };
 document.getElementById('btn-exit').onclick=()=>{
