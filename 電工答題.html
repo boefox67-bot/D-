@@ -46,6 +46,7 @@
   .opt .letter{font-weight:700;color:var(--blue);flex-shrink:0}
   .qmeta{display:inline-block;font-size:11px;background:#e8eefc;color:var(--blue);padding:2px 8px;border-radius:20px;margin-bottom:8px}
   .qtext{font-size:16px;line-height:1.6;margin-bottom:6px}
+  .qbox{position:relative;z-index:2;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
   #quiz-card{position:relative;overflow:hidden}
   #quiz-card > *:not(.wm),.wm-zone > *:not(.wm){position:relative;z-index:1}
   .wm-zone{position:relative;overflow:hidden}
@@ -781,8 +782,10 @@ function renderQuiz(){
   const q=list[idx];
   document.getElementById('quiz-progress').textContent=`第 ${idx+1} / ${list.length} 題 · ${TYPE_LABELS[q.type-1]||''}`+(q.score?` · ${q.score}分`:'');
   let html='';
-  html+=`<span class="qmeta">${TYPE_LABELS[q.type-1]||''}</span>`;
-  html+=`<div class="qtext">${idx+1}. ${renderOptContent(q.question)}</div>`;
+  html+=wmHtml();
+  html+=`<div class="qbox">
+  <span class="qmeta">${TYPE_LABELS[q.type-1]||''}</span>
+  <div class="qtext">${idx+1}. ${renderOptContent(q.question)}</div>`;
   if(q.type===4){
     (q.parts||[]).forEach((pt,pi)=>{
       html+=`<div style="margin:10px 0 4px;font-size:13px;color:var(--muted)">第${pi+1}部分（${pt.kind==='fill'?'填寫':pt.kind==='tf'?'是非':pt.kind==='multi'?'多選':'單選'}）</div>`;
@@ -810,6 +813,7 @@ function renderQuiz(){
         <span class="dot">${on?'✓':''}</span><span class="letter">${'ABCDEF'.charAt(oi)}</span><span>${renderOptContent(op)}</span></div>`;
     });
   }
+  html+='</div>';
   document.getElementById('quiz-card').innerHTML=html;
   // 事件
   document.querySelectorAll('#quiz-card .opt').forEach(el=>{
