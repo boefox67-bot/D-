@@ -1300,7 +1300,7 @@ function renderSub(g){
         const duration=esc(a.durationText||formatDuration(a.durationMs)||'—')+(a.durationHours!=null&&a.durationHours!==''?` · ${a.durationHours}小時`:'');
         return `<div class="grade-card">
           <div class="grade-row1">
-            <div class="grade-main"><b>${esc(a.name)}</b> <span class="muted">${esc(a.className||'未編班')}</span><br><span style="font-size:12px">${esc(a.paperName)}</span></div>
+            <div class="grade-main">(姓名:<b>${esc(a.name)}</b>) <span class="muted">${esc(a.className||'未編班')}</span><br><span style="font-size:12px">${esc(a.paperName)}</span></div>
             <div class="grade-score">
               <button class="btn danger" style="width:auto;padding:3px 9px;margin:0 0 6px;font-size:12px" data-del-attempt="${ri}">拆除</button><br>
               <b>${pct}/100</b> <span class="tag ${a.score100>=60?'ok':'bad'}">${pct}%</span><br><span style="font-size:12px">${duration}</span>
