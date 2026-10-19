@@ -95,8 +95,8 @@
 </style>
 </head>
 <body>
-<!-- 全域維護遮罩：老師開啟維護模式時蓋住所有界面，底下輸入框完全唔可以點擊 -->
-<div id="maintain-mask" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(13,42,94,.97);color:#fff;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px">
+<!-- 考場關閉遮罩：老師按下清場／關閉考場時，蓋住考試碼輸入位置，顯示系統維護中 -->
+<div id="exam-mask" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(13,42,94,.97);color:#fff;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px">
   <div style="font-size:30px;font-weight:800;letter-spacing:4px">系統維護中</div>
   <div style="margin-top:14px;font-size:15px;opacity:.9">老師正在更新資料，請稍候片刻</div>
   <div style="margin-top:30px;font-size:12px;opacity:.6">完成後會自動恢復，唔使重新載入</div>
@@ -298,7 +298,7 @@ const K = {
   students:'quiz_students_v1', locks:'quiz_name_locks', attempts:'quiz_attempts_v1',
   lastAttempt:'quiz_last_attempt', isTeacher:'quiz_is_teacher', pwd:'quiz_teacher_pwd',
   curClass:'quiz_cur_class', userName:'quiz_user_name', ver:'quiz_paper_version',
-  tsesh:'quiz_teacher_session', draft:'quiz_draft_v1', logo:'quiz_logo_custom', btext:'quiz_brand_text', examOpen:'quiz_exam_open', wm:'quiz_wm_custom', maintain:'quiz_maintain'
+  tsesh:'quiz_teacher_session', draft:'quiz_draft_v1', logo:'quiz_logo_custom', btext:'quiz_brand_text', examOpen:'quiz_exam_open', wm:'quiz_wm_custom'
 };
 const LEAP_LOGO_URL=(document.querySelector('#splash img')||{}).src||'';
 
@@ -306,12 +306,12 @@ const LEAP_LOGO_URL=(document.querySelector('#splash img')||{}).src||'';
 const CLOUD_KEY='quiz_cloud_url';
 // 部署前把 Firebase 網址填到下面引號內，所有手機會自動共用同一個雲端，唔使逐部機設定
 const DEFAULT_CLOUD_URL='https://project-3342944994395704108-default-rtdb.firebaseio.com';
-const SERVER_KEYS=['questions','papers','exams','classes','students','attempts','locks','pwd','ver','tsesh','logo','btext','exopen','wmkey','maintain'];
+const SERVER_KEYS=['questions','papers','exams','classes','students','attempts','locks','pwd','ver','tsesh','logo','btext','exopen','wmkey'];
 // 云端裸名 -> 本机 localStorage 键（K 里带 quiz_ 前缀）
 const SERVER_MAP={
   questions:K.questions, papers:K.papers, exams:K.exams, classes:K.classes,
   students:K.students, attempts:K.attempts, locks:K.locks, pwd:K.pwd, ver:K.ver,
-  tsesh:K.tsesh, logo:K.logo, btext:K.btext, exopen:K.examOpen, wmkey:K.wm, maintain:K.maintain
+  tsesh:K.tsesh, logo:K.logo, btext:K.btext, exopen:K.examOpen, wmkey:K.wm
 };
 const Cloud={
   _timers:{},
@@ -1400,15 +1400,9 @@ function renderSub(g){
   }
   if(g==='classes'){
     const cls=getClasses(), sts=getStudents();
-    const maintOn=DB.get(K.maintain,'0')==='1';
     el.innerHTML=subHead('學生管理（班次加減）')+`
-      <div class="card" style="padding:16px;margin-bottom:12px;border:2px solid ${maintOn?'#dc2626':'#f59e0b'}">
-        <h2>全域維護模式</h2>
-        <p class="muted" style="font-size:13px;margin-bottom:8px">開啟後：首頁／輸入考試碼頁／答題頁全部被遮罩蓋住，學生輸入框完全唔可以點擊。改完學生名／班次名再關閉。</p>
-        <button class="btn" style="background:${maintOn?'#dc2626':'#f59e0b'}" onclick="toggleMaintain()">${maintOn?'關閉維護模式（解除鎖定）':'開啟維護模式（鎖定學生界面）'}</button>
-      </div>
-      <label>現有班次（按右邊掣改名／拆除）</label>
-      <div id="C-clsList">${cls.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid var(--line)"><span>${esc(c)}</span><span style="display:flex;gap:6px"><button class="btn secondary" style="width:auto;padding:4px 12px;margin:0;font-size:13px" data-rncls="${esc(c)}">改名</button><button class="btn danger" style="width:auto;padding:4px 12px;margin:0;font-size:13px" data-delcls="${esc(c)}">拆除</button></span></div>`).join('')||'<span class="muted">暫無班次</span>'}</div>
+      <label>現有班次（撳改名變確定，直接同步雲端）</label>
+      <div id="C-clsList">${cls.map((c,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid var(--line)"><span id="C-cls-name-${i}">${esc(c)}</span><span style="display:flex;gap:6px"><button class="btn secondary" style="width:auto;padding:4px 12px;margin:0;font-size:13px" id="C-cls-rn-${i}" onclick="startRenameCls(${i})">改名</button><button class="btn danger" style="width:auto;padding:4px 12px;margin:0;font-size:13px" data-delcls="${esc(c)}">拆除</button></span></div>`).join('')||'<span class="muted">暫無班次</span>'}</div>
       <label>加新班次名</label>
       <input id="C-add" placeholder="新班次名">
       <button class="btn" id="C-addBtn">加班</button>
@@ -1423,10 +1417,10 @@ function renderSub(g){
           return `<div data-row="${idx}" data-cls="${esc(arr.join(','))}" data-name="${esc(nm.toLowerCase())}" style="padding:8px;border-bottom:1px solid var(--line)">
             <details>
               <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;list-style:none">
-                <span>${esc(nm)} ${arr.length?'<span class="tag ok" style="margin-left:6px">'+esc(arr.join('、'))+'</span>':'<span class="tag">未編班</span>'}</span>
+                <span id="C-stu-name-${idx}">${esc(nm)} ${arr.length?'<span class="tag ok" style="margin-left:6px">'+esc(arr.join('、'))+'</span>':'<span class="tag">未編班</span>'}</span>
                 <span style="display:flex;gap:6px;align-items:center">
                   <span class="muted" style="font-size:12px">折開改班</span>
-                  <button class="btn secondary" style="width:auto;padding:4px 12px;margin:0;font-size:13px" data-rnstu-idx="${idx}">改名</button>
+                  <button class="btn secondary" style="width:auto;padding:4px 12px;margin:0;font-size:13px" id="C-stu-rn-${idx}" onclick="startRenameStu(${idx})">改名</button>
                   <button class="btn danger" style="width:auto;padding:4px 12px;margin:0;font-size:13px" data-delstu-idx="${idx}">拆除</button>
                 </span>
               </summary>
@@ -1489,78 +1483,76 @@ function renderSub(g){
         DB.set(K.students,sts2);
       };
     });
-    // 班次改名：自動批量更新所有學生班次欄位＋考試連結
-    document.querySelectorAll('#C-clsList [data-rncls]').forEach(b=>{
-      b.onclick=()=>renameClass(b.dataset.rncls);
-    });
-    function renameClass(oldName){
-      const cls=getClasses();
-      const nn=prompt('請輸入新班次名：', oldName);
-      if(nn==null) return;
-      const n=nn.trim();
-      if(!n) return toast('班次名唔可以空白');
-      if(n===oldName) return;
-      if(cls.includes(n)) return toast('已有同名班次：'+n);
-      DB.set(K.classes, cls.map(c=>c===oldName?n:c));
-      // 批量更新所有學生班次欄位
-      const sts2=getStudents().map(s=>{
-        const arr=stuCls(s).map(c=>c===oldName?n:c);
-        return {name:stuName(s), cls:arr};
-      });
-      DB.set(K.students, sts2);
-      // 更新考試連結嘅班次名
-      const exams=getExams();
-      if(exams.some(e=>e.className===oldName)){
-        DB.set(K.exams, exams.map(e=>e.className===oldName?Object.assign({},e,{className:n}):e));
-      }
-      toast('班次已改名：'+oldName+' → '+n+'（學生已批量更新）');
-      renderSub('classes');
+    // 班次改名：撳「改名」變輸入框＋「儲存」鍵，儲存直接同步雲端同主機
+    function startRenameCls(i){
+      const cls=getClasses(); const old=cls[i]; if(old==null) return;
+      const span=document.getElementById('C-cls-name-'+i); if(!span) return;
+      span.innerHTML=`<input id="C-cls-input-${i}" style="padding:4px 8px;border:1px solid var(--line);border-radius:4px;font-size:14px;width:170px" value="${esc(old)}">`;
+      const btn=document.getElementById('C-cls-rn-'+i); if(!btn) return;
+      btn.textContent='確定';
+      btn.onclick=()=>{
+        const inp=document.getElementById('C-cls-input-'+i);
+        const n=inp?inp.value.trim():'';
+        if(!n) return toast('班次名唔可以空白');
+        if(n===old) return;
+        const cls2=getClasses();
+        if(cls2.includes(n)) return toast('已有同名班次：'+n);
+        DB.set(K.classes, cls2.map(c=>c===old?n:c));
+        // 批量更新所有學生班次欄位
+        const sts2=getStudents().map(s=>{
+          const arr=stuCls(s).map(c=>c===old?n:c);
+          return {name:stuName(s), cls:arr};
+        });
+        DB.set(K.students, sts2);
+        // 更新考試連結嘅班次名
+        const exams=getExams();
+        if(exams.some(e=>e.className===old)){
+          DB.set(K.exams, exams.map(e=>e.className===old?Object.assign({},e,{className:n}):e));
+        }
+        toast('班次已改名並同步雲端：'+old+' → '+n+'（學生已批量更新）');
+        renderSub('classes');
+      };
     }
-    // 學生改名：檢查重名，作答記錄／鎖／草稿跟住姓名保留
-    document.querySelectorAll('#C-stuList [data-rnstu-idx]').forEach(b=>{
-      b.onclick=()=>renameStudent(Number(b.dataset.rnstuIdx));
-    });
-    function renameStudent(idx){
+    // 學生改名：撳「改名」變輸入框＋「儲存」鍵，儲存直接同步雲端
+    function startRenameStu(idx){
       const sts=getStudents(); const s=sts[idx]; if(!s) return;
       const old=stuName(s);
-      const nn=prompt('請輸入新姓名：', old);
-      if(nn==null) return;
-      const n=nn.trim();
-      if(!n) return toast('姓名唔可以空白');
-      if(n===old) return;
-      if(sts.some((x,i)=>i!==idx&&stuName(x)===n)) return toast('已有同名學生：'+n);
-      // 更新名單
-      sts[idx]={name:n, cls:stuCls(s)};
-      DB.set(K.students, sts);
-      // 更新作答記錄（成績保留）
-      const att=getAttempts();
-      let aChanged=false;
-      att.forEach(a=>{ if(a&&a.name===old){ a.name=n; aChanged=true; } });
-      if(aChanged) DB.set(K.attempts, att);
-      // 更新鎖（進行中／已完成狀態保留）
-      const L=getLocks();
-      if(L[old]){ L[n]=L[old]; delete L[old]; DB.set(K.locks, L); }
-      // 更新草稿
-      const all=getDrafts();
-      let dChanged=false;
-      for(const k in all){
-        if(all[k]&&all[k].name===old){
-          const d=all[k];
-          delete all[k];
-          all[draftKey(n, d.code)]=Object.assign({},d,{name:n});
-          dChanged=true;
+      const span=document.getElementById('C-stu-name-'+idx); if(!span) return;
+      span.innerHTML=`<input id="C-stu-input-${idx}" style="padding:4px 8px;border:1px solid var(--line);border-radius:4px;font-size:14px;width:170px" value="${esc(old)}">`;
+      const btn=document.getElementById('C-stu-rn-'+idx); if(!btn) return;
+      btn.textContent='確定';
+      btn.onclick=()=>{
+        const inp=document.getElementById('C-stu-input-'+idx);
+        const n=inp?inp.value.trim():'';
+        if(!n) return toast('姓名唔可以空白');
+        if(n===old) return;
+        const sts2=getStudents();
+        if(sts2.some((x,i)=>i!==idx&&stuName(x)===n)) return toast('已有同名學生：'+n);
+        sts2[idx]={name:n, cls:stuCls(s)};
+        DB.set(K.students, sts2);
+        // 更新作答記錄（成績保留）
+        const att=getAttempts();
+        let aChanged=false;
+        att.forEach(a=>{ if(a&&a.name===old){ a.name=n; aChanged=true; } });
+        if(aChanged) DB.set(K.attempts, att);
+        // 更新鎖（進行中／已完成狀態保留）
+        const L=getLocks();
+        if(L[old]){ L[n]=L[old]; delete L[old]; DB.set(K.locks, L); }
+        // 更新草稿
+        const all=getDrafts();
+        let dChanged=false;
+        for(const k in all){
+          if(all[k]&&all[k].name===old){
+            const d=all[k];
+            delete all[k];
+            all[draftKey(n, d.code)]=Object.assign({},d,{name:n});
+            dChanged=true;
+          }
         }
-      }
-      if(dChanged) DB.set(K.draft, all);
-      toast('已改名：'+old+' → '+n+'（作答記錄同步保留）');
-      renderSub('classes');
-    }
-    // 全域維護模式開關
-    function toggleMaintain(){
-      const on=DB.get(K.maintain,'0')==='1';
-      DB.set(K.maintain, on?'0':'1');
-      toast(on?'維護模式已關閉，學生可以繼續使用':'維護模式已開啟，學生界面已鎖定');
-      renderSub('classes');
+        if(dChanged) DB.set(K.draft, all);
+        toast('已改名並同步雲端：'+old+' → '+n+'（作答記錄保留）');
+        renderSub('classes');
+      };
     }
     // 拆除班次
     document.querySelectorAll('#C-clsList [data-delcls]').forEach(b=>{
@@ -2715,16 +2707,16 @@ document.getElementById('view-home').classList.add('active');
 updateVerBadge();
 updateVerDisplay();
 renderHome();
-// 全域維護模式偵測：老師開啟維護時，首頁／考試碼頁／答題頁全部蓋遮罩，底下輸入框唔可以點擊
-function checkMaintain(){
+// 考場關閉偵測：老師按下清場／關閉考場時，考試碼位置即時被遮罩蓋住，顯示「系統維護中」
+function checkExamMask(){
   if(!Cloud.enabled()) return;
-  Cloud.raw('maintain','GET').then(v=>{
-    const m=document.getElementById('maintain-mask');
-    if(m) m.style.display=String(v)==='1'?'flex':'none';
+  Cloud.raw('exopen','GET').then(v=>{
+    const m=document.getElementById('exam-mask');
+    if(m) m.style.display=String(v)==='0'?'flex':'none';
   }).catch(()=>{});
 }
-setInterval(checkMaintain,10000);
-checkMaintain();
+setInterval(checkExamMask,10000);
+checkExamMask();
 // 唔做開機自動拉取、唔做自動輪詢；輕觸封面先由雲端讀取刷新，再進入學生介面
 </script>
 </body>
