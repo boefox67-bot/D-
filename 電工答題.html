@@ -292,7 +292,7 @@ const K = {
   students:'quiz_students_v1', locks:'quiz_name_locks', attempts:'quiz_attempts_v1',
   lastAttempt:'quiz_last_attempt', isTeacher:'quiz_is_teacher', pwd:'quiz_teacher_pwd',
   curClass:'quiz_cur_class', userName:'quiz_user_name', ver:'quiz_paper_version',
-  tsesh:'quiz_teacher_session', draft:'quiz_draft_v1'
+  tsesh:'quiz_teacher_session', draft:'quiz_draft_v1', logo:'quiz_logo_custom', btext:'quiz_brand_text'
 };
 const LEAP_LOGO_URL=(document.querySelector('#splash img')||{}).src||'';
 
@@ -300,12 +300,12 @@ const LEAP_LOGO_URL=(document.querySelector('#splash img')||{}).src||'';
 const CLOUD_KEY='quiz_cloud_url';
 // 部署前把 Firebase 網址填到下面引號內，所有手機會自動共用同一個雲端，唔使逐部機設定
 const DEFAULT_CLOUD_URL='https://project-3342944994395704108-default-rtdb.firebaseio.com';
-const SERVER_KEYS=['questions','papers','exams','classes','students','attempts','locks','pwd','ver','tsesh'];
+const SERVER_KEYS=['questions','papers','exams','classes','students','attempts','locks','pwd','ver','tsesh','logo','btext'];
 // 云端裸名 -> 本机 localStorage 键（K 里带 quiz_ 前缀）
 const SERVER_MAP={
   questions:K.questions, papers:K.papers, exams:K.exams, classes:K.classes,
   students:K.students, attempts:K.attempts, locks:K.locks, pwd:K.pwd, ver:K.ver,
-  tsesh:K.tsesh
+  tsesh:K.tsesh, logo:K.logo, btext:K.btext
 };
 const Cloud={
   _timers:{},
@@ -347,6 +347,7 @@ const Cloud={
     if(!data||typeof data!=='object') return false;
     let changed=false;
     SERVER_KEYS.forEach(b=>{ if(data[b]!==undefined){ DB.set(SERVER_MAP[b],data[b]); changed=true; } });
+    if(data['logo']!==undefined || data['btext']!==undefined){ applyBranding(); }
     return changed;
   },
   async pushAll(){
@@ -786,9 +787,21 @@ function startQuiz(exam, name){
   document.getElementById('quiz-className').textContent = (exam.className||'')+' · '+name;
   go('quiz'); renderQuiz();
 }
+function applyBranding(){
+  const logo=DB.get(K.logo,'')||LEAP_LOGO_URL;
+  if(logo){
+    document.querySelectorAll('.brand-logo').forEach(im=>{ im.src=logo; });
+    const sp=document.querySelector('#splash img'); if(sp) sp.src=logo;
+  }
+  const text=DB.get(K.btext,'');
+  if(text){
+    const ss=document.getElementById('splash-sub'); if(ss) ss.textContent=text;
+    const hs=document.getElementById('home-sub'); if(hs) hs.textContent=text;
+  }
+}
 function wmHtml(){
   const wmSpans=Array.from({length:14},()=>'<span>飛躍教育中心 · LEAP EDUCATION CENTER</span>').join('');
-  const logo=localStorage.getItem('quiz_logo_custom')||LEAP_LOGO_URL;
+  const logo=DB.get(K.logo,'')||LEAP_LOGO_URL;
   const wmStyle=logo?`style="background-image:url('${logo}')"`:'';
   return `<div class="wm" ${wmStyle}>${wmSpans}</div>`;
 }
@@ -1114,27 +1127,25 @@ function onLogoFile(input){
 }
 function saveLogo(){
   if(!_newLogoImg) return toast('未揀新 Logo 圖');
-  localStorage.setItem('quiz_logo_custom',_newLogoImg);
-  document.querySelectorAll('.brand-logo').forEach(im=>{ im.src=_newLogoImg; });
-  const sp=document.querySelector('#splash img'); if(sp) sp.src=_newLogoImg;
-  toast('已儲存並覆蓋所有界面 Logo');
+  DB.set(K.logo, _newLogoImg);
+  applyBranding();
+  toast('已儲存並上傳雲端，覆蓋所有界面 Logo');
   renderSub('logo');
 }
 function resetLogo(){
   if(!confirm('回復預設 Logo？')) return;
-  localStorage.removeItem('quiz_logo_custom');
-  document.querySelectorAll('.brand-logo').forEach(im=>{ if(LEAP_LOGO_URL) im.src=LEAP_LOGO_URL; });
-  const sp=document.querySelector('#splash img'); if(sp&&LEAP_LOGO_URL) sp.src=LEAP_LOGO_URL;
+  localStorage.removeItem(K.logo);
+  DB.set(K.logo, '');
+  applyBranding();
   toast('已回復預設 Logo');
   renderSub('logo');
 }
 function saveBrandText(){
   const v=document.getElementById('Lg-text').value.trim();
   if(!v) return toast('請輸入課程名稱');
-  localStorage.setItem('quiz_brand_text',v);
-  const ss=document.getElementById('splash-sub'); if(ss) ss.textContent=v;
-  const hs=document.getElementById('home-sub'); if(hs) hs.textContent=v;
-  toast('已儲存課程名稱');
+  DB.set(K.btext, v);
+  applyBranding();
+  toast('已儲存課程名稱並上傳雲端');
   renderSub('logo');
 }
 function refreshBrandLogo(){
@@ -1223,11 +1234,11 @@ function renderSub(g){
       <div class="card" style="padding:16px;margin-top:12px">
         <h2>課程名稱文字</h2>
         <p class="muted" style="font-size:13px;margin-bottom:8px">改呢度嘅字，登入畫面同首頁嘅課程名稱會一齊改。</p>
-        <input id="Lg-text" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px;font-size:14px" value="${esc(localStorage.getItem('quiz_brand_text')||'初級維修電工課程 · 電工答題系統')}">
+        <input id="Lg-text" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px;font-size:14px" value="${esc(DB.get(K.btext,'')||'初級維修電工課程 · 電工答題系統')}">
         <button class="btn" style="margin-top:10px" onclick="saveBrandText()">儲存課程名稱</button>
       </div>`;
     const _lp=document.getElementById('splash-logo-preview');
-    if(_lp) _lp.src=localStorage.getItem('quiz_logo_custom')||LEAP_LOGO_URL;
+    if(_lp) _lp.src=DB.get(K.logo,'')||LEAP_LOGO_URL;
     return;
   }
   if(g==='version'){
@@ -2469,20 +2480,7 @@ function rowsToQuestions(rows, col){
 }
 
 // 初始化：首頁顯示
-document.querySelectorAll('.brand-logo').forEach(img=>{
-  const u=localStorage.getItem('quiz_logo_custom')||LEAP_LOGO_URL;
-  if(u) img.src=u;
-});
-const _splashImg=document.querySelector('#splash img');
-if(_splashImg){
-  const _cu=localStorage.getItem('quiz_logo_custom');
-  if(_cu) _splashImg.src=_cu;
-}
-const _brandText=localStorage.getItem('quiz_brand_text');
-if(_brandText){
-  const _ss=document.getElementById('splash-sub'); if(_ss) _ss.textContent=_brandText;
-  const _hs=document.getElementById('home-sub'); if(_hs) _hs.textContent=_brandText;
-}
+applyBranding();
 document.getElementById('view-home').classList.add('active');
 updateVerBadge();
 updateVerDisplay();
