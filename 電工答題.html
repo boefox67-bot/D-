@@ -101,7 +101,7 @@
   <div style="font-size:34px;font-weight:800;letter-spacing:5px">飛躍教育中心</div>
   <div style="margin-top:8px;font-size:13px;letter-spacing:2px;opacity:.9">LEAP EDUCATION CENTER</div>
   <div style="margin-top:4px;font-size:11px;letter-spacing:1.5px;opacity:.75">CENTRO DE EDUCAÇÃO SALTO</div>
-  <div style="margin-top:14px;font-size:16px;opacity:.9">初級維修電工課程 · 電工答題系統</div>
+  <div id="splash-sub" style="margin-top:14px;font-size:16px;opacity:.9">初級維修電工課程 · 電工答題系統</div>
   <div id="splash-tip" style="margin-top:42px;font-size:14px;opacity:.75;animation:blink 1.6s infinite">輕觸螢幕進入</div>
 </div>
 <style>@keyframes blink{0%,100%{opacity:.75}50%{opacity:.3}}</style>
@@ -112,7 +112,7 @@
     <div class="topbar">
       <img class="brand-logo" alt="飛躍教育中心 LEAP EDUCATION CENTER">
       <h1>電工答題</h1>
-      <p>飛躍教育中心 · 初級維修電工課程</p>
+      <p id="home-sub">飛躍教育中心 · 初級維修電工課程</p>
     </div>
     <div class="card">
       <h2>輸入考試碼入場</h2>
@@ -1062,6 +1062,13 @@ function zoomLogo(img){
   if(big) big.src=img.src||'';
   ov.style.display='flex';
 }
+let _logoZoom=1;
+function applyLogoZoom(){
+  const im=document.getElementById('splash-logo-preview');
+  if(im) im.style.width=Math.round(260*_logoZoom)+'px';
+}
+function logoZoomIn(){ _logoZoom=Math.min(4,_logoZoom+0.25); applyLogoZoom(); }
+function logoZoomOut(){ _logoZoom=Math.max(0.5,_logoZoom-0.25); applyLogoZoom(); }
 let _newLogoImg='';
 function onLogoFile(input){
   const f=input.files[0]; if(!f) return;
@@ -1098,6 +1105,15 @@ function resetLogo(){
   document.querySelectorAll('.brand-logo').forEach(im=>{ if(LEAP_LOGO_URL) im.src=LEAP_LOGO_URL; });
   const sp=document.querySelector('#splash img'); if(sp&&LEAP_LOGO_URL) sp.src=LEAP_LOGO_URL;
   toast('已回復預設 Logo');
+  renderSub('logo');
+}
+function saveBrandText(){
+  const v=document.getElementById('Lg-text').value.trim();
+  if(!v) return toast('請輸入課程名稱');
+  localStorage.setItem('quiz_brand_text',v);
+  const ss=document.getElementById('splash-sub'); if(ss) ss.textContent=v;
+  const hs=document.getElementById('home-sub'); if(hs) hs.textContent=v;
+  toast('已儲存課程名稱');
   renderSub('logo');
 }
 function refreshBrandLogo(){
@@ -1164,8 +1180,13 @@ function renderSub(g){
         <p class="muted" style="margin-bottom:10px">撳下面按鈕，所有界面嘅 Logo（首頁／答題頁／成績頁／水印）會即時刷新到最新位置。</p>
         <button class="btn" onclick="refreshBrandLogo()">刷新界面 Logo 位置</button>
         <div style="margin-top:16px;padding:12px;background:#f8fafc;border-radius:10px;text-align:center">
-          <img class="brand-logo" style="width:96px;cursor:zoom-in" alt="目前 Logo" onclick="zoomLogo(this)" title="撳一下放大查看，再撳一下退回">
-          <div class="muted" style="font-size:12px">目前 Logo 預覽（撳一下放大查看，再撳一下退回）</div>
+          <img id="splash-logo-preview" src="" style="max-width:260px;max-height:130px;cursor:zoom-in;background:#fff;border-radius:10px;padding:8px;border:1px solid var(--line)" alt="登入畫面 Logo" onclick="zoomLogo(this)" title="撳一下放大查看，再撳一下退回">
+          <div style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:10px">
+            <button class="btn secondary" style="padding:6px 16px;font-size:16px" onclick="logoZoomOut()">－</button>
+            <span style="font-size:13px;color:var(--muted)">放大鏡加減</span>
+            <button class="btn secondary" style="padding:6px 16px;font-size:16px" onclick="logoZoomIn()">＋</button>
+          </div>
+          <div class="muted" style="font-size:12px">登入畫面 Logo（撳一下放大查看，再撳一下退回）</div>
         </div>
       </div>
       <div class="card" style="padding:16px;margin-top:12px">
@@ -1177,7 +1198,15 @@ function renderSub(g){
         </div>
         <button class="btn" onclick="saveLogo()">儲存並覆蓋所有界面 Logo</button>
         <button class="btn secondary" onclick="resetLogo()" style="margin-top:8px">回復預設 Logo</button>
+      </div>
+      <div class="card" style="padding:16px;margin-top:12px">
+        <h2>課程名稱文字</h2>
+        <p class="muted" style="font-size:13px;margin-bottom:8px">改呢度嘅字，登入畫面同首頁嘅課程名稱會一齊改。</p>
+        <input id="Lg-text" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px;font-size:14px" value="${esc(localStorage.getItem('quiz_brand_text')||'初級維修電工課程 · 電工答題系統')}">
+        <button class="btn" style="margin-top:10px" onclick="saveBrandText()">儲存課程名稱</button>
       </div>`;
+    const _lp=document.getElementById('splash-logo-preview');
+    if(_lp) _lp.src=localStorage.getItem('quiz_logo_custom')||LEAP_LOGO_URL;
     return;
   }
   if(g==='version'){
@@ -2427,6 +2456,11 @@ const _splashImg=document.querySelector('#splash img');
 if(_splashImg){
   const _cu=localStorage.getItem('quiz_logo_custom');
   if(_cu) _splashImg.src=_cu;
+}
+const _brandText=localStorage.getItem('quiz_brand_text');
+if(_brandText){
+  const _ss=document.getElementById('splash-sub'); if(_ss) _ss.textContent=_brandText;
+  const _hs=document.getElementById('home-sub'); if(_hs) _hs.textContent=_brandText;
 }
 document.getElementById('view-home').classList.add('active');
 updateVerBadge();
