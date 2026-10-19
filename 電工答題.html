@@ -141,7 +141,7 @@
         <input id="in-classType">
       </div>
       <div class="warn" id="home-warn" style="display:none"></div>
-      <button class="btn secondary" id="btn-teacherEntry" style="margin-top:12px">老師入口</button>
+      <button class="btn secondary" id="btn-teacherEntry" style="margin-top:12px;position:relative;z-index:100001">老師入口</button>
     </div>
     <footer>© 2026 豆包工作 版權所有・飛躍教育中心 電工答題系統<br>換 X 檔就係新考試・考試碼 1 小時有效 版本 <span id="footer-ver">1.0</span></footer>
     <div id="ver-tag" style="position:fixed;left:8px;bottom:8px;background:#0f172a;color:#fff;font-size:11px;padding:3px 8px;border-radius:10px;opacity:0.7;z-index:99">v1.0</div>
@@ -495,6 +495,12 @@ function go(view){
   window.scrollTo(0,0);
   if(view==='home'){ renderHome(); if(typeof reloadClassList==='function') reloadClassList(); }
   if(view==='teacher') renderTeacher();
+  // 老師界面（登入頁／後台）唔顯示「系統維護中」遮罩；學生界面即時重新檢查
+  const m=document.getElementById('exam-mask');
+  if(m){
+    if(view==='teacher') m.style.display='none';
+    else if(typeof checkExamMask==='function') checkExamMask();
+  }
 }
 function toast(msg){
   const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
@@ -2707,12 +2713,15 @@ document.getElementById('view-home').classList.add('active');
 updateVerBadge();
 updateVerDisplay();
 renderHome();
-// 考場關閉偵測：老師按下清場／關閉考場時，考試碼位置即時被遮罩蓋住，顯示「系統維護中」
+// 考場關閉偵測：老師按下清場／關閉考場時，學生界面（首頁／考試碼頁／答題頁）遮罩蓋住，顯示「系統維護中」；老師身份唔遮罩，老師入口可以正常撳入
 function checkExamMask(){
-  if(!Cloud.enabled()) return;
+  const m=document.getElementById('exam-mask'); if(!m) return;
+  const tv=document.getElementById('view-teacher');
+  // 老師界面（登入頁／後台）一律唔顯示遮罩；學生界面先睇考場開關
+  if((tv&&tv.classList.contains('active'))||DB.get(K.isTeacher,false)===true){ m.style.display='none'; return; }
+  if(!Cloud.enabled()){ m.style.display='none'; return; }
   Cloud.raw('exopen','GET').then(v=>{
-    const m=document.getElementById('exam-mask');
-    if(m) m.style.display=String(v)==='0'?'flex':'none';
+    m.style.display=String(v)==='0'?'flex':'none';
   }).catch(()=>{});
 }
 setInterval(checkExamMask,10000);
