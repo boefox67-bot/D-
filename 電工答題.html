@@ -781,7 +781,6 @@ function renderQuiz(){
   const q=list[idx];
   document.getElementById('quiz-progress').textContent=`第 ${idx+1} / ${list.length} 題 · ${TYPE_LABELS[q.type-1]||''}`+(q.score?` · ${q.score}分`:'');
   let html='';
-  html+=wmHtml();
   html+=`<span class="qmeta">${TYPE_LABELS[q.type-1]||''}</span>`;
   html+=`<div class="qtext">${idx+1}. ${renderOptContent(q.question)}</div>`;
   if(q.type===4){
@@ -1005,7 +1004,7 @@ function showResult(a){
     return arr.map(i=>opts[i]!==undefined?opts[i]:('選項'+(i+1))).join('、')||'（未作答）';
   };
   const fmtUserAns=ua=>String(ua==null||ua===''?'（未作答）':ua);
-  document.getElementById('result-detail').innerHTML=wmHtml()+det.map((d,i)=>{
+  document.getElementById('result-detail').innerHTML=det.map((d,i)=>{
     const ok=isCorrect(d, d.userAnswer);
     const tag=ok?'<span class="tag ok">啱</span>':'<span class="tag bad">錯</span>';
     const sc=Number(d.score)||0;
