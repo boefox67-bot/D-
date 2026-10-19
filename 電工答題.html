@@ -82,18 +82,21 @@
       <h2>輸入考試碼入場</h2>
       <label>考試碼（老師派發嘅數字）</label>
       <input id="in-code" inputmode="numeric" placeholder="例如 1234">
-      <label>班次（第一欄揀、第二欄自動同步）</label>
-      <div style="display:flex;gap:8px">
-        <select id="in-classSelect" style="flex:1"><option value="">— 揀班 —</option></select>
-        <input id="in-classType" style="flex:1" placeholder="自動同步">
-        <button type="button" class="btn secondary" style="width:auto;padding:6px 10px;margin:0;font-size:13px" onclick="reloadClassList()" title="重新載入班別">↻</button>
+      <button class="btn" id="btn-verify">驗證考試碼</button>
+      <div id="examEntry" style="display:none">
+        <label>班次（第一欄揀、第二欄自動同步）</label>
+        <div style="display:flex;gap:8px">
+          <select id="in-classSelect" style="flex:1"><option value="">— 揀班 —</option></select>
+          <input id="in-classType" style="flex:1" placeholder="自動同步">
+          <button type="button" class="btn secondary" style="width:auto;padding:6px 10px;margin:0;font-size:13px" onclick="reloadClassList()" title="重新載入班別">↻</button>
+        </div>
+        <label>第一欄：從名單揀名</label>
+        <select id="in-nameSelect"><option value="-1">— 請揀名 —</option></select>
+        <label>第二欄：填寫同名</label>
+        <input id="in-nameType" placeholder="打返頭先揀嗰個名">
+        <button class="btn" id="btn-start">開始考試</button>
       </div>
-      <label>第一欄：從名單揀名</label>
-      <select id="in-nameSelect"><option value="-1">— 請揀名 —</option></select>
-      <label>第二欄：填寫同名</label>
-      <input id="in-nameType" placeholder="打返頭先揀嗰個名">
       <div class="warn" id="home-warn" style="display:none"></div>
-      <button class="btn" id="btn-start">開始考試</button>
       <button class="btn secondary" id="btn-teacherEntry">老師入口</button>
     </div>
     <footer>© 2026 豆包工作 版權所有・飛躍教育中心 電工答題系統<br>換 X 檔就係新考試・考試碼 1 小時有效 版本 <span id="footer-ver">1.0</span></footer>
@@ -312,7 +315,21 @@ function renderHome(){
     document.getElementById('in-nameType').value = (i>=0 && sts[i]) ? stuName(sts[i]) : '';
   };
   document.getElementById('in-code').oninput=()=>{
+    document.getElementById('examEntry').style.display='none';
+    const w=document.getElementById('home-warn'); if(w) w.style.display='none';
+  };
+  document.getElementById('btn-verify').onclick=()=>{
+    const w=document.getElementById('home-warn'); if(w) w.style.display='none';
+    const code=document.getElementById('in-code').value.trim();
+    if(!code){ warnMsg('請輸入考試碼'); return; }
+    const exam=examByCode(code);
+    if(!exam){ warnMsg('考試碼唔啱或者已過期'); return; }
+    document.getElementById('examEntry').style.display='block';
+    const clsSel=document.getElementById('in-classSelect');
+    clsSel.value=exam.className;
+    document.getElementById('in-classType').value=exam.className;
     reloadNameList();
+    toast('驗證成功，揀班揀名開始考試');
   };
 }
 let currentExamClass='';
