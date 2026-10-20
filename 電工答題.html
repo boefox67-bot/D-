@@ -144,7 +144,7 @@
       <!-- 學生界面（考試碼入口頁）老師入口按鍵：z-index 高過「系統維護中」遮罩，清場封鎖學生時老師照樣撳得入；封面（主logo頁）冇呢個按鍵 -->
       <button class="btn secondary" id="btn-teacherEntry" style="margin-top:12px;position:relative;z-index:100001;font-weight:800;letter-spacing:2px;background:#0f766e;color:#fff;border:none;padding:12px 28px;border-radius:10px;user-select:none;-webkit-user-select:none;touch-action:manipulation">AC</button>
     </div>
-    <footer>© 2026 豆包工作 版權所有・飛躍教育中心 電工答題系統<br>換 X 檔就係新考試・考試碼 1 小時有效 版本 <span id="footer-ver">1.0</span> ・<a id="link-teacher" style="color:#94a3b8;cursor:pointer;text-decoration:underline;position:relative;z-index:100001;user-select:none;-webkit-user-select:none">AC</a></footer>
+    <footer>© 2026 豆包工作 版權所有・飛躍教育中心 電工答題系統<br>換 X 檔就係新考試・考試碼 1 小時有效 版本 <span id="footer-ver">1.0</span></footer>
     <div id="ver-tag" style="position:fixed;left:8px;bottom:8px;background:#0f172a;color:#fff;font-size:11px;padding:3px 8px;border-radius:10px;opacity:0.7;z-index:99">v1.0</div>
   </div>
 
@@ -859,7 +859,7 @@ document.getElementById('btn-enterStudent').onclick=function(){
 };
 function warnMsg(m){ const w=document.getElementById('home-warn'); w.textContent=m; w.style.display='block'; }
 // 老師入口：學生界面（考試碼入口頁）「老師入口」按鍵直接 go('teacher')，封面（主logo頁）冇按鍵；頁尾「導師」連結同樣可用
-// 導師隱藏入口「AC」：普通點擊唔觸發，長按超過 4 秒先入導師密碼畫面（防學生誤觸）
+// 導師隱藏入口「AC」：普通點擊唔觸發，長按超過 3 秒先入導師密碼畫面（防學生誤觸）
 function bindLongPress(el, fn, ms){
   if(!el) return;
   let t=null, fired=false;
@@ -873,8 +873,7 @@ function bindLongPress(el, fn, ms){
   el.addEventListener('click', e=>{ if(!fired){ e.preventDefault(); e.stopPropagation(); } });
   el.addEventListener('contextmenu', e=>e.preventDefault());
 }
-bindLongPress(document.getElementById('btn-teacherEntry'), ()=>go('teacher'), 4000);
-bindLongPress(document.getElementById('link-teacher'), ()=>go('teacher'), 4000);
+bindLongPress(document.getElementById('btn-teacherEntry'), ()=>go('teacher'), 3000);
 
 /* ================= 答題頁 ================= */
 let QZ = null; // { exam, name, list, answers, idx }
