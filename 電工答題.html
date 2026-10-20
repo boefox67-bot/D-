@@ -1822,13 +1822,38 @@ function renderSub(g){
     el.innerHTML=subHead('導入 X 檔題庫')+`
       <p class="muted">揀標準考卷範本格式嘅 .xlsx（34欄：題型標記=1 先打開，AI 欄「多少分題」寫分數）。導入後會存為一張考卷，老師開考時揀呢張卷。</p>
       <input type="file" id="I-file" accept=".xlsx,.xls" style="margin:12px 0">
-      <label>考卷名稱</label><input id="I-name" placeholder="例如 考題1">
+      <div style="margin:10px 0;font-size:13px">
+        <label style="display:block;margin:4px 0;cursor:pointer"><input type="radio" name="I-mode" value="new" checked onchange="toggleImportMode()"> 新建文件檔（導入後建立一個新檔案）</label>
+        <label style="display:block;margin:4px 0;cursor:pointer"><input type="radio" name="I-mode" value="exist" onchange="toggleImportMode()"> 揀已建成文件檔做存檔（導入後覆蓋嗰個檔）</label>
+      </div>
+      <div id="I-newBox"><label>新文件檔名稱</label><input id="I-name" placeholder="例如 電工初級52期A卷"></div>
+      <div id="I-existBox" style="display:none"><label>揀已建成文件檔</label><select id="I-target" style="width:100%;padding:8px"><option value="">— 揀要存檔嘅考卷 —</option></select></div>
       <button class="btn" id="I-go">導入並存考卷</button>
       <div id="I-msg" class="warn"></div>`;
+    function toggleImportMode(){
+      const m=document.querySelector('input[name="I-mode"]:checked');
+      const mode=m?m.value:'new';
+      document.getElementById('I-newBox').style.display=(mode==='new')?'block':'none';
+      document.getElementById('I-existBox').style.display=(mode==='exist')?'block':'none';
+    }
+    const _it=document.getElementById('I-target');
+    if(_it){ _it.innerHTML='<option value="">— 揀要存檔嘅考卷 —</option>'+getPapers().map(pp=>`<option value="${pp.id}">${esc(pp.name)}（${pp.questions.length}題）</option>`).join(''); }
+    document.getElementById('I-existBox').style.display='none';
     document.getElementById('I-go').onclick=()=>{
       const f=document.getElementById('I-file').files[0];
       if(!f) return toast('揀 X 檔');
-      const name=document.getElementById('I-name').value.trim()||f.name.replace(/\.xlsx?$/i,'');
+      const _mode=document.querySelector('input[name="I-mode"]:checked');
+      const mode=_mode?_mode.value:'new';
+      let name='', targetId=null;
+      if(mode==='exist'){
+        targetId=document.getElementById('I-target').value;
+        if(!targetId) return toast('先揀已建成文件檔做存檔');
+        const _t=getPapers().find(pp=>String(pp.id)===targetId);
+        if(!_t) return toast('揀唔到嗰個文件檔');
+        name=_t.name;
+      } else {
+        name=document.getElementById('I-name').value.trim()||f.name.replace(/\.xlsx?$/i,'');
+      }
       const rd=new FileReader();
       rd.onload=async e=>{
         try{
@@ -1917,11 +1942,22 @@ function renderSub(g){
           document.getElementById('I-msg').textContent=debugMsg;
           alert(debugMsg); // 彈出視窗
           const papers=getPapers();
-          const newPid=Date.now()*100+Math.floor(Math.random()*900);
-          papers.push({id:newPid,name,createdAt:Date.now(),questions:qs});
-          DB.set(K.papers,papers);
-          DB.set(K.activePaper,newPid); // 自動切換到新導入嘅卷
-          document.getElementById('I-msg').textContent=`成功導入 ${qs.length} 題，儲存為「${name}」，已自動切換到呢張卷（保持喺導入頁，唔跳去題庫管理）`;
+          if(mode==='exist' && targetId){
+            const _idx=papers.findIndex(pp=>String(pp.id)===targetId);
+            if(_idx<0){ document.getElementById('I-msg').textContent='揀唔到嗰個文件檔'; return; }
+            papers[_idx].name=name;
+            papers[_idx].questions=qs;
+            papers[_idx].updatedAt=Date.now();
+            DB.set(K.papers,papers);
+            DB.set(K.activePaper,Number(targetId));
+            document.getElementById('I-msg').textContent=`成功導入 ${qs.length} 題，已存檔到已建成文件檔「${name}」（覆蓋原內容，已切換到呢張卷）`;
+          } else {
+            const newPid=Date.now()*100+Math.floor(Math.random()*900);
+            papers.push({id:newPid,name,createdAt:Date.now(),questions:qs});
+            DB.set(K.papers,papers);
+            DB.set(K.activePaper,newPid); // 自動切換到新導入嘅卷
+            document.getElementById('I-msg').textContent=`成功導入 ${qs.length} 題，儲存為新文件檔「${name}」，已自動切換到呢張卷（保持喺導入頁，唔跳去題庫管理）`;
+          }
           // 唔跳頁，留喺導入頁
         }catch(err){ document.getElementById('I-msg').textContent='解析失敗：'+err.message; }
       };
