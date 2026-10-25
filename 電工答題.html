@@ -149,8 +149,12 @@
         <div id="home-open-info" style="background:#fff7ed;border-radius:10px;padding:10px;margin:10px 0;font-size:13px;color:#92400e">開卷考試：全部題庫・隨機出題・冇任何限制・交卷後可以無限次再刷</div>
         <label>揀班次（可留空＝全部班）</label>
         <select id="in-openCls"><option value="">— 全部班次 —</option></select>
-        <label>選擇學生帳號</label>
+        <label>選擇學生帳號（基礎測驗班：可以唔揀，直接用下面電話號碼）</label>
         <select id="in-openName"><option value="-1">— 請揀班再揀學生 —</option></select>
+        <div style="border-top:1px dashed var(--line);margin:10px 0 8px"></div>
+        <label>或者直接輸入電話號碼（可加國家前綴 +852／+86／+853）</label>
+        <input id="in-openPhone" inputmode="tel" maxlength="16" placeholder="例如 66881234、+852 66881234、+86 13800138000" autocomplete="off" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px;font-size:14px">
+        <div class="muted" style="font-size:12px;margin-top:4px">基礎測驗班唔使學生學號・電話號碼（8或11位，可加 +852／+86／+853）就係身份，即刻開卷考</div>
         <button class="btn" id="btn-openStart" style="margin-top:12px">開始開卷考</button>
         <button class="btn secondary" id="btn-openBack" style="margin-top:8px;font-size:13px">返回考試碼入口</button>
       </div>
@@ -886,12 +890,23 @@ document.getElementById('btn-openBack').onclick=()=>{
 document.getElementById('btn-openStart').onclick=()=>{
   const warn=document.getElementById('home-warn'); warn.style.display='none';
   const cls=document.getElementById('in-openCls').value;
-  const si=Number(document.getElementById('in-openName').value);
-  if(si<0){ warnMsg('請揀學生帳號'); return; }
-  const roster=getStudents().filter(s=>!cls||hasClass(s,cls));
-  const chosenObj=roster[si]||null;
-  if(!chosenObj){ warnMsg('請重新揀學生帳號'); return; }
-  const name=stuName(chosenObj), key=stuKey(chosenObj);
+  const phone=document.getElementById('in-openPhone').value.trim();
+  let name, key;
+  if(phone){
+    // 基礎測驗班：唔使學號，電話號碼做身份；可加 +852／+86／+853 國家前綴
+    const m=phone.replace(/\s+/g,'').replace(/^(\+?852)(\d+)$/,'852$2').replace(/^(\+?86)(\d+)$/,'86$2').replace(/^(\+?853)(\d+)$/,'853$2');
+    const ok852=/^852\d{8}$/.test(m), ok86=/^86\d{11}$/.test(m), ok853=/^853\d{8}$/.test(m);
+    const okLocal8=/^\d{8}$/.test(m), okLocal11=/^\d{11}$/.test(m);
+    if(!(ok852||ok86||ok853||okLocal8||okLocal11)){ warnMsg('電話號碼要 8 或 11 位數字，可加 +852／+86／+853 國家前綴'); return; }
+    name=m; key=m;
+  } else {
+    const si=Number(document.getElementById('in-openName').value);
+    if(si<0){ warnMsg('請揀學生帳號，或者直接輸入電話號碼'); return; }
+    const roster=getStudents().filter(s=>!cls||hasClass(s,cls));
+    const chosenObj=roster[si]||null;
+    if(!chosenObj){ warnMsg('請重新揀學生帳號'); return; }
+    name=stuName(chosenObj); key=stuKey(chosenObj);
+  }
   // 開卷考試：全部題庫・隨機・冇鎖・可無限次重刷；唔入 exams 雲端清單，純練習
   const exam={code:'OPENBOOK', name:'開卷考試', className:cls||'', useAll:true, paperId:0, paperIds:[], order:'rand', drawCount:0, openBook:true, launchedAt:Date.now(), expireAt:Date.now()+24*3600*1000};
   DB.set(K.curExam, exam);
