@@ -130,23 +130,31 @@
       </div>
       <div id="home-student-step" style="display:none">
         <div id="home-exam-info" style="background:#f8fafc;border-radius:10px;padding:10px;margin:10px 0;font-size:13px"></div>
-        <label>選擇學生學號</label>
-        <select id="in-nameSelect"><option value="-1">— 請揀學生學號 —</option></select>
-        <input id="in-nameType" type="hidden">
+        <label>入場方式（二揀一）</label>
+        <div style="display:flex;gap:10px;font-size:13px;margin:4px 0 2px">
+          <label class="L-opt" style="flex:1;cursor:pointer;padding:9px;border:1.5px solid var(--line);border-radius:8px;text-align:center;background:#fff"><input type="radio" name="entryMode" value="stu" checked> 揀學生名</label>
+          <label class="L-opt" style="flex:1;cursor:pointer;padding:9px;border:1.5px solid var(--line);border-radius:8px;text-align:center;background:#fff"><input type="radio" name="entryMode" value="phone"> 電話號碼</label>
+        </div>
+        <div id="in-stuBox">
+          <div id="home-class-box" style="display:none">
+            <label>揀班次（分流）</label>
+            <select id="in-classSelect"><option value="">— 揀班 —</option></select>
+            <input id="in-classType">
+          </div>
+          <label>選擇學生學號</label>
+          <select id="in-nameSelect"><option value="-1">— 請揀學生學號 —</option></select>
+          <input id="in-nameType" type="hidden">
+        </div>
         <div id="in-phoneBox" style="display:none;margin-top:8px">
           <label>輸入電話號碼（8或11位，可加 +852／+86／+853）</label>
           <input id="in-examPhone" inputmode="tel" maxlength="16" placeholder="例如 66881234、+852 66881234、+86 13800138000" autocomplete="off" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px;font-size:14px">
-          <div class="muted" style="font-size:12px;margin-top:4px">電話開放考卷：入電話號碼就係身份・可無限刷題・直到老師關卷先停</div>
+          <div class="muted" style="font-size:12px;margin-top:4px">電話號碼就係身份・可無限刷題・直到老師關卷先停</div>
         </div>
         <button class="btn" id="btn-enterStudent" style="margin-top:12px">進入考卷</button>
         <button class="btn secondary" id="btn-backCode" style="margin-top:8px;font-size:13px">改考試碼</button>
       </div>
-      <div id="home-class-box" style="display:none">
-        <select id="in-classSelect"><option value="">— 揀班 —</option></select>
-        <input id="in-classType">
-      </div>
       <div style="border-top:1px dashed var(--line);margin:14px 0 8px"></div>
-      <div id="home-open-book">
+      <div id="home-open-book" style="display:none">
         <button class="btn orange" id="btn-openBook" style="width:100%;padding:12px;font-size:15px">開卷考試（無限刷・無需考試碼）</button>
         <div class="muted" style="font-size:12px;margin-top:6px">學生直接揀自己個帳號就開卷考・全部題庫・隨時睇答案・無限次重刷</div>
       </div>
@@ -168,7 +176,7 @@
     </div>
     <footer>© 2026 豆包工作 版權所有・飛躍教育中心 電工答題系統<br>換 X 檔就係新考試・考試碼 1 小時有效 版本 <span id="footer-ver">1.0</span> ・<a id="link-teacher" style="display:none;color:#94a3b8;cursor:pointer;text-decoration:underline;position:relative;z-index:100001;user-select:none;-webkit-user-select:none">AC</a></footer>
     <div id="home-footlogo-box" style="text-align:center;margin:14px 0 20px">
-      <img id="home-footlogo" alt="底部Logo" style="max-height:56px;max-width:220px;width:auto;object-fit:contain;border-radius:8px;padding:6px;background:#fff">
+      <img id="home-footlogo" alt="底部Logo" style="width:100%;max-width:520px;height:auto;object-fit:contain;border-radius:8px;padding:6px;background:#fff">
       <div class="muted" style="font-size:11px;margin-top:2px">飛躍教育中心</div>
     </div>
     <div id="ver-tag" style="position:fixed;left:8px;bottom:8px;background:#0f172a;color:#fff;font-size:11px;padding:3px 8px;border-radius:10px;opacity:0.7;z-index:99">v1.0</div>
@@ -774,8 +782,8 @@ function renderHome(){
   document.getElementById('in-code').oninput=()=>{
     reloadNameList();
   };
-  // 開卷考試（無限刷）：預設收起
-  const ob=document.getElementById('home-open-book'); if(ob) ob.style.display='block';
+  // 開卷考試入口：學生界面唔顯示（直接用考試碼＋揀學生名／電話號碼入場）
+  const ob=document.getElementById('home-open-book'); if(ob) ob.style.display='none';
   const ops=document.getElementById('home-open-step'); if(ops) ops.style.display='none';
   updateVerDisplay();
 }
@@ -862,25 +870,42 @@ document.getElementById('btn-start').onclick = async function(){
   else if(exam.paperId){ const p=findCloudPaper(exam.paperId); if(p&&p.questions) availQ=p.questions.length; }
   if(!availQ){ warnMsg('呢場考試連結嘅考卷無效或者冇題目'); return; }
   pendingExam=exam;
-  document.getElementById('in-classSelect').value=exam.className||'';
+  // 班次（分流）：考試本身鎖定班次就隱藏揀班；冇鎖定就畀學生揀自己班（鶴山／新城等分流）
+  const clsSel2=document.getElementById('in-classSelect');
+  clsSel2.innerHTML='<option value="">— 揀班（分流）—</option>'+getClasses().map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  clsSel2.value=exam.className||'';
   document.getElementById('in-classType').value=exam.className||'';
-  currentRoster=getStudents().filter(s=>hasClass(s, exam.className||''));
+  const clsWant=exam.className||clsSel2.value;
+  currentRoster=getStudents().filter(s=>!clsWant||hasClass(s,clsWant));
   const sel=document.getElementById('in-nameSelect');
   sel.innerHTML='<option value="-1">— 請揀學生學號 —</option>'+currentRoster.map((s,i)=>`<option value="${i}">[${esc(s.id||(i+1))}] ${esc(stuName(s))}</option>`).join('');
   document.getElementById('in-nameType').value='';
-  // 電話開放考卷：唔使學號，改為直接入電話號碼
+  // 入場方式二揀一：揀學生名／電話號碼；預設揀呢場容許嗰種（電話開放→電話，固定→揀學生名）
   const pb=document.getElementById('in-phoneBox');
-  if(exam.phoneOpen){
-    sel.style.display='none';
-    sel.closest('label').style.display='none';
-    pb.style.display='block';
-    document.getElementById('in-examPhone').value='';
-  } else {
-    sel.style.display='';
-    if(sel.closest('label')) sel.closest('label').style.display='';
-    pb.style.display='none';
-  }
-  document.getElementById('home-exam-info').innerHTML=`考試碼 ${esc(code)} · ${esc(pendingPaperName(exam))}（${availQ}題）${exam.phoneOpen?'<br><span style="color:#ea580c">電話開放考卷：入電話號碼入場・無限刷題，關卷先停</span>':''}`;
+  const sb=document.getElementById('in-stuBox');
+  const cb=document.getElementById('home-class-box');
+  const modeRadio=(v)=>{ document.querySelectorAll('input[name="entryMode"]').forEach(r=>{ r.checked=(r.value===v); }); };
+  modeRadio(exam.phoneOpen?'phone':'stu');
+  const syncEntryUI=()=>{
+    const mode=(document.querySelector('input[name="entryMode"]:checked')||{}).value||'stu';
+    const isPhone=mode==='phone';
+    sb.style.display=isPhone?'none':'block';
+    pb.style.display=isPhone?'block':'none';
+    // 揀班次：淨係「揀學生名」模式顯示；電話模式唔顯示班次；考試鎖定咗班次都唔顯示（自動分流）
+    cb.style.display=(isPhone||exam.className)?'none':'block';
+    document.getElementById('in-examPhone').value=document.getElementById('in-examPhone').value||'';
+  };
+  syncEntryUI();
+  document.querySelectorAll('input[name="entryMode"]').forEach(r=>r.onchange=syncEntryUI);
+  document.getElementById('in-classSelect').onchange=()=>{
+    const cw=document.getElementById('in-classSelect').value;
+    document.getElementById('in-classType').value=cw;
+    currentRoster=getStudents().filter(s=>!cw||hasClass(s,cw));
+    const s2=document.getElementById('in-nameSelect');
+    s2.innerHTML='<option value="-1">— 請揀學生學號 —</option>'+currentRoster.map((s,i)=>`<option value="${i}">[${esc(s.id||(i+1))}] ${esc(stuName(s))}</option>`).join('');
+    document.getElementById('in-nameType').value='';
+  };
+  document.getElementById('home-exam-info').innerHTML=`考試碼 ${esc(code)} · ${esc(pendingPaperName(exam))}（${availQ}題）${exam.phoneOpen?'<br><span style="color:#ea580c">電話開放考卷：揀「電話號碼」入場・無限刷題，關卷先停</span>':''}`;
   showHomeStep('student');
 };
 document.getElementById('in-nameSelect').onchange=()=>{
@@ -944,8 +969,10 @@ document.getElementById('btn-enterStudent').onclick=function(){
   const exam=pendingExam;
   if(!exam){ warnMsg('請先輸入並驗證考試碼'); showHomeStep('code'); return; }
   const code=String(exam.code);
-  // 電話開放考卷：電話號碼（8或11位，可加+852/+86/+853）即身份・無限刷・關卷先停
-  if(exam.phoneOpen){
+  // 入場方式二揀一：①揀學生名（固定）②電話號碼（無限刷）
+  const entryMode=(document.querySelector('input[name="entryMode"]:checked')||{}).value||'stu';
+  if(entryMode==='phone'){
+    if(!exam.phoneOpen){ warnMsg('呢場考卷用固定學生入場，請揀「揀學生名」'); return; }
     if(exam.closed){ warnMsg('考卷已關閉，唔可以再入場'); return; }
     const phone=document.getElementById('in-examPhone').value.trim();
     const m=phone.replace(/\s+/g,'').replace(/^(\+?852)(\d+)$/,'852$2').replace(/^(\+?86)(\d+)$/,'86$2').replace(/^(\+?853)(\d+)$/,'853$2');
@@ -956,6 +983,8 @@ document.getElementById('btn-enterStudent').onclick=function(){
     startQuiz(exam, m, m);
     return;
   }
+  // 揀學生名（固定）：電話開放考卷唔適用
+  if(exam.phoneOpen){ warnMsg('呢場係電話開放考卷，請揀「電話號碼」入場'); return; }
   const si=Number(document.getElementById('in-nameSelect').value);
   const name=document.getElementById('in-nameType').value.trim();
   if(si<0 || !name){ warnMsg('請先選擇學生學號'); return; }
