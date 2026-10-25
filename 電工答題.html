@@ -140,10 +140,28 @@
         <select id="in-classSelect"><option value="">— 揀班 —</option></select>
         <input id="in-classType">
       </div>
+      <div style="border-top:1px dashed var(--line);margin:14px 0 8px"></div>
+      <div id="home-open-book">
+        <button class="btn orange" id="btn-openBook" style="width:100%;padding:12px;font-size:15px">開卷考試（無限刷・無需考試碼）</button>
+        <div class="muted" style="font-size:12px;margin-top:6px">學生直接揀自己個帳號就開卷考・全部題庫・隨時睇答案・無限次重刷</div>
+      </div>
+      <div id="home-open-step" style="display:none">
+        <div id="home-open-info" style="background:#fff7ed;border-radius:10px;padding:10px;margin:10px 0;font-size:13px;color:#92400e">開卷考試：全部題庫・隨機出題・冇任何限制・交卷後可以無限次再刷</div>
+        <label>揀班次（可留空＝全部班）</label>
+        <select id="in-openCls"><option value="">— 全部班次 —</option></select>
+        <label>選擇學生帳號</label>
+        <select id="in-openName"><option value="-1">— 請揀班再揀學生 —</option></select>
+        <button class="btn" id="btn-openStart" style="margin-top:12px">開始開卷考</button>
+        <button class="btn secondary" id="btn-openBack" style="margin-top:8px;font-size:13px">返回考試碼入口</button>
+      </div>
       <div class="warn" id="home-warn" style="display:none"></div>
       
     </div>
     <footer>© 2026 豆包工作 版權所有・飛躍教育中心 電工答題系統<br>換 X 檔就係新考試・考試碼 1 小時有效 版本 <span id="footer-ver">1.0</span> ・<a id="link-teacher" style="display:none;color:#94a3b8;cursor:pointer;text-decoration:underline;position:relative;z-index:100001;user-select:none;-webkit-user-select:none">AC</a></footer>
+    <div id="home-footlogo-box" style="text-align:center;margin:14px 0 20px">
+      <img id="home-footlogo" alt="底部Logo" style="max-height:56px;max-width:220px;width:auto;object-fit:contain;border-radius:8px;padding:6px;background:#fff">
+      <div class="muted" style="font-size:11px;margin-top:2px">飛躍教育中心</div>
+    </div>
     <div id="ver-tag" style="position:fixed;left:8px;bottom:8px;background:#0f172a;color:#fff;font-size:11px;padding:3px 8px;border-radius:10px;opacity:0.7;z-index:99">v1.0</div>
   </div>
 
@@ -214,6 +232,7 @@
       <label style="margin-top:14px">逐題對答案</label>
       <div id="result-detail" class="wm-zone" style="font-size:14px"></div>
     </div>
+    <button class="btn orange" id="btn-again" style="display:none">再刷一轉（無限次）</button>
     <button class="btn secondary" onclick="go('home')">返回首頁</button>
   </div>
 
@@ -298,7 +317,7 @@ const K = {
   students:'quiz_students_v1', locks:'quiz_name_locks', attempts:'quiz_attempts_v1',
   lastAttempt:'quiz_last_attempt', isTeacher:'quiz_is_teacher', pwd:'quiz_teacher_pwd',
   curClass:'quiz_cur_class', userName:'quiz_user_name', ver:'quiz_paper_version',
-  tsesh:'quiz_teacher_session', draft:'quiz_draft_v1', logo:'quiz_logo_custom', btext:'quiz_brand_text', examOpen:'quiz_exam_open', wm:'quiz_wm_custom'
+  tsesh:'quiz_teacher_session', draft:'quiz_draft_v1', logo:'quiz_logo_custom', btext:'quiz_brand_text', examOpen:'quiz_exam_open', wm:'quiz_wm_custom', footerLogo:'quiz_footer_logo'
 };
 const LEAP_LOGO_URL=(document.querySelector('#splash img')||{}).src||'';
 
@@ -306,12 +325,13 @@ const LEAP_LOGO_URL=(document.querySelector('#splash img')||{}).src||'';
 const CLOUD_KEY='quiz_cloud_url';
 // 部署前把 Firebase 網址填到下面引號內，所有手機會自動共用同一個雲端，唔使逐部機設定
 const DEFAULT_CLOUD_URL='https://project-3342944994395704108-default-rtdb.firebaseio.com';
-const SERVER_KEYS=['questions','papers','exams','classes','students','attempts','locks','pwd','ver','tsesh','logo','btext','exopen','wmkey'];
+const SERVER_KEYS=['questions','papers','exams','classes','students','attempts','locks','pwd','ver','tsesh','logo','btext','exopen','wmkey','footerLogo'];
 // 云端裸名 -> 本机 localStorage 键（K 里带 quiz_ 前缀）
 const SERVER_MAP={
   questions:K.questions, papers:K.papers, exams:K.exams, classes:K.classes,
   students:K.students, attempts:K.attempts, locks:K.locks, pwd:K.pwd, ver:K.ver,
-  tsesh:K.tsesh, logo:K.logo, btext:K.btext, exopen:K.examOpen, wmkey:K.wm
+  tsesh:K.tsesh, logo:K.logo, btext:K.btext, exopen:K.examOpen, wmkey:K.wm,
+  footerLogo:K.footerLogo
 };
 const Cloud={
   _timers:{},
@@ -353,7 +373,7 @@ const Cloud={
     if(!data||typeof data!=='object') return false;
     let changed=false;
     SERVER_KEYS.forEach(b=>{ if(data[b]!==undefined){ DB.set(SERVER_MAP[b],data[b]); changed=true; } });
-    if(data['logo']!==undefined || data['btext']!==undefined){ applyBranding(); }
+    if(data['logo']!==undefined || data['btext']!==undefined || data['footerLogo']!==undefined){ applyBranding(); }
     return changed;
   },
   async pushAll(){
@@ -691,6 +711,16 @@ function questionsForExam(exam){
   return getQuestions().length;
 }
 // 組成答題列表：支援單卷／多卷混合、順序／隨機、抽指定題數；每題保留原始序號同原卷名
+// 開卷練習用：全部題庫＝所有已導入考卷＋舊式平鋪題庫，隨機排列
+function buildOpenBookList(){
+  let pool=[];
+  getPapers().forEach(p=>{
+    if(p&&p.questions) p.questions.forEach((q,idx)=>{ pool.push(Object.assign({},q,{_orig:idx+1,_paper:p.name,_pid:p.id})); });
+  });
+  getQuestions().forEach((q,idx)=>{ pool.push(Object.assign({},q,{_orig:idx+1,_paper:'全部題庫'})); });
+  for(let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=pool[i]; pool[i]=pool[j]; pool[j]=t; }
+  return pool;
+}
 function buildQuizList(exam){
   let pool=[];
   const addPaper=(pid)=>{ const p=paperById(pid); if(!p||!p.questions) return; p.questions.forEach((q,idx)=>{ pool.push(Object.assign({},q,{_orig:idx+1,_paper:p.name,_pid:p.id})); }); };
@@ -735,6 +765,9 @@ function renderHome(){
   document.getElementById('in-code').oninput=()=>{
     reloadNameList();
   };
+  // 開卷考試（無限刷）：預設收起
+  const ob=document.getElementById('home-open-book'); if(ob) ob.style.display='block';
+  const ops=document.getElementById('home-open-step'); if(ops) ops.style.display='none';
   updateVerDisplay();
 }
 let currentExamClass='';
@@ -825,6 +858,46 @@ document.getElementById('in-nameSelect').onchange=()=>{
   document.getElementById('in-nameType').value=currentRoster[si]?stuName(currentRoster[si]):'';
 };
 document.getElementById('btn-backCode').onclick=()=>{ pendingExam=null; showHomeStep('code'); };
+/* ================= 開卷考試（無限刷・無需考試碼） ================= */
+function reloadOpenRoster(){
+  const cls=document.getElementById('in-openCls').value;
+  const list=getStudents().filter(s=>!cls||hasClass(s,cls));
+  const sel=document.getElementById('in-openName');
+  sel.innerHTML='<option value="-1">— 請揀學生帳號 —</option>'+list.map((s,i)=>{
+    const extra=stuCls(s).length?(cls?'':'（'+esc(stuCls(s).join('、'))+'）'):(cls?'':'（未編班）');
+    return `<option value="${i}">${esc('['+(s.id||(i+1))+'] '+stuName(s))}${extra}</option>`;
+  }).join('');
+}
+document.getElementById('btn-openBook').onclick=()=>{
+  const warn=document.getElementById('home-warn'); if(warn) warn.style.display='none';
+  document.getElementById('home-open-book').style.display='none';
+  showHomeStep('');
+  document.getElementById('home-open-step').style.display='block';
+  const cls=document.getElementById('in-openCls');
+  cls.innerHTML='<option value="">— 全部班次 —</option>'+getClasses().map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  cls.onchange=reloadOpenRoster;
+  reloadOpenRoster();
+};
+document.getElementById('btn-openBack').onclick=()=>{
+  document.getElementById('home-open-step').style.display='none';
+  document.getElementById('home-open-book').style.display='block';
+  showHomeStep('code');
+};
+document.getElementById('btn-openStart').onclick=()=>{
+  const warn=document.getElementById('home-warn'); warn.style.display='none';
+  const cls=document.getElementById('in-openCls').value;
+  const si=Number(document.getElementById('in-openName').value);
+  if(si<0){ warnMsg('請揀學生帳號'); return; }
+  const roster=getStudents().filter(s=>!cls||hasClass(s,cls));
+  const chosenObj=roster[si]||null;
+  if(!chosenObj){ warnMsg('請重新揀學生帳號'); return; }
+  const name=stuName(chosenObj), key=stuKey(chosenObj);
+  // 開卷考試：全部題庫・隨機・冇鎖・可無限次重刷；唔入 exams 雲端清單，純練習
+  const exam={code:'OPENBOOK', name:'開卷考試', className:cls||'', useAll:true, paperId:0, paperIds:[], order:'rand', drawCount:0, openBook:true, launchedAt:Date.now(), expireAt:Date.now()+24*3600*1000};
+  DB.set(K.curExam, exam);
+  DB.set(K.userName, name);
+  startQuiz(exam, name, key);
+};
 document.getElementById('btn-enterStudent').onclick=function(){
   const warn=document.getElementById('home-warn'); warn.style.display='none';
   const exam=pendingExam;
@@ -879,19 +952,20 @@ bindLongPress(document.getElementById('link-teacher'), ()=>go('teacher'), 3000);
 let QZ = null; // { exam, name, list, answers, idx }
 window.addEventListener('beforeunload', saveDraft);
 function startQuiz(exam, name, key){
+  const isOpen=(exam&&exam.openBook)===true;
   const saved=loadDraft(name,exam.code,key);
   let list, answers, idx, startAt;
   if(saved){
     list=saved.list; answers=saved.answers; idx=Math.min(saved.idx||0,list.length-1); startAt=saved.startAt||Date.now();
   } else {
-    list=buildQuizList(exam);
+    list=isOpen ? buildOpenBookList() : buildQuizList(exam);
     if(!list.length){ toast('呢場考卷無效或者冇題目'); return; }
     answers=list.map(()=>null); idx=0; startAt=Date.now();
   }
   QZ={ exam, name, key:key||'', list, answers, idx, startAt };
-  sessRegister(exam,name);
-  // 自動偵測被清場：老師清空／關閉考場時自動退出（草稿保留），手機同網頁都會生效
-  if(Cloud.enabled()){
+  if(!isOpen){ sessRegister(exam,name); }
+  // 自動偵測被清場：老師清空／關閉考場時自動退出（草稿保留），手機同網頁都會生效（開卷練習唔受清場管制）
+  if(!isOpen && Cloud.enabled()){
     if(window._kickT) clearInterval(window._kickT);
     window._kickT=setInterval(async ()=>{
       try{
@@ -911,10 +985,11 @@ function startQuiz(exam, name, key){
     },12000);
   }
   let pname='全部題庫';
-  if(exam.paperIds&&exam.paperIds.length>1) pname='混合卷（'+exam.paperIds.length+'張）';
+  if(isOpen){ pname='開卷練習・全部題庫'; }
+  else if(exam.paperIds&&exam.paperIds.length>1) pname='混合卷（'+exam.paperIds.length+'張）';
   else if(exam.paperId){ const p=paperById(exam.paperId); pname=p?p.name:'考卷'; }
   document.getElementById('quiz-paperName').textContent=pname;
-  document.getElementById('quiz-className').textContent = (exam.className||'')+' · '+name;
+  document.getElementById('quiz-className').textContent = ((exam.className||(isOpen?'全部班':''))||'')+' · '+name;
   go('quiz'); renderQuiz();
 }
 function applyBranding(){
@@ -923,6 +998,9 @@ function applyBranding(){
     document.querySelectorAll('.brand-logo').forEach(im=>{ im.src=logo; });
     const sp=document.querySelector('#splash img'); if(sp) sp.src=logo;
   }
+  // 底部獨立 Logo：只喺學生界面下方顯示，老師後台可獨立改寫
+  const fl=document.getElementById('home-footlogo');
+  if(fl) fl.src=DB.get(K.footerLogo,'')||LEAP_LOGO_URL;
   const text=DB.get(K.btext,'');
   if(text){
     const ss=document.getElementById('splash-sub'); if(ss) ss.textContent=text;
@@ -935,10 +1013,17 @@ function wmHtml(){
   const wmStyle=logo?`style="background-image:url('${logo}')"`:'';
   return `<div class="wm" ${wmStyle}>${wmSpans}</div>`;
 }
+// 開卷練習用：顯示某 part 嘅正確答案文字
+function fmtOpenAns(pt){
+  if(pt.kind==='fill') return String(pt.answer==null||pt.answer===''?'（空）':pt.answer);
+  const opts=pt.options||[];
+  const arr=Array.isArray(pt.answer)?pt.answer:(pt.answer==null?[]:[pt.answer]);
+  return arr.map(i=>opts[i]!==undefined?opts[i]:('選項'+(i+1))).join('、')||'（未作答）';
+}
 function renderQuiz(){
   if(!QZ){ go('home'); return; }
-  // 檢查考試碼仲存在／未過期（後台可能已關閉考場）
-  if(!examByCode(QZ.exam.code)){ alert('呢場考試已被老師關閉，刷新頁面返回首頁'); go('home'); return; }
+  // 檢查考試碼仲存在／未過期（後台可能已關閉考場）；開卷練習唔受呢啲限制
+  if(!QZ.exam.openBook && !examByCode(QZ.exam.code)){ alert('呢場考試已被老師關閉，刷新頁面返回首頁'); go('home'); return; }
   const {list, answers, idx}=QZ;
   const q=list[idx];
   document.getElementById('quiz-progress').textContent=`第 ${idx+1} / ${list.length} 題 · ${TYPE_LABELS[q.type-1]||''}`+(q.score?` · ${q.score}分`:'');
@@ -975,7 +1060,45 @@ function renderQuiz(){
     });
   }
   html+='</div>';
+  // 開卷練習：作答後即時對答案，或按「睇答案」即時揭曉（無限次練習用）
+  if(QZ.exam.openBook){
+    const ua=answers[idx];
+    const answered = q.type===4
+      ? !!(ua&&ua.parts&&ua.parts.some(p=>p!=null&&p!==undefined&&(typeof p==='string'?p!=='':(Array.isArray(p)&&p.length>0))))
+      : (q.type===3 ? !(ua==null||ua==='') : !!(Array.isArray(ua)&&ua.length>0));
+    if(answered || QZ._showAns){
+      html+='<div style="margin-top:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;font-size:14px">';
+      html+='<div style="font-weight:800;margin-bottom:6px;color:#166534">開卷答案</div>';
+      if(q.type===4){
+        (q.parts||[]).forEach((pt,pi)=>{
+          const up=ua&&ua.parts?ua.parts[pi]:null;
+          const ok=partCorrect(pt,up);
+          const upTxt=pt.kind==='fill'
+            ? String(up==null||up===''?'（未作答）':up)
+            : (Array.isArray(up)?up:(up==null?[]:[up])).map(i=>pt.options&&pt.options[i]!==undefined?pt.options[i]:('選項'+(i+1))).join('、')||'（未作答）';
+          html+=`<div style="margin:3px 0">第${pi+1}部分：${ok?'<span class="tag ok">啱</span>':'<span class="tag bad">錯</span>'}　正確答案「${esc(fmtOpenAns(pt))}」${ok?'':'　你答「'+esc(upTxt)+'」'}</div>`;
+        });
+      } else if(q.type===3){
+        const ok=isCorrect(q,ua);
+        html+=`<div>${ok?'<span class="tag ok">啱</span>':'<span class="tag bad">錯</span>'}　正確答案「${esc(String(q.answer==null?'':q.answer))}」${ok?'':'　你答「'+esc(String(ua==null?'':ua))+'」'}</div>`;
+      } else {
+        const opts=q.options||[];
+        const co=Array.isArray(q.answer)?q.answer:[q.answer];
+        const coTxt=co.map(i=>opts[i]!==undefined?opts[i]:('選項'+(i+1))).join('、');
+        const ok=isCorrect(q,ua);
+        const upArr=Array.isArray(ua)?ua:(ua==null||ua===''?[]:[ua]);
+        const upTxt=upArr.map(i=>opts[i]!==undefined?opts[i]:('選項'+(i+1))).join('、')||'（未作答）';
+        html+=`<div>${ok?'<span class="tag ok">啱</span>':'<span class="tag bad">錯</span>'}　正確答案「${esc(coTxt)}」${ok?'':'　你答「'+esc(upTxt)+'」'}</div>`;
+      }
+      html+='</div>';
+    } else {
+      html+='<button class="btn secondary" id="btn-openAnswer" style="margin-top:12px;width:auto;padding:6px 16px;font-size:13px">睇答案</button>';
+    }
+  }
   document.getElementById('quiz-card').innerHTML=html;
+  // 開卷練習：睇答案按鈕 → 揭曉答案
+  const oab=document.getElementById('btn-openAnswer');
+  if(oab) oab.onclick=()=>{ QZ._showAns=true; renderQuiz(); };
   // 事件
   document.querySelectorAll('#quiz-card .opt').forEach(el=>{
     el.onclick=()=>{
@@ -1083,12 +1206,12 @@ document.getElementById('btn-submit').onclick=()=>{
     }
     if(empty) untouched.push(i+1);
   });
-  let msg='確認交卷？交卷後個名會鎖死，唔可以再入本卷';
+  let msg = QZ.exam.openBook ? '確認完成本次開卷練習？成績會記錄喺後台，但唔會鎖名，可以無限次再刷' : '確認交卷？交卷後個名會鎖死，唔可以再入本卷';
   if(untouched.length) msg='⚠ 未作答題號：'+untouched.join('、')+'\n\n'+msg;
   if(!confirm(msg)) return;
   const {exam, name}=QZ;
-  // 檢查考試碼仲存在（後台可能已關閉考場）
-  if(!examByCode(exam.code)){ alert('呢場考試已被老師關閉，唔可以交卷'); go('home'); return; }
+  // 檢查考試碼仲存在（後台可能已關閉考場）；開卷練習唔受限制
+  if(!exam.openBook && !examByCode(exam.code)){ alert('呢場考試已被老師關閉，唔可以交卷'); go('home'); return; }
   let totalScore=0, gotScore=0, wrongIdx=[];
   list.forEach((q,i)=>{
     const sc=Number(q.score)||1; totalScore+=sc;
@@ -1096,7 +1219,8 @@ document.getElementById('btn-submit').onclick=()=>{
     if(!isCorrect(q, answers[i])) wrongIdx.push({i:i+1, orig:q._orig, paper:q._paper, q, ua:answers[i]});
   });
   let pn='全部題庫';
-  if(exam.paperIds&&exam.paperIds.length>1) pn='混合卷（'+exam.paperIds.length+'張）';
+  if(exam.openBook){ pn='開卷練習（全部題庫）'; }
+  else if(exam.paperIds&&exam.paperIds.length>1) pn='混合卷（'+exam.paperIds.length+'張）';
   else if(exam.paperId){ const p=paperById(exam.paperId); pn=p?p.name:'考卷#'+exam.paperId; }
   const attempt={
     name, className:exam.className||'', paperName:pn,
@@ -1111,23 +1235,34 @@ document.getElementById('btn-submit').onclick=()=>{
     durationText:formatDuration(Date.now()-QZ.startAt),
     durationHours:durationHours(Date.now()-QZ.startAt),
     wrong:wrongIdx,
+    openBook:!!exam.openBook,
     detail:list.map((q,i)=>({question:q.question,type:q.type,parts:q.parts||null,options:q.options,answer:q.answer,score:Number(q.score)||0,orig:q._orig,paper:q._paper,ok:isCorrect(q,answers[i]),userAnswer:answers[i]}))
   };
   const key=QZ.key||QZ.name; // 序號綁定：記錄跟序號
   attempt.stuId = key;
   const att=getAttempts(); att.push(attempt); DB.set(K.attempts, att);
   DB.set(K.lastAttempt, attempt);
-  const L=getLocks();
-  if(key!==QZ.name && !L[key] && L[QZ.name]){ L[key]=L[QZ.name]; delete L[QZ.name]; }
-  const rec=lockRec(L,key,QZ.name); rec.code=exam.code; rec.state='submitted'; rec.at=Date.now(); rec.history[exam.code]='submitted'; L[key]=rec; DB.set(K.locks,L);
+  if(exam.openBook){ window._lastOpen={exam, name, key}; }
+  // 開卷練習唔鎖名（唔寫 submitted 鎖），學生隨時可以再入無限刷
+  if(!exam.openBook){
+    const L=getLocks();
+    if(key!==QZ.name && !L[key] && L[QZ.name]){ L[key]=L[QZ.name]; delete L[QZ.name]; }
+    const rec=lockRec(L,key,QZ.name); rec.code=exam.code; rec.state='submitted'; rec.at=Date.now(); rec.history[exam.code]='submitted'; L[key]=rec; DB.set(K.locks,L);
+  }
   clearDraft(QZ.name,exam.code,key);
-  sessClear(exam,name);
+  if(!exam.openBook) sessClear(exam,name);
   if(window._kickT){ clearInterval(window._kickT); window._kickT=null; }
   DB.remove(K.curExam);
   showResult(attempt);
 };
 function showResult(a){
   go('result');
+  // 開卷練習：成績頁提供「再刷一轉」即時重新開始（無限次）
+  const againBtn=document.getElementById('btn-again');
+  if(againBtn){
+    againBtn.style.display = a.openBook?'block':'none';
+    againBtn.onclick=()=>{ const e=window._lastOpen; if(e&&e.exam) startQuiz(e.exam, e.name, e.key); };
+  }
   document.getElementById('result-score').textContent=a.score+' / '+a.totalScore;
   document.getElementById('result-paper').textContent=a.paperName+' · '+a.name+' · '+a.className;
   document.getElementById('result-correct').textContent= a.total - (a.wrong?a.wrong.length:0) +' / '+a.total;
@@ -1330,6 +1465,44 @@ function saveBrandText(){
   toast('已儲存課程名稱並上傳雲端');
   renderSub('logo');
 }
+// 底部獨立 Logo（學生界面下方）：老師後台獨立改寫
+let _newFootLogo='';
+function onFootLogoFile(input){
+  const f=input.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement('canvas');
+      const max=400;
+      let w=img.width,h=img.height;
+      if(w>max){ h=Math.round(h*max/w); w=max; }
+      c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      _newFootLogo=c.toDataURL('image/png');
+      const pv=document.getElementById('FootLg-preview');
+      if(pv) pv.src=_newFootLogo;
+      toast('已載入新底部 Logo，撳「儲存底部 Logo」生效');
+    };
+    img.src=e.target.result;
+  };
+  rd.readAsDataURL(f);
+}
+function saveFootLogo(){
+  if(!_newFootLogo) return toast('未揀新底部 Logo 圖');
+  DB.set(K.footerLogo, _newFootLogo);
+  applyBranding();
+  toast('已儲存底部 Logo 並上傳雲端');
+  renderSub('logo');
+}
+function resetFootLogo(){
+  if(!confirm('底部 Logo 還原為預設 Logo？')) return;
+  localStorage.removeItem(K.footerLogo);
+  DB.set(K.footerLogo, '');
+  applyBranding();
+  toast('底部 Logo 已還原預設');
+  renderSub('logo');
+}
 function refreshBrandLogo(){
   const all=document.querySelectorAll('.brand-logo');
   all.forEach(img=>{ if(LEAP_LOGO_URL) img.src=LEAP_LOGO_URL; });
@@ -1500,6 +1673,18 @@ function renderSub(g){
         <button class="btn secondary" onclick="resetWm()" style="margin-top:8px">水印還原用主 Logo</button>
       </div>
       <div class="card" style="padding:16px;margin-top:12px">
+        <h2>底部獨立 Logo（學生界面下方）</h2>
+        <p class="muted" style="font-size:13px;margin-bottom:8px">呢張 Logo 只喺學生界面最下方顯示，獨立於上面嘅主 Logo，可以自己換圖；唔設定就用預設 Logo。</p>
+        <div style="padding:12px;background:#f8fafc;border-radius:10px;text-align:center">
+          <img id="FootLg-preview" src="" style="max-width:260px;max-height:130px;background:#fff;border-radius:10px;padding:8px;border:1px solid var(--line)" alt="底部 Logo">
+          <div class="muted" style="font-size:12px">目前底部 Logo 預覽</div>
+        </div>
+        <div style="margin-top:10px"><label>揀新圖（PNG／JPG）</label></div>
+        <input type="file" id="FootLg-file" accept="image/*" onchange="onFootLogoFile(this)" style="margin:8px 0">
+        <button class="btn" onclick="saveFootLogo()">儲存底部 Logo</button>
+        <button class="btn secondary" onclick="resetFootLogo()" style="margin-top:8px">還原預設 Logo</button>
+      </div>
+      <div class="card" style="padding:16px;margin-top:12px">
         <h2>課程名稱文字</h2>
         <p class="muted" style="font-size:13px;margin-bottom:8px">改呢度嘅字，登入畫面同首頁嘅課程名稱會一齊改。</p>
         <input id="Lg-text" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px;font-size:14px" value="${esc(DB.get(K.btext,'')||'初級維修電工課程 · 電工答題系統')}">
@@ -1507,6 +1692,8 @@ function renderSub(g){
       </div>`;
     const _lp=document.getElementById('splash-logo-preview');
     if(_lp) _lp.src=DB.get(K.logo,'')||LEAP_LOGO_URL;
+    const _fpl=document.getElementById('FootLg-preview');
+    if(_fpl) _fpl.src=DB.get(K.footerLogo,'')||LEAP_LOGO_URL;
     return;
   }
   if(g==='version'){
