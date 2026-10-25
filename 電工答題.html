@@ -284,6 +284,7 @@
         <button data-go="launch">發起考試碼</button>
         <button data-go="classes">學生管理（班次）</button>
         <button data-go="admin">成績後台</button>
+        <button data-go="imgGrade">圖片作答批改</button>
         <button data-go="papers">考卷管理</button>
       </div>
       <div class="link-grid" style="margin-top:10px" id="t-grid2">
@@ -617,11 +618,16 @@ function setImgAnswer(dataUrl){
   if(!QZ) return;
   // 壓縮兩層：主圖 700px（顯示）＋細圖 360px JPEG 0.5（X檔導出用，避免超出 Excel 格 32767 字元）
   compressImg(dataUrl, 700, c=>{
-    compressImg(c, 360, c2=>{
-      QZ.answers[QZ.idx]={img:c, imgS:c2, ts:Date.now()};
-      renderQuiz();
-      toast('圖片已載入（已壓縮），撳「儲存作答」鎖實');
-    });
+    // 安全閘：如果 700px 仍然太大（>350KB），再壓細到 480px，避免 localStorage/Firebase 超限儲存失敗
+    const finish=saved=>{
+      compressImg(saved, 360, c2=>{
+        QZ.answers[QZ.idx]={img:saved, imgS:c2, ts:Date.now()};
+        renderQuiz();
+        toast('圖片已載入（已壓縮），撳「儲存作答」鎖實');
+      });
+    };
+    if(c.length>350000){ compressImg(c,480,c3=>finish(c3)); }
+    else finish(c);
   });
 }
 function saveImgAnswer(){
@@ -2010,6 +2016,69 @@ function startRenameStu(idx){
   };
 }
 
+/* ===== 圖片作答評分（全局，圖片作答批改頁/成績後台共用）===== */
+function recomputeAttempt(a){
+  let got=0,tot=0,g=0,p=0;
+  (a.detail||[]).forEach(d=>{
+    const sc=d.type===5?(Number(d.score)||1):(Number(d.score)||0); // 圖片題無分數時當 1 分，避免 0 分點改都係 0
+    if(d.type===5){
+      if(d.graded){ got+=Number(d.earned)||0; tot+=sc; g++; }
+      else p++;
+    } else { tot+=sc; if(d.ok) got+=sc; }
+  });
+  a.score=Math.round(got*10)/10;
+  a.totalScore=Math.round(tot*10)/10;
+  a.score100=tot?Math.min(100,Math.round(got/tot*100)):0;
+  a.pct=tot?Math.min(100,Math.round(got/tot*1000)/10):0;
+  a.imgCount=Number(a.imgCount)||g+p;
+  return {g,p};
+}
+window.saveGrade=function(a, di, pctRaw){
+  if(!a) return;
+  const d=a.detail&&a.detail[di]; if(!d||d.type!==5){ toast('搵唔到嗰題'); return; }
+  const sc=Number(d.score)||1;
+  const pct=Math.max(0,Math.min(100,Math.round(Number(pctRaw)||0)));
+  d.graded=true; d.pct=pct;
+  d.earned=Math.round(sc*pct/100*10)/10;
+  d.ok=pct>=60;
+  recomputeAttempt(a);
+  const att=getAttempts();
+  const idx=att.findIndex(x=>x===a||(x&&x.ts===a.ts&&x.name===a.name&&x.paperName===a.paperName));
+  if(idx>=0){ att[idx]=a; DB.set(K.attempts,att); }
+  toast('已儲存圖片分：'+pct+'%（得 '+d.earned+' / '+sc+' 分）');
+  renderSub(curSub||'admin');
+};
+window.renderGradeBox=function(a, holder, ri){
+  const items=(a.detail||[]).map((d,di)=>({d,di})).filter(x=>x.d.type===5);
+  if(!items.length){ holder.innerHTML='<span class="muted">呢筆冇圖片作答題</span>'; return; }
+  window.__gradeA=a;
+  holder.innerHTML=items.map(({d,di})=>{
+    let ua=d.userAnswer||{};
+    if(typeof ua==='string') ua={img:ua}; // 舊數據：答案直接係 dataURL 字串
+    const imgSrc=ua.img||ua.imgS||'';
+    const imgSrc2=ua.imgS||ua.img||'';
+    const graded=!!d.graded;
+    const sc=Number(d.score)||1;
+    const imgBlock=imgSrc
+      ? `<img src="${esc(imgSrc)}" style="max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--line);cursor:zoom-in" onclick="zoomImgAns(this)" onerror="if(this.src!==this.getAttribute('data-fb')){this.setAttribute('data-fb','${esc(imgSrc2)}');this.src=this.getAttribute('data-fb');}else{this.outerHTML='<span class=\'muted\'>圖片載入失敗</span>';}">`
+      : '<span class="muted">學生未上載圖片</span>';
+    return `<div style="padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#fff">
+      <div style="font-weight:700;font-size:13px">圖片作答題 ${di+1} ${graded?'<span class="tag ok">已批改 '+d.pct+'%・得 '+d.earned+'分</span>':'<span class="tag bad">未批改</span>'}</div>
+      <div class="muted" style="font-size:12px;margin:4px 0">${esc(d.question)}（原分 ${sc} 分）</div>
+      <div style="text-align:center;margin:6px 0">${imgBlock}</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="font-size:13px;flex:0 0 auto">得分%</label>
+        <input type="number" min="0" max="100" step="1" value="${graded?d.pct:''}" placeholder="0-100" id="gPct-${ri}-${di}" style="flex:1;padding:7px;border:1px solid var(--line);border-radius:6px;font-size:14px">
+        <button class="btn" style="width:auto;padding:7px 16px;margin:0" onclick="saveGrade(window.__gradeA,${di},document.getElementById('gPct-${ri}-${di}').value)">儲存</button>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:4px">百分比 × 原分 = 得分（例如 80% × ${sc}分 = ${Math.round(sc*80/100*10)/10}分）</div>
+    </div>`;
+  }).join('')+'<button class="btn secondary" style="width:100%;margin-top:4px" onclick="renderSub(curSub||\'admin\')">完成，返去上一頁</button>';
+  if(holder._zoomBound) return;
+  holder._zoomBound=true;
+  holder.querySelectorAll('img').forEach(im=>im.addEventListener('click',function(){ zoomImgAns(this); }));
+};
+
 function renderSub(g){
   curSub=g||'';
   const el=document.getElementById('t-sub');
@@ -2292,6 +2361,51 @@ function renderSub(g){
       };
     });
   }
+  if(g==='imgGrade'){
+    // 圖片作答批改：未批改卷＝左欄，改好分嘅卷＝右欄；覺得分唔啱可以喺右欄重新改分
+    const att=getAttempts();
+    const withImg=att.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).filter(a=>(a.detail||[]).some(d=>d.type===5));
+    window.__igAttempts=withImg;
+    const pending=withImg.filter(a=>(a.detail||[]).some(d=>d.type===5&&!d.graded));
+    const done=withImg.filter(a=>!pending.includes(a));
+    function igCard(a, gi, label){
+      const qi=(a.detail||[]).filter(d=>d.type===5);
+      const g=qi.filter(d=>d.graded).length;
+      const pct=a.pct!=null?a.pct:'—';
+      const dur=esc(a.durationText||formatDuration(a.durationMs)||'');
+      return `<div class="grade-card" style="margin-bottom:8px">
+        <div class="grade-row1"><div class="grade-main">(姓名:<b>${esc(a.name)}</b>) <span class="muted">${esc(a.className||'未編班')}</span><br><span style="font-size:12px">${esc(a.paperName)}</span></div>
+        <div class="grade-score"><b>${pct}/100</b><br><span style="font-size:12px">${esc(String(a.date||'').split(/\s+/).slice(0,2).join(' '))}</span>${dur?`<br><span style="font-size:12px">${dur}</span>`:''}</div></div>
+        <div style="margin-top:6px"><button class="btn secondary" style="width:auto;padding:4px 10px;margin:0;font-size:12px;color:#ea580c;border-color:#fdba74" data-ig-card="${gi}">📷 ${label}（${g}/${qi.length}題已批改）</button>
+        <div id="igBox-${gi}" style="display:none;margin-top:8px"></div></div>
+      </div>`;
+    }
+    el.innerHTML=subHead('圖片作答批改')+`
+      <p class="muted" style="margin-bottom:10px;font-size:13px">未批改卷（導師未改分）＝左欄；改好分嘅卷＝右欄。覺得邊份卷嘅分唔啱，喺右欄撳「重新改分」搵返出嚟改就得。</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
+        <div style="flex:1;min-width:280px">
+          <div class="card" style="padding:12px"><h3 style="font-size:15px;color:#ea580c">⏳ 未批改（${pending.length}份）</h3>
+            <div>${pending.map(a=>igCard(a,withImg.indexOf(a),'批改')).join('')||'<div class="muted">冇未批改嘅圖片作答卷 🎉</div>'}</div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:280px">
+          <div class="card" style="padding:12px"><h3 style="font-size:15px;color:#16a34a">✅ 已批改（${done.length}份）</h3>
+            <div>${done.map(a=>igCard(a,withImg.indexOf(a),'重新改分')).join('')||'<div class="muted">（仲未有改好分嘅卷）</div>'}</div>
+          </div>
+        </div>
+      </div>`;
+    el.querySelectorAll('[data-ig-card]').forEach(b=>{
+      b.onclick=()=>{
+        const gi=Number(b.dataset.igCard);
+        const a=window.__igAttempts[gi]; if(!a) return;
+        const box=document.getElementById('igBox-'+gi);
+        const show=box.style.display==='none';
+        box.style.display=show?'block':'none';
+        if(show) renderGradeBox(a, box, gi);
+      };
+    });
+    return;
+  }
   if(g==='admin'){
     const att=getAttempts();
     const sortedAll=att.slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
@@ -2443,57 +2557,7 @@ function renderSub(g){
       return rows2;
     }
   }
-  /* ===== 圖片作答評分（導師後台）===== */
-  function recomputeAttempt(a){
-    let got=0,tot=0,g=0,p=0;
-    (a.detail||[]).forEach(d=>{
-      const sc=Number(d.score)||0;
-      if(d.type===5){
-        if(d.graded){ got+=Number(d.earned)||0; tot+=sc; g++; }
-        else p++;
-      } else { tot+=sc; if(d.ok) got+=sc; }
-    });
-    a.score=Math.round(got*10)/10;
-    a.totalScore=Math.round(tot*10)/10;
-    a.score100=tot?Math.min(100,Math.round(got/tot*100)):0;
-    a.pct=tot?Math.min(100,Math.round(got/tot*1000)/10):0;
-    a.imgCount=Number(a.imgCount)||g+p;
-    return {g,p};
-  }
-  window.saveGrade=function(a, di, pctRaw){
-    if(!a) return;
-    const d=a.detail&&a.detail[di]; if(!d||d.type!==5){ toast('搵唔到嗰題'); return; }
-    const pct=Math.max(0,Math.min(100,Math.round(Number(pctRaw)||0)));
-    d.graded=true; d.pct=pct;
-    d.earned=Math.round(Number(d.score)*pct/100*10)/10;
-    d.ok=pct>=60;
-    recomputeAttempt(a);
-    const att=getAttempts();
-    const idx=att.findIndex(x=>x===a||(x&&x.ts===a.ts&&x.name===a.name&&x.paperName===a.paperName));
-    if(idx>=0){ att[idx]=a; DB.set(K.attempts,att); }
-    toast('已儲存圖片分：'+pct+'%（得 '+d.earned+' / '+d.score+' 分）');
-    renderSub('admin');
-  };
-  window.renderGradeBox=function(a, holder, ri){
-    const items=(a.detail||[]).map((d,di)=>({d,di})).filter(x=>x.d.type===5);
-    if(!items.length){ holder.innerHTML='<span class="muted">呢筆冇圖片作答題</span>'; return; }
-    window.__gradeA=a;
-    holder.innerHTML=items.map(({d,di})=>{
-      const ua=d.userAnswer||{};
-      const graded=!!d.graded;
-      return `<div style="padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#fff">
-        <div style="font-weight:700;font-size:13px">圖片作答題 ${di+1} ${graded?'<span class="tag ok">已批改 '+d.pct+'%・得 '+d.earned+'分</span>':'<span class="tag bad">未批改</span>'}</div>
-        <div class="muted" style="font-size:12px;margin:4px 0">${esc(d.question)}（原分 ${Number(d.score)||0} 分）</div>
-        <div style="text-align:center;margin:6px 0">${ua&&ua.img?`<img src="${esc(ua.img)}" style="max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--line);cursor:zoom-in" onclick="zoomImgAns(this)">`:'<span class="muted">學生未上載圖片</span>'}</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <label style="font-size:13px;flex:0 0 auto">得分%</label>
-          <input type="number" min="0" max="100" step="1" value="${graded?d.pct:''}" placeholder="0-100" id="gPct-${ri}-${di}" style="flex:1;padding:7px;border:1px solid var(--line);border-radius:6px;font-size:14px">
-          <button class="btn" style="width:auto;padding:7px 16px;margin:0" onclick="saveGrade(window.__gradeA,${di},document.getElementById('gPct-${ri}-${di}').value)">儲存</button>
-        </div>
-        <div class="muted" style="font-size:12px;margin-top:4px">百分比 × 原分 = 得分（例如 80% × 10分 = 8分）</div>
-      </div>`;
-    }).join('')+'<button class="btn secondary" style="width:100%;margin-top:4px" onclick="renderSub(\'admin\')">完成，返去成績表</button>';
-  };
+  /* ===== 圖片作答評分（全局，見上方）===== */
   if(g==='papers'){
     const papers=getPapers().slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'zh-Hans-CN'));
     el.innerHTML=subHead('考卷管理')+`
@@ -2503,7 +2567,7 @@ function renderSub(g){
   }
   if(g==='import'){
     el.innerHTML=subHead('導入 X 檔題庫')+`
-      <p class="muted">揀標準考卷範本格式嘅 .xlsx（34欄：題型標記=1 先打開，AI 欄「多少分題」寫分數）。導入後會存為一張考卷，老師開考時揀呢張卷。</p>
+      <p class="muted">揀標準考卷範本格式嘅 .xlsx（34欄：題型標記=1 先打開，AI 欄「多少分題」寫分數；「插圖題(1/0)」欄寫 1 就係圖片作答題）。導入後會存為一張考卷，老師開考時揀呢張卷。</p>
       <input type="file" id="I-file" accept=".xlsx,.xls" style="margin:12px 0">
       <div style="margin:10px 0;font-size:13px">
         <label style="display:block;margin:4px 0;cursor:pointer"><input type="radio" name="I-mode" value="new" checked onchange="toggleImportMode()"> 新建文件檔（導入後建立一個新檔案）</label>
@@ -2916,7 +2980,7 @@ function renderSub(g){
         let q={question:'（新題目）', type, score:0, answer:[]};
         if(type===1||type===2){ q.options=['選項A','選項B','選項C','選項D']; q.answer=[0]; }
         else if(type===3){ q.answer=''; }
-        else if(type===5){ q.question='（圖片作答題）'; }
+        else if(type===5){ q.question='（圖片作答題）'; q.score=1; } // 圖片題預設 1 分，避免 0 分改極都係 0
         else if(type===4){
           q.parts=[
             {kind:'single', options:['選項A','選項B','選項C','選項D'], answer:[0]},
@@ -3353,13 +3417,17 @@ function exportPaperXlsx(){
     '多選題答案位A內容','多選題答案位B內容','多選題答案位C內容','多選題答案位D內容','多選題答案位E內容','多選題答案位F內容',
     '填寫題答案位(學生)','單選題A(學生)','單選題B(學生)','單選題C(學生)','單選題D(學生)','單選題E(學生)','單選題F(學生)',
     '多選題A(學生)','多選題B(學生)','多選題C(學生)','多選題D(學生)','多選題E(學生)','多選題F(學生)',
-    '是非題對(學生)','是非題錯(學生)','多少分題'];
+    '是非題對(學生)','是非題錯(學生)','多少分題','插圖題(1/0)'];
   const rows=[headers];
   (p.questions||[]).forEach((q,idx)=>{
-    const row=new Array(35).fill('');
+    const row=new Array(36).fill('');
     row[0]=idx+1;
     row[1]=cleanText(q.question);
     row[34]=q.score||'';
+    if(q.type===5){
+      // 圖片作答題：插圖題=1 觸發
+      row[35]=1;
+    }
     if(q.type===3){
       row[2]=1; // 填寫題
       row[6]=cleanText(q.answer); // 填寫答案
@@ -3498,12 +3566,12 @@ function detectColumns(rows){
     // B=問題, C=填寫題, D=單選題, E=多選題, F=是非題, G=填寫題答案
     // H-M(8-13)=單選選項A-F, N-S(14-19)=多選選項A-F
     // T(20)=填寫題學生答案, U-Z(21-26)=單選學生答案A-F, AA-AF(27-32)=多選學生答案A-F
-    // AG(33)=是非對, AH(34)=是非錯, AI(35)=多少分題
+    // AG(33)=是非對, AH(34)=是非錯, AI(35)=多少分題, AJ(36)=插圖題(1/0)（圖片作答題觸發）
     const singleOpt=[8,9,10,11,12,13];
     const multiOpt=[14,15,16,17,18,19];
     const singleStudent=[21,22,23,24,25,26];
     const multiStudent=[27,28,29,30,31,32];
-    return {header:true, fmt:2, col:{question:2,fillMark:3,singleMark:4,multiMark:5,tfMark:6,fillAns:7,singleOpt,multiOpt,singleStudent,multiStudent,tfTrue:33,tfFalse:34,score:35}};
+    return {header:true, fmt:2, col:{question:2,fillMark:3,singleMark:4,multiMark:5,tfMark:6,fillAns:7,singleOpt,multiOpt,singleStudent,multiStudent,tfTrue:33,tfFalse:34,score:35,imgMark:36}};
   }
   return {header:false, fmt:0, col:{}};
 }
@@ -3517,9 +3585,19 @@ function rowToQuestion(cells, col){
   const singleHas=hasAny(col.singleOpt), multiHas=hasAny(col.multiOpt);
   const tfHas=isMark(col.tfTrue)||isMark(col.tfFalse);
   let type;
-  if(isMark(col.fillMark)) type=3; else if(multiHas) type=2; else if(singleHas||tfHas) type=1; else return null;
+  // 插圖題(1/0)（第36欄）：標記 1 就係圖片作答題，優先判斷
+  if(isMark(col.imgMark)) type=5;
+  else if(isMark(col.fillMark)) type=3;
+  else if(multiHas) type=2;
+  else if(singleHas||tfHas) type=1;
+  else return null;
   const q={type, question, options:[], answer:[], score:0};
-  const scN=parseFloat(get(col.score)); q.score=(!scN||scN<=0)?0:scN;
+  const scN=parseFloat(get(col.score)); q.score=(!scN||scN<=0)?1:scN; // 分數留空預設 1 分
+  if(type===5){
+    // 圖片作答題：冇預設答案，導師喺後台按圖改分 0-100%
+    q.parts=[];
+    return q;
+  }
   const marks=[];
   if(isMark(col.singleMark)) marks.push('single');
   if(isMark(col.multiMark)) marks.push('multi');
