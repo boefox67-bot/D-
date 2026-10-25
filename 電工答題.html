@@ -246,6 +246,7 @@
       </div>
       <label>錯題序號</label>
       <div class="wronglist" id="result-wrong">—</div>
+      <div id="result-imgnote" style="display:none;margin:8px 0;padding:8px 10px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;font-size:13px;color:#9a3412"></div>
       <label style="margin-top:14px">逐題對答案</label>
       <div id="result-detail" class="wm-zone" style="font-size:14px"></div>
     </div>
@@ -497,7 +498,7 @@ function cloudRefreshView(){
   else if(id==='view-teacher' && DB.get(K.isTeacher,false)===true) renderSub(curSub);
 }
 const EXAM_HOURS = 4, MAX_CLASSES = 6;
-const TYPE_LABELS = ['單選題','多選題','計算題','混合題'];
+const TYPE_LABELS = ['單選題','多選題','計算題','混合題','圖片作答'];
 function getVersion(){ return DB.get(K.ver, '4.9'); }
 function renderOptContent(text){
   if(!text) return '（空）';
@@ -566,6 +567,7 @@ function partCorrect(pt, up){
   return a.length===b.length && a.every((v,i)=>v===b[i]);
 }
 function isCorrect(q, ua){
+  if(q.type===5) return false; // 圖片作答：冇自動對錯，由導師喺後台改分（0-100%）
   if(q.type===4){
     if(!ua||!ua.parts) return false;
     const parts=q.parts||[], up=ua.parts||[];
@@ -578,6 +580,7 @@ function isCorrect(q, ua){
 }
 function questionScore(q, ua){
   const base=Number(q.score)||1;
+  if(q.type===5) return 0; // 圖片作答：即刻唔計分，等導師改好（百分比×題分）先計
   if(q.type===4){
     const parts=q.parts||[]; if(!parts.length) return 0;
     const per=base/parts.length, up=(ua&&ua.parts)||[];
@@ -592,6 +595,52 @@ function formatDuration(ms){
   if(h>0) return `${h}小時${String(m).padStart(2,'0')}分`;
   if(m>0) return `${m}分${String(s).padStart(2,'0')}秒`;
   return `${s}秒`;
+}
+/* ================= 圖片作答（type 5） ================= */
+function imgQCount(list){ return list?list.filter(q=>q&&q.type===5).length:0; }
+function compressImg(dataUrl, maxW, cb){
+  const img=new Image();
+  img.onload=()=>{
+    try{
+      const canvas=document.createElement('canvas');
+      const ratio=Math.min(1,maxW/img.width);
+      canvas.width=Math.max(1,Math.round(img.width*ratio));
+      canvas.height=Math.max(1,Math.round(img.height*ratio));
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      cb(canvas.toDataURL('image/jpeg',0.72));
+    }catch(e){ cb(dataUrl); }
+  };
+  img.onerror=()=>cb(dataUrl);
+  img.src=dataUrl;
+}
+function setImgAnswer(dataUrl){
+  if(!QZ) return;
+  // 壓縮兩層：主圖 700px（顯示）＋細圖 360px JPEG 0.5（X檔導出用，避免超出 Excel 格 32767 字元）
+  compressImg(dataUrl, 700, c=>{
+    compressImg(c, 360, c2=>{
+      QZ.answers[QZ.idx]={img:c, imgS:c2, ts:Date.now()};
+      renderQuiz();
+      toast('圖片已載入（已壓縮），撳「儲存作答」鎖實');
+    });
+  });
+}
+function saveImgAnswer(){
+  if(!QZ) return;
+  const a=QZ.answers[QZ.idx];
+  if(!a||!a.img){ toast('未有圖片作答'); return; }
+  saveDraft();
+  toast('已儲存，翻頁／刷新頁面都保留');
+}
+function onImgAnsFile(input){
+  const f=input.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=e=>setImgAnswer(e.target.result);
+  rd.readAsDataURL(f);
+  input.value='';
+}
+function zoomImgAns(img){
+  const ov=document.getElementById('logo-zoom'), big=document.getElementById('logo-zoom-img');
+  if(ov&&big){ big.src=img.src||''; big.style.width=''; big.style.maxWidth='92vw'; ov.style.display='flex'; }
 }
 function durationHours(ms){
   if(ms==null||isNaN(ms)||ms<0) return '';
@@ -1133,6 +1182,24 @@ function renderQuiz(){
   } else if(q.type===3){
     const cur=answers[idx]==null?'':answers[idx];
     html+=`<input data-kind="fill" class="fill-input" inputmode="decimal" placeholder="輸入計算答案" value="${esc(cur)}">`;
+  } else if(q.type===5){
+    const ua=answers[idx];
+    const hasImg=!!(ua&&ua.img);
+    html+=`<div class="imgans">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+        <label class="btn secondary" style="width:auto;padding:7px 14px;margin:0;font-size:13px;cursor:pointer">📷 拍照<input type="file" accept="image/*" capture="environment" id="imgAnsCam" style="display:none" onchange="onImgAnsFile(this)"></label>
+        <label class="btn secondary" style="width:auto;padding:7px 14px;margin:0;font-size:13px;cursor:pointer">🖼 上傳圖片<input type="file" accept="image/*" id="imgAnsFile" style="display:none" onchange="onImgAnsFile(this)"></label>
+        <button class="btn secondary" id="btn-imgPaste" style="width:auto;padding:7px 14px;margin:0;font-size:13px">📋 貼圖</button>
+      </div>
+      <div id="imgPasteBox" style="display:none;margin-bottom:8px">
+        <textarea id="imgPasteTa" placeholder="按 Ctrl+V 貼上圖片..." style="width:100%;height:52px;border:1.5px dashed var(--line);border-radius:8px;font-size:13px;padding:8px;text-align:center"></textarea>
+        <div class="muted" style="font-size:12px;margin-top:4px">撳入下面框，按 Ctrl+V（或右鍵→貼上）</div>
+      </div>
+      <div class="imgans-preview" style="text-align:center">
+        ${hasImg?`<img src="${esc(ua.img)}" style="max-width:100%;max-height:300px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:zoom-in" onclick="zoomImgAns(this)">`:'<span class="muted" style="font-size:13px">未作答——影／傳／貼一張圖片</span>'}
+      </div>
+      ${hasImg?'<button class="btn" id="btn-saveImgAns" style="margin-top:10px;width:100%">儲存作答（鎖實・可刷新）</button>':'<button class="btn" id="btn-saveImgAns" style="margin-top:10px;width:100%;opacity:.55" disabled>未有圖片，先影／傳／貼</button>'}
+    </div>`;
   } else {
     const kind=q.type===2?'multi':'';
     const selArr=Array.isArray(answers[idx])?answers[idx]:[];
@@ -1148,11 +1215,13 @@ function renderQuiz(){
     const ua=answers[idx];
     const answered = q.type===4
       ? !!(ua&&ua.parts&&ua.parts.some(p=>p!=null&&p!==undefined&&(typeof p==='string'?p!=='':(Array.isArray(p)&&p.length>0))))
-      : (q.type===3 ? !(ua==null||ua==='') : !!(Array.isArray(ua)&&ua.length>0));
+      : (q.type===3 ? !(ua==null||ua==='') : (q.type===5 ? !!(ua&&ua.img) : !!(Array.isArray(ua)&&ua.length>0)));
     if(answered || QZ._showAns){
       html+='<div style="margin-top:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;font-size:14px">';
       html+='<div style="font-weight:800;margin-bottom:6px;color:#166534">開卷答案</div>';
-      if(q.type===4){
+      if(q.type===5){
+        html+='<div>圖片作答：已上載圖片，由導師喺後台改分（0-100%）</div>';
+      } else if(q.type===4){
         (q.parts||[]).forEach((pt,pi)=>{
           const up=ua&&ua.parts?ua.parts[pi]:null;
           const ok=partCorrect(pt,up);
@@ -1216,6 +1285,30 @@ function renderQuiz(){
       saveDraft();
     };
   });
+  // 圖片作答：貼圖框 + 儲存按鈕
+  const pBtn=document.getElementById('btn-imgPaste');
+  if(pBtn) pBtn.onclick=()=>{
+    const box=document.getElementById('imgPasteBox');
+    const show=box.style.display==='none';
+    box.style.display=show?'block':'none';
+    if(show){ const ta=document.getElementById('imgPasteTa'); ta.value=''; ta.focus(); }
+  };
+  const pTa=document.getElementById('imgPasteTa');
+  if(pTa) pTa.addEventListener('paste',e=>{
+    const it=(e.clipboardData||window.clipboardData||{items:[]}).items;
+    for(let i=0;i<it.length;i++){
+      if(it[i].type.indexOf('image')===0){
+        const f=it[i].getAsFile(); if(!f) continue;
+        const rd=new FileReader();
+        rd.onload=ev=>setImgAnswer(ev.target.result);
+        rd.readAsDataURL(f);
+        return;
+      }
+    }
+    toast('剪貼簿入面冇圖片');
+  });
+  const sBtn=document.getElementById('btn-saveImgAns');
+  if(sBtn) sBtn.onclick=saveImgAnswer;
   document.getElementById('btn-next').textContent = idx===list.length-1 ? '完成作答' : '下一題';
   document.getElementById('btn-submit').style.display = (idx===list.length-1)?'block':'none';
 }
@@ -1282,6 +1375,8 @@ document.getElementById('btn-submit').onclick=()=>{
         if(pt.kind==='fill') return ua==null||ua==='';
         return !ua || (Array.isArray(ua)&&ua.length===0);
       });
+    } else if(q.type===5){
+      empty=!(a&&a.img);
     } else if(q.type===3){
       empty=a==null||a==='';
     } else {
@@ -1297,10 +1392,13 @@ document.getElementById('btn-submit').onclick=()=>{
   if(!(exam.openBook||exam.phoneOpen) && !examByCode(exam.code)){ alert('呢場考試已被老師關閉，唔可以交卷'); go('home'); return; }
   let totalScore=0, gotScore=0, wrongIdx=[];
   list.forEach((q,i)=>{
+    // 圖片作答：即刻唔計分（先唔加入圖片作答題嘅分數），等導師喺後台改好分先計
+    if(q.type===5) return;
     const sc=Number(q.score)||1; totalScore+=sc;
     const got=questionScore(q, answers[i]); gotScore+=got;
     if(!isCorrect(q, answers[i])) wrongIdx.push({i:i+1, orig:q._orig, paper:q._paper, q, ua:answers[i]});
   });
+  const imgCnt=imgQCount(list);
   let pn='全部題庫';
   if(exam.openBook){ pn='開卷練習（全部題庫）'; }
   else if(exam.phoneOpen){ pn='電話開放（無限刷）'; }
@@ -1321,6 +1419,7 @@ document.getElementById('btn-submit').onclick=()=>{
     wrong:wrongIdx,
     openBook:!!exam.openBook,
     phoneOpen:!!exam.phoneOpen,
+    imgCount:imgCnt,
     detail:list.map((q,i)=>({question:q.question,type:q.type,parts:q.parts||null,options:q.options,answer:q.answer,score:Number(q.score)||0,orig:q._orig,paper:q._paper,ok:isCorrect(q,answers[i]),userAnswer:answers[i]}))
   };
   const key=QZ.key||QZ.name; // 序號綁定：記錄跟序號
@@ -1350,9 +1449,18 @@ function showResult(a){
   }
   document.getElementById('result-score').textContent=a.score+' / '+a.totalScore;
   document.getElementById('result-paper').textContent=a.paperName+' · '+a.name+' · '+a.className;
-  document.getElementById('result-correct').textContent= a.total - (a.wrong?a.wrong.length:0) +' / '+a.total;
+  const imgCnt=Number(a.imgCount)||imgQCount(a.detail||[]);
+  const gradedCnt=(a.detail||[]).filter(d=>d.type===5&&d.graded).length;
+  document.getElementById('result-correct').textContent= (a.total - imgCnt - (a.wrong?a.wrong.length:0)) +' / '+Math.max(0,a.total-imgCnt);
   document.getElementById('result-pct').textContent=a.score100+'%';
   document.getElementById('result-duration').textContent=a.durationText||formatDuration(a.durationMs)||'—';
+  const imgNote=document.getElementById('result-imgnote');
+  if(imgNote){
+    if(imgCnt>0){
+      imgNote.style.display='block';
+      imgNote.innerHTML=`圖片作答 ${imgCnt} 題：已批改 ${gradedCnt} 題，未批改 ${imgCnt-gradedCnt} 題。未批改前分數只計其他題型，導師喺後台改分後會自動更新。`;
+    } else { imgNote.style.display='none'; }
+  }
   if(!a.wrong || !a.wrong.length){
     document.getElementById('result-wrong').innerHTML='<span class="tag ok">全對！</span>';
   } else {
@@ -1371,6 +1479,9 @@ function showResult(a){
   // 逐題對答案
   const det=a.detail||[];
   const ansText=(d, ua)=>{
+    if(d.type===5){
+      return ua&&ua.img ? '已上載圖片作答（導師批改後會更新分數）' : '（未作答）';
+    }
     if(d.type===4){
       const parts=d.parts||[];
       return parts.map((pt,pi)=>{
@@ -1398,6 +1509,19 @@ function showResult(a){
   };
   const fmtUserAns=ua=>String(ua==null||ua===''?'（未作答）':ua);
   document.getElementById('result-detail').innerHTML=det.map((d,i)=>{
+    if(d.type===5){
+      const ua=d.userAnswer||{};
+      const graded=!!d.graded;
+      const dsc=Number(d.score)||0;
+      const pctN=graded?('· 已批改 '+d.pct+'%'+(d.earned!=null?'（得 '+d.earned+' / '+dsc+' 分）':'')):'· 待導師批改（未計分）';
+      const tag=graded?'<span class="tag ok">已批改</span>':'<span class="tag bad">待批改</span>';
+      const dsrc=d.paper?`《${esc(d.paper)}》原第 ${d.orig||(i+1)} 題`:`原第 ${d.orig||(i+1)} 題`;
+      return `<div style="padding:8px;border-bottom:1px solid var(--line)">
+        <div><b>第${i+1}題</b> ${tag} <span class="muted" style="font-size:12px">（${dsc}分）· ${dsrc}${pctN}</span></div>
+        <div style="color:var(--muted);margin:4px 0">${esc(d.question)}</div>
+        <div style="font-size:13px">${ua&&ua.img?`<img src="${esc(ua.img)}" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--line);cursor:zoom-in" onclick="zoomImgAns(this)">`:'（未作答）'}</div>
+      </div>`;
+    }
     const ok=isCorrect(d, d.userAnswer);
     const tag=ok?'<span class="tag ok">啱</span>':'<span class="tag bad">錯</span>';
     const sc=Number(d.score)||0;
@@ -1987,8 +2111,9 @@ function renderSub(g){
       <label>抽題數量（0＝全部；混合時隨機抽指定題數）</label>
       <input id="L-count" type="number" min="0" value="0" inputmode="numeric">
       <label>考試碼（阿拉伯數字）</label><input id="L-code" inputmode="numeric" placeholder="例如 1234">
-      <label>開放時長（小時，1～168，一週）</label>
-      <input id="L-hours" type="number" min="1" max="168" value="4" inputmode="numeric">
+      <label>開放時長（小時；0＝無限時間直到關閉考場，平時默認2）</label>
+      <input id="L-hours" type="number" min="0" max="168" value="2" inputmode="numeric">
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:4px">填 0 = 無限時間：直到你喺「進行中考試」撳關閉考場先停（唔受 168 上限）</div>
       <button class="btn" id="L-go">生成考試碼</button></div>
       <div class="card"><h2>進行中考試</h2><div id="L-list"></div></div>`;
     renderActiveExams();
@@ -2014,7 +2139,8 @@ function renderSub(g){
       const code=document.getElementById('L-code').value.trim();
       if(!code){ toast('請輸入考試碼'); return; }
       let hours=Number(document.getElementById('L-hours').value);
-      if(!hours||hours<1) hours=1;
+      if(isNaN(hours)||hours===null) hours=2;
+      if(hours<0) hours=0;
       if(hours>168) hours=168;
       const className=document.getElementById('L-cls').value;
       // 收集勾選嘅考卷
@@ -2035,14 +2161,15 @@ function renderSub(g){
       const mode=(document.querySelector('input[name="L-mode"]:checked')||{}).value||'fixed';
       const phoneOpen=mode==='phone';
       const list=getExams().filter(e=>!(e.code===code));
-      const examObj={code,paperId:paperIds[0]||0,paperIds,useAll,order,drawCount,durationMin:hours*60,className,launchedAt:now};
+      const examObj={code,paperId:paperIds[0]||0,paperIds,useAll,order,drawCount,durationMin:hours*60,className,launchedAt:now,unlimited:hours===0};
       if(phoneOpen){ examObj.phoneOpen=true; examObj.expireAt=now+30*24*3600*1000; examObj.closed=false; }
+      else if(hours===0){ examObj.expireAt=now+100*365*24*3600*1000; }
       else { examObj.expireAt=now+hours*3600*1000; }
       list.push(examObj);
       DB.set(K.exams, list);
       // 用同一個號碼重開：清走該碼舊嘅進場／交卷鎖，等學生可以重新刷題；舊成績歷史保留
       const locks=getLocks(); clearLockCode(locks,code); DB.set(K.locks,locks);
-      toast(phoneOpen ? ('已生成考試碼 '+code+'（電話開放・長期有效，喺「進行中考試」關卷先停）') : ('已生成考試碼 '+code+'（'+hours+' 小時有效）'));
+      toast(phoneOpen ? ('已生成考試碼 '+code+'（電話開放・長期有效，喺「進行中考試」關卷先停）') : (hours===0 ? ('已生成考試碼 '+code+'（無限時間・直到關閉考場先停）') : ('已生成考試碼 '+code+'（'+hours+' 小時有效）')));
       renderSub('launch');
     };
   }
@@ -2172,8 +2299,14 @@ function renderSub(g){
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:10px">
         <div><label>開始日期時間</label><input type="datetime-local" id="A-from"></div>
         <div><label>結束日期時間</label><input type="datetime-local" id="A-to"></div>
+        <div><label>圖片篩選</label><select id="A-imgF" style="padding:7px 8px;border-radius:6px;border:1px solid var(--line)">
+          <option value="">全部（有冇圖片都計）</option>
+          <option value="1">有圖片作答</option>
+          <option value="0">冇圖片作答</option>
+        </select></div>
         <button class="btn secondary" id="A-filter">篩選時段</button>
-        <button class="btn" id="A-export">提取時段成績生成 X 檔</button>
+        <button class="btn" id="A-export">導出Excel（冇圖片）</button>
+        <button class="btn" id="A-exportImg">導出Excel（含圖片）</button>
       </div>
       <div class="grade-wrap"><div class="grade-list" id="A-tbody"></div></div>`;
     function renderTable(list){
@@ -2190,6 +2323,7 @@ function renderSub(g){
           : '—';
         const pct=a.pct!=null?a.pct:(a.totalScore?Math.round(a.score/a.totalScore*1000)/10:a.score100);
         const duration=esc(a.durationText||formatDuration(a.durationMs)||'—')+(a.durationHours!=null&&a.durationHours!==''?` · ${a.durationHours}小時`:'');
+        const imgQ=(a.detail||[]).filter(d=>d.type===5);
         return `<div class="grade-card">
           <div class="grade-row1">
             <div class="grade-main">(姓名:<b>${esc(a.name)}</b>) <span class="muted">${esc(a.className||'未編班')}</span><br><span style="font-size:12px">${esc(a.paperName)}</span></div>
@@ -2199,6 +2333,7 @@ function renderSub(g){
             </div>
           </div>
           <div class="grade-row2">${esc(dateStr)} ${esc(timeStr)}<div class="grade-wrong">${wrongTxt}</div></div>
+          ${imgQ.length?`<div style="margin-top:6px"><button class="btn secondary" style="width:auto;padding:4px 10px;margin:0;font-size:12px;color:#ea580c;border-color:#fdba74" data-grade-attempt="${ri}">📷 圖片作答評分（${imgQ.filter(d=>d.graded).length}/${imgQ.length}題已批改）</button><div id="gradeBox-${ri}" style="display:none;margin-top:8px"></div></div>`:''}
         </div>`;
       }).join('')||'<div class="muted">暫無成績</div>';
     }
@@ -2220,6 +2355,10 @@ function renderSub(g){
       const tsOf=a=>a.ts||parseZhDate(a.date);
       if(from){ const f=new Date(from).getTime(); list=list.filter(a=>{ const t=tsOf(a); return t!==null&&t>=f; }); }
       if(to){ const t=new Date(to).getTime(); list=list.filter(a=>{ const ts=tsOf(a); return ts!==null&&ts<=t; }); }
+      const imgF=document.getElementById('A-imgF').value;
+      const hasImg=a=>(a.detail||[]).some(d=>d.type===5&&d.userAnswer&&(d.userAnswer.img||d.userAnswer.imgS));
+      if(imgF==='1') list=list.filter(hasImg);
+      else if(imgF==='0') list=list.filter(a=>!hasImg(a));
       curList=list; renderTable(curList);
       document.querySelectorAll('[data-del-attempt]').forEach(b=>{
         b.onclick=()=>{
@@ -2235,11 +2374,41 @@ function renderSub(g){
           refreshTable();
         };
       });
+      document.querySelectorAll('[data-grade-attempt]').forEach(b=>{
+        b.onclick=()=>{
+          const idx=Number(b.dataset.gradeAttempt);
+          const a=curList[idx]; if(!a) return;
+          const box=document.getElementById('gradeBox-'+idx);
+          const show=box.style.display==='none';
+          box.style.display=show?'block':'none';
+          if(show) renderGradeBox(a, box, idx);
+        };
+      });
     }
     refreshTable();
     document.getElementById('A-filter').onclick=()=>{ refreshTable(); toast('已篩選 '+curList.length+' 筆'); };
     document.getElementById('A-export').onclick=()=>{
-      // 参考成绩表格式：次序列 + 每卷一对「錯題卷名N / 錯題N」，3卷6格、5卷10格
+      const rows1=buildRows1();
+      const rows2=buildRows2(false); // 冇圖片版：作答明細唔含圖片欄
+      const wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows1),'成績記錄');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows2),'作答明細');
+      const d=new Date();
+      XLSX.writeFile(wb,'電工答題成績(冇圖片)_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'.xlsx');
+      toast('已導出（冇圖片）'+curList.length+' 筆成績');
+    };
+    document.getElementById('A-exportImg').onclick=()=>{
+      const rows1=buildRows1();
+      const rows2=buildRows2(true); // 含圖片版：作答明細最後一欄「圖片作答」儲存每行圖片
+      const wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows1),'成績記錄');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows2),'作答明細');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[]]),'題庫');
+      const d=new Date();
+      XLSX.writeFile(wb,'電工答題成績(含圖片)_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'.xlsx');
+      toast('已導出（含圖片）'+curList.length+' 筆成績');
+    };
+    function buildRows1(){
       const rows1=curList.map(a=>{
         const groups={};
         (a.wrong||[]).forEach(w=>{ const pk=w.paper||'全部題庫'; (groups[pk]=groups[pk]||[]).push(w.orig||w.i); });
@@ -2247,7 +2416,7 @@ function renderSub(g){
         const row={
           日期:a.date,班次:a.className,姓名:a.name,卷名:a.paperName,
           得分:(a.pct!=null?a.pct:(a.totalScore?Math.round(a.score/a.totalScore*1000)/10:a.score100)),總分:100,正確率:a.score100+'%',
-          答對:(a.total-(a.wrong||[]).length)+'/'+a.total,
+          答對:(a.total-(a.wrong||[]).length-(Number(a.imgCount)||0))+'/'+Math.max(0,a.total-(Number(a.imgCount)||0)),
           次序:a.order||'',狀態:a.score100>=60?'合格':'不合格',
           用時:a.durationText||formatDuration(a.durationMs)||'',
           '用時(小時)':a.durationHours!=null&&a.durationHours!==''?a.durationHours:''
@@ -2258,17 +2427,73 @@ function renderSub(g){
         }
         return row;
       });
+      return rows1;
+    }
+    function buildRows2(withImg){
       const rows2=[];
-      curList.forEach(a=>(a.detail||[]).forEach((d,i)=>rows2.push({姓名:a.name,班次:a.className,原卷名:d.paper||'全部題庫',原始題號:d.orig||(i+1),本場題號:i+1,題型:TYPE_LABELS[d.type-1]||'',題目:d.question,得分:Number(d.score)||1,是否答對:d.ok?'啱':'錯',學生答案:JSON.stringify(d.userAnswer||''),正確答案:JSON.stringify(d.answer||d.parts||'')})));
-      const wb=XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows1),'成績記錄');
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows2),'作答明細');
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[]]),'題庫');
-      const d=new Date();
-      XLSX.writeFile(wb,'電工答題成績_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'.xlsx');
-      toast('已導出 '+curList.length+' 筆成績');
-    };
+      curList.forEach(a=>(a.detail||[]).forEach((d,i)=>{
+        if(d.type===5){
+          const ua=d.userAnswer||{};
+          const imgCell=(ua.imgS||ua.img||'').slice(0,32000); // Excel 格上限 32767 字元，截斷保護
+          rows2.push({姓名:a.name,班次:a.className,原卷名:d.paper||'全部題庫',原始題號:d.orig||(i+1),本場題號:i+1,題型:'圖片作答',題目:d.question,得分:Number(d.score)||1,是否答對:d.graded?('已批改 '+d.pct+'%・得 '+d.earned+'分'):'待批改',學生答案:withImg?'(圖片作答：見最後一欄)':'(圖片作答：喺系統睇圖)',正確答案:'—（由導師按圖片評分0-100%）',圖片作答:withImg?imgCell:''});
+          return;
+        }
+        rows2.push({姓名:a.name,班次:a.className,原卷名:d.paper||'全部題庫',原始題號:d.orig||(i+1),本場題號:i+1,題型:TYPE_LABELS[d.type-1]||'',題目:d.question,得分:Number(d.score)||1,是否答對:d.ok?'啱':'錯',學生答案:JSON.stringify(d.userAnswer||''),正確答案:JSON.stringify(d.answer||d.parts||''),圖片作答:''});
+      }));
+      return rows2;
+    }
   }
+  /* ===== 圖片作答評分（導師後台）===== */
+  function recomputeAttempt(a){
+    let got=0,tot=0,g=0,p=0;
+    (a.detail||[]).forEach(d=>{
+      const sc=Number(d.score)||0;
+      if(d.type===5){
+        if(d.graded){ got+=Number(d.earned)||0; tot+=sc; g++; }
+        else p++;
+      } else { tot+=sc; if(d.ok) got+=sc; }
+    });
+    a.score=Math.round(got*10)/10;
+    a.totalScore=Math.round(tot*10)/10;
+    a.score100=tot?Math.min(100,Math.round(got/tot*100)):0;
+    a.pct=tot?Math.min(100,Math.round(got/tot*1000)/10):0;
+    a.imgCount=Number(a.imgCount)||g+p;
+    return {g,p};
+  }
+  window.saveGrade=function(a, di, pctRaw){
+    if(!a) return;
+    const d=a.detail&&a.detail[di]; if(!d||d.type!==5){ toast('搵唔到嗰題'); return; }
+    const pct=Math.max(0,Math.min(100,Math.round(Number(pctRaw)||0)));
+    d.graded=true; d.pct=pct;
+    d.earned=Math.round(Number(d.score)*pct/100*10)/10;
+    d.ok=pct>=60;
+    recomputeAttempt(a);
+    const att=getAttempts();
+    const idx=att.findIndex(x=>x===a||(x&&x.ts===a.ts&&x.name===a.name&&x.paperName===a.paperName));
+    if(idx>=0){ att[idx]=a; DB.set(K.attempts,att); }
+    toast('已儲存圖片分：'+pct+'%（得 '+d.earned+' / '+d.score+' 分）');
+    renderSub('admin');
+  };
+  window.renderGradeBox=function(a, holder, ri){
+    const items=(a.detail||[]).map((d,di)=>({d,di})).filter(x=>x.d.type===5);
+    if(!items.length){ holder.innerHTML='<span class="muted">呢筆冇圖片作答題</span>'; return; }
+    window.__gradeA=a;
+    holder.innerHTML=items.map(({d,di})=>{
+      const ua=d.userAnswer||{};
+      const graded=!!d.graded;
+      return `<div style="padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#fff">
+        <div style="font-weight:700;font-size:13px">圖片作答題 ${di+1} ${graded?'<span class="tag ok">已批改 '+d.pct+'%・得 '+d.earned+'分</span>':'<span class="tag bad">未批改</span>'}</div>
+        <div class="muted" style="font-size:12px;margin:4px 0">${esc(d.question)}（原分 ${Number(d.score)||0} 分）</div>
+        <div style="text-align:center;margin:6px 0">${ua&&ua.img?`<img src="${esc(ua.img)}" style="max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--line);cursor:zoom-in" onclick="zoomImgAns(this)">`:'<span class="muted">學生未上載圖片</span>'}</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label style="font-size:13px;flex:0 0 auto">得分%</label>
+          <input type="number" min="0" max="100" step="1" value="${graded?d.pct:''}" placeholder="0-100" id="gPct-${ri}-${di}" style="flex:1;padding:7px;border:1px solid var(--line);border-radius:6px;font-size:14px">
+          <button class="btn" style="width:auto;padding:7px 16px;margin:0" onclick="saveGrade(window.__gradeA,${di},document.getElementById('gPct-${ri}-${di}').value)">儲存</button>
+        </div>
+        <div class="muted" style="font-size:12px;margin-top:4px">百分比 × 原分 = 得分（例如 80% × 10分 = 8分）</div>
+      </div>`;
+    }).join('')+'<button class="btn secondary" style="width:100%;margin-top:4px" onclick="renderSub(\'admin\')">完成，返去成績表</button>';
+  };
   if(g==='papers'){
     const papers=getPapers().slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'zh-Hans-CN'));
     el.innerHTML=subHead('考卷管理')+`
@@ -2563,7 +2788,9 @@ function renderSub(g){
         const isMix=q.type===4;
         // 如果 q.parts 為空（舊數據），根據 q.type 預設勾選
         let cbs;
-        if(q.parts&&q.parts.length>0){
+        if(q.type===5){
+          cbs=['img'];
+        } else if(q.parts&&q.parts.length>0){
           cbs=q.parts.filter(pt=>pt.visible!==false).map(pt=>pt.kind);
           // 確保根據 q.type 對應嘅 part 係 visible
           if(q.type===1&&!cbs.includes('single')) cbs.push('single');
@@ -2589,11 +2816,13 @@ function renderSub(g){
             <span class="muted">展開後可改題目、答案同選項</span>
             <button class="btn" style="width:auto;padding:4px 12px;margin:0;font-size:12px;background:#2563eb;color:#fff" onclick="saveQuestion(${p.id},${i})">儲存</button>
           </div>
+          ${q.type===5?'<div style="margin-bottom:8px;padding:8px 10px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;font-size:13px;color:#9a3412">圖片作答題：學生會影／傳／貼圖片作答；冇預設答案，導師喺「成績後台」撳「圖片作答評分」逐題改分（0-100%，百分比×呢度分數＝得分）。</div>':''}
           <div style="display:flex;gap:12px;font-size:13px;margin-bottom:8px;padding:6px;background:#f8fafc;border-radius:6px">
             <label><input type="checkbox" data-type-toggle="${i}" value="fill" ${chk('fill')}> 填寫(D)</label>
             <label><input type="checkbox" data-type-toggle="${i}" value="single" ${chk('single')}> 單選(E)</label>
             <label><input type="checkbox" data-type-toggle="${i}" value="multi" ${chk('multi')}> 多選(F)</label>
             <label><input type="checkbox" data-type-toggle="${i}" value="tf" ${chk('tf')}> 是非(G)</label>
+            <label><input type="checkbox" data-type-toggle="${i}" value="img" ${chk('img')}> 插圖(H)</label>
           </div>
           <label>題目內容</label>
           <div class="admin-imgbox" style="padding:8px;background:#f8fafc;margin-bottom:6px;min-height:40px">${renderOptContent(q.question)}</div>
@@ -2632,6 +2861,7 @@ function renderSub(g){
           <button class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:13px" onclick="addQuestion(${p.id},2)">＋多選</button>
           <button class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:13px" onclick="addQuestion(${p.id},3)">＋填寫/計算</button>
           <button class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:13px" onclick="addQuestion(${p.id},4)">＋混合題</button>
+          <button class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:13px;background:#ea580c;color:#fff" onclick="addQuestion(${p.id},5)">＋圖片作答</button>
         </div>
       </div>`;
       qArea.innerHTML=h;
@@ -2648,7 +2878,7 @@ function renderSub(g){
           const qi=Number(cb.dataset.typeToggle);
           const papers=getPapers();
           const pp=papers.find(x=>x.id===Number(pid)); const q=pp&&pp.questions[qi]; if(!q) return;
-          // 確保 parts 存在，並初始化所有四種 part
+          // 確保 parts 存在，並初始化所有四種 part（插圖題唔使 parts）
           if(!q.parts) q.parts=[];
           const kinds=['fill','single','multi','tf'];
           kinds.forEach(kind=>{
@@ -2665,6 +2895,14 @@ function renderSub(g){
           // checkbox 只係切換 visible 屬性，唔拆除唔改寫
           const marks=Array.from(qArea.querySelectorAll(`[data-type-toggle="${qi}"]:checked`)).map(c=>c.value);
           q.parts.forEach(pt=>{ pt.visible=marks.includes(pt.kind); });
+          // 點擊切換觸發：插圖(H)勾選＝圖片作答題型（type 5）；單一種＝單選/多選/填寫；多過一種＝混合
+          if(marks.includes('img')){
+            q.type=5;
+          } else {
+            const on=kinds.filter(k=>marks.includes(k));
+            if(on.length>1) q.type=4;
+            else if(on.length===1) q.type = on[0]==='single'?1 : on[0]==='multi'?2 : on[0]==='fill'?3 : 4;
+          }
           DB.set(K.papers,papers);
           renderQArea(pid);
         };
@@ -2678,6 +2916,7 @@ function renderSub(g){
         let q={question:'（新題目）', type, score:0, answer:[]};
         if(type===1||type===2){ q.options=['選項A','選項B','選項C','選項D']; q.answer=[0]; }
         else if(type===3){ q.answer=''; }
+        else if(type===5){ q.question='（圖片作答題）'; }
         else if(type===4){
           q.parts=[
             {kind:'single', options:['選項A','選項B','選項C','選項D'], answer:[0]},
@@ -2953,7 +3192,7 @@ function renderActiveExams(){
     const showN=drawN>0?drawN:poolN;
     const ordTxt=e.order==='rand'?'隨機出題':'順序出題';
     return `<div style="padding:8px;border-bottom:1px solid var(--line)">
-      <b>碼 ${e.code}</b> · ${esc(e.className)} · ${esc(pname)} · ${ordTxt} · ${showN}題 · ${e.phoneOpen?'<span class="tag" style="background:#ea580c;color:#fff">電話開放・無限刷</span> · <span style="color:#ea580c">長期開放（關卷先停）</span>':'剩餘 '+Math.max(0,Math.round((e.expireAt-Date.now())/3600000*10)/10)+'小時'}
+      <b>碼 ${e.code}</b> · ${esc(e.className)} · ${esc(pname)} · ${ordTxt} · ${showN}題 · ${e.phoneOpen?'<span class="tag" style="background:#ea580c;color:#fff">電話開放・無限刷</span> · <span style="color:#ea580c">長期開放（關卷先停）</span>':(e.unlimited?'<span style="color:#16a34a">無限時間（直到關閉考場）</span>':'剩餘 '+Math.max(0,Math.round((e.expireAt-Date.now())/3600000*10)/10)+'小時')}
       ${paperList}
       <div style="margin:6px 0;font-size:13px">
         <span style="color:#16a34a">已完成 ${done}</span> ·
