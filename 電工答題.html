@@ -2540,7 +2540,7 @@ function renderSub(g){
   }
   if(g==='import'){
     el.innerHTML=subHead('導入 X 檔題庫')+`
-      <p class="muted">揀標準考卷範本格式嘅 .xlsx（34欄：題型標記=1 先打開，AI 欄「多少分題」寫分數；「插圖題(1/0)」欄寫 1 就係圖片作答題）。導入後會存為一張考卷，老師開考時揀呢張卷。</p>
+      <p class="muted">揀標準考卷範本格式嘅 .xlsx（38欄，跟表頭自動對位：題型標記=1 先打開，「多少分題」欄寫分數；「插圖題(1/0)」欄寫 1 就係圖片作答題，支援 WPS 嵌入式圖片）。導入後會存為一張考卷，老師開考時揀呢張卷。</p>
       <input type="file" id="I-file" accept=".xlsx,.xls" style="margin:12px 0">
       <div style="margin:10px 0;font-size:13px">
         <label style="display:block;margin:4px 0;cursor:pointer"><input type="radio" name="I-mode" value="new" checked onchange="toggleImportMode()"> 新建文件檔（導入後建立一個新檔案）</label>
@@ -2606,11 +2606,21 @@ function renderSub(g){
             if(cellImgFile){
               const xml=await cellImgFile.async('string');
               console.log('cellimages.xml 內容:',xml);
-              // 解析 cellimages.xml
-              const re=/<cellImage[^>]*>\s*<name>([^<]+)<\/name>\s*<drawingR:id>([^<]+)<\/drawingR:id>/g;
-              let m;
+              // 解析 cellimages.xml（支援 WPS 格式：<xdr:cNvPr name="ID_XXX"/> + <a:blip r:embed="rIdN"/>，
+              // 以及舊格式 <name>ID</name><drawingR:id>rIdN</drawingR:id>）
               const idMap={};
-              while((m=re.exec(xml))!==null){ idMap[m[2]]=m[1]; }
+              const re=/<etc:cellImage>([\s\S]*?)<\/etc:cellImage>/g;
+              let m;
+              while((m=re.exec(xml))!==null){
+                const blk=m[1];
+                const nm=(blk.match(/<xdr:cNvPr[^>]*name="([^"]+)"/)||[])[1];
+                const rid=(blk.match(/r:embed="([^"]+)"/)||[])[1];
+                if(nm&&rid) idMap[rid]=nm;
+              }
+              if(!Object.keys(idMap).length){
+                const reOld=/<cellImage[^>]*>\s*<name>([^<]+)<\/name>\s*<drawingR:id>([^<]+)<\/drawingR:id>/g;
+                while((m=reOld.exec(xml))!==null){ idMap[m[2]]=m[1]; }
+              }
               console.log('idMap:',idMap);
               // 讀取 rels
               const relsFile=zip.file('xl/_rels/cellimages.xml.rels');
@@ -2622,7 +2632,7 @@ function renderSub(g){
                 while((r=re2.exec(rels))!==null){
                   const id=idMap[r[1]];
                   if(id){
-                    const imgPath='xl/'+r[2].replace(/^\//,'');
+                    const imgPath='xl/'+r[2].replace(/^\//,'').replace(/^\.\.\//,'');
                     const imgFile=zip.file(imgPath);
                     if(imgFile){
                       const blob=await imgFile.async('base64');
@@ -3385,7 +3395,7 @@ function exportPaperXlsx(){
     }
     return s;
   };
-  const headers=['序號','問題','填寫題','單選題','多選題','是非題','填寫題答案位內容',
+  const headers=['序號','問題','填寫題','單選題','多選題','是非題','插圖題(1/0)','填寫題答案位內容','',
     '單選題答案位A內容','單選題答案位B內容','單選題答案位C內容','單選題答案位D內容','單選題答案位E內容','單選題答案位F內容',
     '多選題答案位A內容','多選題答案位B內容','多選題答案位C內容','多選題答案位D內容','多選題答案位E內容','多選題答案位F內容',
     '填寫題答案位(學生)','單選題A(學生)','單選題B(學生)','單選題C(學生)','單選題D(學生)','單選題E(學生)','單選題F(學生)',
@@ -3393,47 +3403,48 @@ function exportPaperXlsx(){
     '是非題對(學生)','是非題錯(學生)','多少分題','插圖題(1/0)'];
   const rows=[headers];
   (p.questions||[]).forEach((q,idx)=>{
-    const row=new Array(36).fill('');
+    const row=new Array(38).fill('');
     row[0]=idx+1;
     row[1]=cleanText(q.question);
-    row[34]=q.score||'';
+    row[36]=q.score||'';
     if(q.type===5){
-      // 圖片作答題：插圖題=1 觸發
-      row[35]=1;
+      // 圖片作答題：插圖題=1 觸發（第7欄＋尾欄）
+      row[6]=1;
+      row[37]=1;
     }
     if(q.type===3){
       row[2]=1; // 填寫題
-      row[6]=cleanText(q.answer); // 填寫答案
+      row[7]=cleanText(q.answer); // 填寫答案
     } else if(q.type===1){
       row[3]=1; // 單選題
       const ans=q.answer||[];
-      (q.options||[]).forEach((op,i)=>{ row[7+i] = cleanText(op); });
-      for(let i=0;i<6;i++){ row[20+i] = ans.includes(i)?1:0; }
+      (q.options||[]).forEach((op,i)=>{ row[9+i] = cleanText(op); });
+      for(let i=0;i<6;i++){ row[22+i] = ans.includes(i)?1:0; }
     } else if(q.type===2){
       row[4]=1; // 多選題
       const ans=q.answer||[];
-      (q.options||[]).forEach((op,i)=>{ row[13+i] = cleanText(op); });
-      for(let i=0;i<6;i++){ row[26+i] = ans.includes(i)?1:0; }
+      (q.options||[]).forEach((op,i)=>{ row[15+i] = cleanText(op); });
+      for(let i=0;i<6;i++){ row[28+i] = ans.includes(i)?1:0; }
     } else if(q.type===4){
       // 混合題
       (q.parts||[]).forEach(pt=>{
         if(pt.kind==='fill'){
-          row[2]=1; row[6]=cleanText(pt.answer);
+          row[2]=1; row[7]=cleanText(pt.answer);
         } else if(pt.kind==='single'){
           row[3]=1;
           const ans=pt.answer||[];
-          (pt.options||[]).forEach((op,i)=>{ row[7+i] = cleanText(op); });
-          for(let i=0;i<6;i++){ row[20+i] = ans.includes(i)?1:0; }
+          (pt.options||[]).forEach((op,i)=>{ row[9+i] = cleanText(op); });
+          for(let i=0;i<6;i++){ row[22+i] = ans.includes(i)?1:0; }
         } else if(pt.kind==='multi'){
           row[4]=1;
           const ans=pt.answer||[];
-          (pt.options||[]).forEach((op,i)=>{ row[13+i] = cleanText(op); });
-          for(let i=0;i<6;i++){ row[26+i] = ans.includes(i)?1:0; }
+          (pt.options||[]).forEach((op,i)=>{ row[15+i] = cleanText(op); });
+          for(let i=0;i<6;i++){ row[28+i] = ans.includes(i)?1:0; }
         } else if(pt.kind==='tf'){
           row[5]=1;
           const ans=pt.answer||[];
-          row[32] = ans.includes(0)?1:0;
-          row[33] = ans.includes(1)?1:0;
+          row[34] = ans.includes(0)?1:0;
+          row[35] = ans.includes(1)?1:0;
         }
       });
     }
@@ -3534,17 +3545,29 @@ function togglePartMultiAnswer(pid, qi, pi, oi){
 function hasKW(h, kws){ return kws.some(k=>String(h).indexOf(k)>=0); }
 function detectColumns(rows){
   const first=rows[0]||[], joined=first.join('|');
-  if(hasKW(joined,['问题','問題']) && (hasKW(joined,['填写题','填寫題'])||hasKW(joined,['单选题','單選題'])||hasKW(joined,['是非题','是非題']))){
-    // 固定映射（跟標準考卷範本）
-    // B=問題, C=填寫題, D=單選題, E=多選題, F=是非題, G=填寫題答案
-    // H-M(8-13)=單選選項A-F, N-S(14-19)=多選選項A-F
-    // T(20)=填寫題學生答案, U-Z(21-26)=單選學生答案A-F, AA-AF(27-32)=多選學生答案A-F
-    // AG(33)=是非對, AH(34)=是非錯, AI(35)=多少分題, AJ(36)=插圖題(1/0)（圖片作答題觸發）
-    const singleOpt=[8,9,10,11,12,13];
-    const multiOpt=[14,15,16,17,18,19];
-    const singleStudent=[21,22,23,24,25,26];
-    const multiStudent=[27,28,29,30,31,32];
-    return {header:true, fmt:2, col:{question:2,fillMark:3,singleMark:4,multiMark:5,tfMark:6,fillAns:7,singleOpt,multiOpt,singleStudent,multiStudent,tfTrue:33,tfFalse:34,score:35,imgMark:36}};
+  if(hasKW(joined,['问题','問題']) && (hasKW(joined,['填写题','填寫題'])||hasKW(joined,['单选题','單選題'])||hasKW(joined,['是非题','是非題'])||hasKW(joined,['插圖題','插图题']))){
+    // 跟表頭自動對位（支援標準X檔：插圖題(1/0)喺第7欄＋尾欄、多少分題喺尾二）
+    const idx=name=>{ const i=first.findIndex(h=>String(h==null?'':h).trim()===name); return i>=0?i+1:0; };
+    const col={};
+    col.question=idx('問題');
+    col.fillMark=idx('填寫題');
+    col.singleMark=idx('單選題');
+    col.multiMark=idx('多選題');
+    col.tfMark=idx('是非題');
+    col.imgMark=idx('插圖題(1/0)')||idx('插圖題');
+    col.fillAns=idx('填寫題答案位內容');
+    col.fillStudent=idx('填寫題答案位(學生)');
+    col.singleOpt=[]; col.multiOpt=[]; col.singleStudent=[]; col.multiStudent=[];
+    for(const L of ['A','B','C','D','E','F']){
+      col.singleOpt.push(idx('單選題答案位'+L+'內容'));
+      col.multiOpt.push(idx('多選題答案位'+L+'內容'));
+      col.singleStudent.push(idx('單選題'+L+'(學生)'));
+      col.multiStudent.push(idx('多選題'+L+'(學生)'));
+    }
+    col.tfTrue=idx('是非題對(學生)');
+    col.tfFalse=idx('是非題錯(學生)');
+    col.score=idx('多少分題');
+    return {header:true, fmt:2, col};
   }
   return {header:false, fmt:0, col:{}};
 }
