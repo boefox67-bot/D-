@@ -133,6 +133,11 @@
         <label>選擇學生學號</label>
         <select id="in-nameSelect"><option value="-1">— 請揀學生學號 —</option></select>
         <input id="in-nameType" type="hidden">
+        <div id="in-phoneBox" style="display:none;margin-top:8px">
+          <label>輸入電話號碼（8或11位，可加 +852／+86／+853）</label>
+          <input id="in-examPhone" inputmode="tel" maxlength="16" placeholder="例如 66881234、+852 66881234、+86 13800138000" autocomplete="off" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px;font-size:14px">
+          <div class="muted" style="font-size:12px;margin-top:4px">電話開放考卷：入電話號碼就係身份・可無限刷題・直到老師關卷先停</div>
+        </div>
         <button class="btn" id="btn-enterStudent" style="margin-top:12px">進入考卷</button>
         <button class="btn secondary" id="btn-backCode" style="margin-top:8px;font-size:13px">改考試碼</button>
       </div>
@@ -839,12 +844,21 @@ document.getElementById('btn-start').onclick = async function(){
   }catch(e){}
   let exam=examByCode(code);
   if(!exam && cloudExams.length) exam=cloudExams.find(x=>String(x.code)===String(code) && x.expireAt>=Date.now());
-  if(!exam){ warnMsg('考試碼唔啱或者已過期'); return; }
+  if(!exam){
+    const closedOne=getExams().find(x=>String(x.code)===String(code) && x.closed);
+    if(closedOne){ warnMsg('考卷已關閉，唔可以再入場'); return; }
+    warnMsg('考試碼唔啱或者已過期'); return;
+  }
   if(DB.get(K.examOpen,'1')==='0'){ warnMsg('考場已關閉，請等候老師開啟考場'); return; }
   // 權威核對：直接用雲端考卷陣列計有效題數，避免本機列表異常誤判無效
   const findCloudPaper=id=>cloudPapers.find(p=>p.id===Number(id))||paperById(id);
   let availQ=0;
-  if(exam.paperIds&&exam.paperIds.length) exam.paperIds.forEach(pid=>{ const p=findCloudPaper(pid); if(p&&p.questions) availQ+=p.questions.length; });
+  if(exam.useAll){
+    cloudPapers.forEach(p=>{ if(p&&p.questions) availQ+=p.questions.length; });
+    getPapers().forEach(p=>{ if(p&&p.questions) availQ+=p.questions.length; });
+    availQ+=getQuestions().length;
+  }
+  else if(exam.paperIds&&exam.paperIds.length) exam.paperIds.forEach(pid=>{ const p=findCloudPaper(pid); if(p&&p.questions) availQ+=p.questions.length; });
   else if(exam.paperId){ const p=findCloudPaper(exam.paperId); if(p&&p.questions) availQ=p.questions.length; }
   if(!availQ){ warnMsg('呢場考試連結嘅考卷無效或者冇題目'); return; }
   pendingExam=exam;
@@ -854,7 +868,19 @@ document.getElementById('btn-start').onclick = async function(){
   const sel=document.getElementById('in-nameSelect');
   sel.innerHTML='<option value="-1">— 請揀學生學號 —</option>'+currentRoster.map((s,i)=>`<option value="${i}">[${esc(s.id||(i+1))}] ${esc(stuName(s))}</option>`).join('');
   document.getElementById('in-nameType').value='';
-  document.getElementById('home-exam-info').innerHTML=`考試碼 ${esc(code)} · ${esc(pendingPaperName(exam))}（${availQ}題）`;
+  // 電話開放考卷：唔使學號，改為直接入電話號碼
+  const pb=document.getElementById('in-phoneBox');
+  if(exam.phoneOpen){
+    sel.style.display='none';
+    sel.closest('label').style.display='none';
+    pb.style.display='block';
+    document.getElementById('in-examPhone').value='';
+  } else {
+    sel.style.display='';
+    if(sel.closest('label')) sel.closest('label').style.display='';
+    pb.style.display='none';
+  }
+  document.getElementById('home-exam-info').innerHTML=`考試碼 ${esc(code)} · ${esc(pendingPaperName(exam))}（${availQ}題）${exam.phoneOpen?'<br><span style="color:#ea580c">電話開放考卷：入電話號碼入場・無限刷題，關卷先停</span>':''}`;
   showHomeStep('student');
 };
 document.getElementById('in-nameSelect').onchange=()=>{
@@ -918,6 +944,18 @@ document.getElementById('btn-enterStudent').onclick=function(){
   const exam=pendingExam;
   if(!exam){ warnMsg('請先輸入並驗證考試碼'); showHomeStep('code'); return; }
   const code=String(exam.code);
+  // 電話開放考卷：電話號碼（8或11位，可加+852/+86/+853）即身份・無限刷・關卷先停
+  if(exam.phoneOpen){
+    if(exam.closed){ warnMsg('考卷已關閉，唔可以再入場'); return; }
+    const phone=document.getElementById('in-examPhone').value.trim();
+    const m=phone.replace(/\s+/g,'').replace(/^(\+?852)(\d+)$/,'852$2').replace(/^(\+?86)(\d+)$/,'86$2').replace(/^(\+?853)(\d+)$/,'853$2');
+    const ok852=/^852\d{8}$/.test(m), ok86=/^86\d{11}$/.test(m), ok853=/^853\d{8}$/.test(m);
+    if(!(ok852||ok86||ok853||/^\d{8}$/.test(m)||/^\d{11}$/.test(m))){ warnMsg('電話號碼要 8 或 11 位數字，可加 +852／+86／+853 國家前綴'); return; }
+    DB.set(K.curExam, exam);
+    DB.set(K.userName, m);
+    startQuiz(exam, m, m);
+    return;
+  }
   const si=Number(document.getElementById('in-nameSelect').value);
   const name=document.getElementById('in-nameType').value.trim();
   if(si<0 || !name){ warnMsg('請先選擇學生學號'); return; }
@@ -967,13 +1005,13 @@ bindLongPress(document.getElementById('link-teacher'), ()=>go('teacher'), 3000);
 let QZ = null; // { exam, name, list, answers, idx }
 window.addEventListener('beforeunload', saveDraft);
 function startQuiz(exam, name, key){
-  const isOpen=(exam&&exam.openBook)===true;
+  const isOpen=(exam&&(exam.openBook||exam.phoneOpen))===true;
   const saved=loadDraft(name,exam.code,key);
   let list, answers, idx, startAt;
   if(saved){
     list=saved.list; answers=saved.answers; idx=Math.min(saved.idx||0,list.length-1); startAt=saved.startAt||Date.now();
   } else {
-    list=isOpen ? buildOpenBookList() : buildQuizList(exam);
+    list=(exam.openBook||(exam.phoneOpen&&exam.useAll)) ? buildOpenBookList() : buildQuizList(exam);
     if(!list.length){ toast('呢場考卷無效或者冇題目'); return; }
     answers=list.map(()=>null); idx=0; startAt=Date.now();
   }
@@ -1000,7 +1038,8 @@ function startQuiz(exam, name, key){
     },12000);
   }
   let pname='全部題庫';
-  if(isOpen){ pname='開卷練習・全部題庫'; }
+  if(exam.openBook){ pname='開卷練習・全部題庫'; }
+  else if(exam.phoneOpen){ pname='電話開放・無限刷'; }
   else if(exam.paperIds&&exam.paperIds.length>1) pname='混合卷（'+exam.paperIds.length+'張）';
   else if(exam.paperId){ const p=paperById(exam.paperId); pname=p?p.name:'考卷'; }
   document.getElementById('quiz-paperName').textContent=pname;
@@ -1221,12 +1260,12 @@ document.getElementById('btn-submit').onclick=()=>{
     }
     if(empty) untouched.push(i+1);
   });
-  let msg = QZ.exam.openBook ? '確認完成本次開卷練習？成績會記錄喺後台，但唔會鎖名，可以無限次再刷' : '確認交卷？交卷後個名會鎖死，唔可以再入本卷';
+  let msg = QZ.exam.openBook ? '確認完成本次開卷練習？成績會記錄喺後台，但唔會鎖名，可以無限次再刷' : QZ.exam.phoneOpen ? '確認交卷？成績會記錄喺後台・可以無限次再刷（關卷後唔可以再入）' : '確認交卷？交卷後個名會鎖死，唔可以再入本卷';
   if(untouched.length) msg='⚠ 未作答題號：'+untouched.join('、')+'\n\n'+msg;
   if(!confirm(msg)) return;
   const {exam, name}=QZ;
-  // 檢查考試碼仲存在（後台可能已關閉考場）；開卷練習唔受限制
-  if(!exam.openBook && !examByCode(exam.code)){ alert('呢場考試已被老師關閉，唔可以交卷'); go('home'); return; }
+  // 檢查考試碼仲存在（後台可能已關閉考場）；開卷／電話開放練習唔受限制
+  if(!(exam.openBook||exam.phoneOpen) && !examByCode(exam.code)){ alert('呢場考試已被老師關閉，唔可以交卷'); go('home'); return; }
   let totalScore=0, gotScore=0, wrongIdx=[];
   list.forEach((q,i)=>{
     const sc=Number(q.score)||1; totalScore+=sc;
@@ -1235,6 +1274,7 @@ document.getElementById('btn-submit').onclick=()=>{
   });
   let pn='全部題庫';
   if(exam.openBook){ pn='開卷練習（全部題庫）'; }
+  else if(exam.phoneOpen){ pn='電話開放（無限刷）'; }
   else if(exam.paperIds&&exam.paperIds.length>1) pn='混合卷（'+exam.paperIds.length+'張）';
   else if(exam.paperId){ const p=paperById(exam.paperId); pn=p?p.name:'考卷#'+exam.paperId; }
   const attempt={
@@ -1251,21 +1291,22 @@ document.getElementById('btn-submit').onclick=()=>{
     durationHours:durationHours(Date.now()-QZ.startAt),
     wrong:wrongIdx,
     openBook:!!exam.openBook,
+    phoneOpen:!!exam.phoneOpen,
     detail:list.map((q,i)=>({question:q.question,type:q.type,parts:q.parts||null,options:q.options,answer:q.answer,score:Number(q.score)||0,orig:q._orig,paper:q._paper,ok:isCorrect(q,answers[i]),userAnswer:answers[i]}))
   };
   const key=QZ.key||QZ.name; // 序號綁定：記錄跟序號
   attempt.stuId = key;
   const att=getAttempts(); att.push(attempt); DB.set(K.attempts, att);
   DB.set(K.lastAttempt, attempt);
-  if(exam.openBook){ window._lastOpen={exam, name, key}; }
-  // 開卷練習唔鎖名（唔寫 submitted 鎖），學生隨時可以再入無限刷
-  if(!exam.openBook){
+  if(exam.openBook||exam.phoneOpen){ window._lastOpen={exam, name, key}; }
+  // 開卷／電話開放練習唔鎖名（唔寫 submitted 鎖），學生隨時可以再入無限刷
+  if(!(exam.openBook||exam.phoneOpen)){
     const L=getLocks();
     if(key!==QZ.name && !L[key] && L[QZ.name]){ L[key]=L[QZ.name]; delete L[QZ.name]; }
     const rec=lockRec(L,key,QZ.name); rec.code=exam.code; rec.state='submitted'; rec.at=Date.now(); rec.history[exam.code]='submitted'; L[key]=rec; DB.set(K.locks,L);
   }
   clearDraft(QZ.name,exam.code,key);
-  if(!exam.openBook) sessClear(exam,name);
+  if(!(exam.openBook||exam.phoneOpen)) sessClear(exam,name);
   if(window._kickT){ clearInterval(window._kickT); window._kickT=null; }
   DB.remove(K.curExam);
   showResult(attempt);
@@ -1275,7 +1316,7 @@ function showResult(a){
   // 開卷練習：成績頁提供「再刷一轉」即時重新開始（無限次）
   const againBtn=document.getElementById('btn-again');
   if(againBtn){
-    againBtn.style.display = a.openBook?'block':'none';
+    againBtn.style.display = (a.openBook||a.phoneOpen)?'block':'none';
     againBtn.onclick=()=>{ const e=window._lastOpen; if(e&&e.exam) startQuiz(e.exam, e.name, e.key); };
   }
   document.getElementById('result-score').textContent=a.score+' / '+a.totalScore;
@@ -1482,25 +1523,49 @@ function saveBrandText(){
 }
 // 底部獨立 Logo（學生界面下方）：老師後台獨立改寫
 let _newFootLogo='';
+function loadFootLogoDataUrl(dataUrl){
+  const img=new Image();
+  img.onload=()=>{
+    const c=document.createElement('canvas');
+    const max=400;
+    let w=img.width,h=img.height;
+    if(w>max){ h=Math.round(h*max/w); w=max; }
+    c.width=w;c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    _newFootLogo=c.toDataURL('image/png');
+    const pv=document.getElementById('FootLg-preview');
+    if(pv) pv.src=_newFootLogo;
+    toast('已載入新底部 Logo，撳「儲存底部 Logo」生效');
+  };
+  img.src=dataUrl;
+}
 function onFootLogoFile(input){
   const f=input.files[0]; if(!f) return;
   const rd=new FileReader();
-  rd.onload=e=>{
-    const img=new Image();
-    img.onload=()=>{
-      const c=document.createElement('canvas');
-      const max=400;
-      let w=img.width,h=img.height;
-      if(w>max){ h=Math.round(h*max/w); w=max; }
-      c.width=w;c.height=h;
-      c.getContext('2d').drawImage(img,0,0,w,h);
-      _newFootLogo=c.toDataURL('image/png');
-      const pv=document.getElementById('FootLg-preview');
-      if(pv) pv.src=_newFootLogo;
-      toast('已載入新底部 Logo，撳「儲存底部 Logo」生效');
-    };
-    img.src=e.target.result;
-  };
+  rd.onload=e=>loadFootLogoDataUrl(e.target.result);
+  rd.readAsDataURL(f);
+}
+// 貼圖：Ctrl+V 直接貼上（入圖位）
+function onFootLogoPaste(e){
+  const it=(e.clipboardData||window.clipboardData||{items:[]}).items;
+  for(let i=0;i<it.length;i++){
+    if(it[i].type.indexOf('image')===0){
+      const f=it[i].getAsFile(); if(!f) continue;
+      const rd=new FileReader();
+      rd.onload=ev=>loadFootLogoDataUrl(ev.target.result);
+      rd.readAsDataURL(f);
+      return;
+    }
+  }
+  toast('剪貼簿入面冇圖片，先複製圖片再貼');
+}
+// 拖圖入入圖位
+function onFootLogoDrop(e){
+  e.preventDefault();
+  const f=e.dataTransfer&&e.dataTransfer.files[0];
+  if(!f||f.type.indexOf('image')!==0){ toast('請拖入圖片檔案'); return; }
+  const rd=new FileReader();
+  rd.onload=ev=>loadFootLogoDataUrl(ev.target.result);
   rd.readAsDataURL(f);
 }
 function saveFootLogo(){
@@ -1694,8 +1759,9 @@ function renderSub(g){
           <img id="FootLg-preview" src="" style="max-width:260px;max-height:130px;background:#fff;border-radius:10px;padding:8px;border:1px solid var(--line)" alt="底部 Logo">
           <div class="muted" style="font-size:12px">目前底部 Logo 預覽</div>
         </div>
-        <div style="margin-top:10px"><label>揀新圖（PNG／JPG）</label></div>
+        <div style="margin-top:10px"><label>揀新圖（PNG／JPG），或者直接貼圖</label></div>
         <input type="file" id="FootLg-file" accept="image/*" onchange="onFootLogoFile(this)" style="margin:8px 0">
+        <div id="FootLg-zone" onclick="document.getElementById('FootLg-file').click()" onpaste="onFootLogoPaste(event)" ondragover="event.preventDefault()" ondrop="onFootLogoDrop(event)" title="Ctrl+V 貼上，或者拖圖片入嚟，或者撳一下揀檔案" style="padding:14px;border:2px dashed #ea580c;border-radius:10px;text-align:center;font-size:13px;color:#ea580c;background:#fff7ed;cursor:pointer">貼圖／拖圖入呢個入圖位（Ctrl+V 直接貼上），或者撳呢度揀檔案</div>
         <button class="btn" onclick="saveFootLogo()">儲存底部 Logo</button>
         <button class="btn secondary" onclick="resetFootLogo()" style="margin-top:8px">還原預設 Logo</button>
       </div>
@@ -1730,6 +1796,11 @@ function renderSub(g){
       <div style="max-height:140px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px">
         <label class="L-opt" style="font-size:13px;cursor:pointer"><input type="checkbox" class="L-pchk" value="0"> 全部題庫（${getQuestions().length}題）</label>
         ${paperBoxes}
+      </div>
+      <label>入場方式</label>
+      <div style="font-size:13px">
+        <label class="L-opt" style="cursor:pointer"><input type="radio" name="L-mode" value="fixed" checked> 固定學生（舊規矩：揀學號・交卷鎖名）</label>
+        <label class="L-opt" style="margin-left:12px;cursor:pointer"><input type="radio" name="L-mode" value="phone"> 只要電話（電話號碼即身份・無限刷題・關卷先停）</label>
       </div>
       <label>出題順序</label>
       <div style="font-size:13px">
@@ -1776,17 +1847,25 @@ function renderSub(g){
       const drawCount=Math.max(0,Number(document.getElementById('L-count').value)||0);
       // 只認有效考卷：計總題數
       let pool=0;
-      if(useAll){ pool=getQuestions().length; }
+      if(useAll){
+        papers.forEach(p=>{ if(p&&p.questions) pool+=p.questions.length; });
+        pool+=getQuestions().length;
+      }
       else { paperIds.forEach(pid=>{ const p=paperById(pid); if(p&&p.questions) pool+=p.questions.length; }); }
       if(pool<=0){ toast('揀嘅考卷無效或者冇題目'); return; }
       if(drawCount>pool){ toast('抽題數量多過總題數（'+pool+'題）'); return; }
       const now=Date.now();
+      const mode=(document.querySelector('input[name="L-mode"]:checked')||{}).value||'fixed';
+      const phoneOpen=mode==='phone';
       const list=getExams().filter(e=>!(e.code===code));
-      list.push({code,paperId:paperIds[0]||0,paperIds,useAll,order,drawCount,durationMin:hours*60,className,launchedAt:now,expireAt:now+hours*3600*1000});
+      const examObj={code,paperId:paperIds[0]||0,paperIds,useAll,order,drawCount,durationMin:hours*60,className,launchedAt:now};
+      if(phoneOpen){ examObj.phoneOpen=true; examObj.expireAt=now+30*24*3600*1000; examObj.closed=false; }
+      else { examObj.expireAt=now+hours*3600*1000; }
+      list.push(examObj);
       DB.set(K.exams, list);
       // 用同一個號碼重開：清走該碼舊嘅進場／交卷鎖，等學生可以重新刷題；舊成績歷史保留
       const locks=getLocks(); clearLockCode(locks,code); DB.set(K.locks,locks);
-      toast('已生成考試碼 '+code+'（'+hours+' 小時有效）');
+      toast(phoneOpen ? ('已生成考試碼 '+code+'（電話開放・長期有效，喺「進行中考試」關卷先停）') : ('已生成考試碼 '+code+'（'+hours+' 小時有效）'));
       renderSub('launch');
     };
   }
@@ -2697,7 +2776,7 @@ function renderActiveExams(){
     const showN=drawN>0?drawN:poolN;
     const ordTxt=e.order==='rand'?'隨機出題':'順序出題';
     return `<div style="padding:8px;border-bottom:1px solid var(--line)">
-      <b>碼 ${e.code}</b> · ${esc(e.className)} · ${esc(pname)} · ${ordTxt} · ${showN}題 · 剩餘 ${Math.max(0,Math.round((e.expireAt-Date.now())/3600000*10)/10)}小時
+      <b>碼 ${e.code}</b> · ${esc(e.className)} · ${esc(pname)} · ${ordTxt} · ${showN}題 · ${e.phoneOpen?'<span class="tag" style="background:#ea580c;color:#fff">電話開放・無限刷</span> · <span style="color:#ea580c">長期開放（關卷先停）</span>':'剩餘 '+Math.max(0,Math.round((e.expireAt-Date.now())/3600000*10)/10)+'小時'}
       ${paperList}
       <div style="margin:6px 0;font-size:13px">
         <span style="color:#16a34a">已完成 ${done}</span> ·
@@ -2705,11 +2784,18 @@ function renderActiveExams(){
         <span class="muted">未開始 ${todo}</span> · 共 ${names.length} 人
       </div>
       <div style="margin:6px 0;line-height:2">${chips||'<span class="muted">名單為空</span>'}</div>
-      <button class="btn danger" style="margin-top:6px;padding:8px" onclick="endExam('${e.code}')">結束呢場考試</button></div>`;
+      <button class="btn danger" style="margin-top:6px;padding:8px" onclick="endExam('${e.code}')">${e.phoneOpen?'關閉呢場考卷（唔可以再入・唔可以再刷）':'結束呢場考試'}</button></div>`;
   }).join('') : '<span class="muted">冇進行中考試</span>';
 }
 function delPaper(id){ if(!confirm('確認拆除呢張卷？'))return; DB.set(K.papers, getPapers().filter(p=>p.id!==id)); renderSub('papers'); }
-function endExam(code){ DB.set(K.exams, getExams().filter(e=>e.code!==code)); const locks=getLocks(); clearLockCode(locks,code); DB.set(K.locks,locks); renderSub('launch'); }
+function endExam(code){
+  const list=getExams().map(e=>{
+    if(e.code===code){ e.closed=true; e.expireAt=Date.now()-1; }
+    return e;
+  });
+  DB.set(K.exams, list);
+  const locks=getLocks(); clearLockCode(locks,code); DB.set(K.locks,locks); renderSub('launch');
+}
 function editPaperQScore(pid, i, v){
   if(!confirm('確定要儲存呢項分數修改？')) return;
   const papers=getPapers();
