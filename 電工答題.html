@@ -3436,20 +3436,15 @@ function saveQuestion(pid, i){
     });
   }
   DB.set(K.papers,papers);
-  // 記住邊份卷同邊題展開，避免跳返第一份卷第一題
+  // 記住邊份卷同邊題展開
   window._qFold=window._qFold||{};
   window._qFold[pid+'|'+i]=true;
-  window._lastPid=Number(pid);
   const savedY=window.scrollY;
   toast('第'+(i+1)+'題已儲存');
-  renderSub('questions');
-  // 還原：揀返原本份考卷 + 捲動位置 + 展開原本題目
-  requestAnimationFrame(()=>{
-    const sel=document.getElementById('Q-paperSel');
-    if(sel&&window._lastPid){ sel.value=window._lastPid; renderQArea(window._lastPid); }
-    window.scrollTo(0,savedY);
-    setTimeout(bindAllQImg,50);
-  });
+  // 唔好成頁 renderSub，直接刷新題目區，保留 dropdown 同捲動位置
+  renderQArea(pid);
+  window.scrollTo(0,savedY);
+  setTimeout(bindAllQImg,50);
 }
 function delQuestion(pid, qi){
   const papers=getPapers();
