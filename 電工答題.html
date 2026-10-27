@@ -89,7 +89,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   #quiz-card > *:not(.wm),.wm-zone > *:not(.wm){position:relative;z-index:1}
   .wm-zone{position:relative;overflow:hidden}
   .wm{position:absolute;inset:-24px;z-index:0;opacity:.10;pointer-events:none;transform:rotate(-18deg);display:flex;flex-wrap:wrap;align-content:space-around;justify-content:space-around;gap:28px 46px;overflow:hidden;color:#0f172a;font-weight:700;font-size:14px;line-height:1.4;white-space:nowrap;background-repeat:repeat;background-size:92px 104px;background-position:center}
-  .content-img{display:inline-block;max-width:min(100%,260px);max-height:2.2em;height:auto;margin:0 2px;vertical-align:middle;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+  .content-img{display:inline-block;max-width:min(100%,260px);height:auto;margin:0 2px;vertical-align:middle;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+  .content-img-S{height:2em}
+  .content-img-M{height:4.5em}
+  .content-img-L{height:9em}
   .admin-imgbox{padding:10px;overflow-x:auto;overflow-y:hidden;background:#fff;border:1px solid var(--line);border-radius:8px;margin:6px 0}
   .admin-imgbox .content-img{max-width:100%;max-height:260px}  details.qfold{background:#fff;border-radius:10px}
   details.qfold[open]{box-shadow:0 1px 4px rgba(18,38,68,.08)}
@@ -545,8 +548,11 @@ function getVersion(){ return DB.get(K.ver, '4.9'); }
 function renderOptContent(text){
   if(!text) return '（空）';
   let s=String(text);
-  // Markdown 圖片 ![圖片](url)
-  s=s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img class="content-img" src="$2" alt="$1">');
+  // Markdown 圖片 ![圖片](url|size) size=S/M/L
+  s=s.replace(/!\[([^\]]*)\]\(([^)|]+)(?:\|([SML]))?\)/g, function(m,alt,url,sz){
+    const h = sz==='L' ? '9em' : sz==='M' ? '4.5em' : '2em';
+    return '<img class="content-img content-img-'+(sz||'S')+'" style="height:'+h+'" src="'+url+'" alt="'+alt+'" data-size="'+(sz||'S')+'">';
+  });
   // DISPIMG 公式 =DISPIMG("ID_xxx",1)
   const m=s.match(/^=DISPIMG\(["']([^"']+)["']/);
   if(m){
@@ -2840,7 +2846,7 @@ function renderSub(g){
         ta.selectionStart=ta.selectionEnd=start+imgTag.length;
         // 即時更新預覽
         const pv=document.getElementById('q_preview_'+qi);
-        if(pv) pv.innerHTML=renderOptContent(ta.value);
+        if(pv){ pv.innerHTML=renderOptContent(ta.value); bindImgResize(pid,qi); }
         // 即時儲存（唔彈 confirm）
         const papers=getPapers();
         const p=papers.find(x=>x.id===Number(pid));
@@ -2852,6 +2858,46 @@ function renderSub(g){
       };
       img.src=dataUrl;
     }
+    // Admin 預覽：撃圖切換大小 S→M→L
+    window.bindAllQImg=function(){
+      const papers=getPapers();
+      papers.forEach(function(p){
+        (p.questions||[]).forEach(function(q,i){
+          bindImgResize(p.id,i);
+        });
+      });
+    };
+    window.bindImgResize=function(pid,qi){
+      const pv=document.getElementById('q_preview_'+qi);
+      if(!pv) return;
+      const imgs=pv.querySelectorAll('img.content-img');
+      imgs.forEach(function(im,idx){
+        im.style.cursor='pointer';
+        im.title='撃切換大小';
+        im.onclick=function(){
+          const cur=im.getAttribute('data-size')||'S';
+          const next=cur==='S'?'M':cur==='M'?'L':'S';
+          const ta=document.getElementById('q_text_'+qi);
+          if(!ta) return;
+          // 搵返對應嘅 markdown 並替換 size
+          let v=ta.value;
+          // 搵呢張圖嘅 dataURL（src）
+          const src=im.getAttribute('src');
+          // 原有 ![圖片](src 或 ![圖片](src|S/M/L)
+          const re=new RegExp('!\\[[^\\]]*\\]\\('+src.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?:\\|[SML])?\\)');
+          if(re.test(v)){
+            v=v.replace(re,'![圖片]('+src+'|'+next+')');
+          }
+          ta.value=v;
+          pv.innerHTML=renderOptContent(v);
+          bindImgResize(pid,qi);
+          const papers=getPapers();
+          const p=papers.find(x=>x.id===Number(pid));
+          if(p&&p.questions[qi]){ p.questions[qi].question=v; DB.set(K.papers,papers); }
+          toast('圖片大小：'+(next==='S'?'細':next==='M'?'中':'大'));
+        };
+      });
+    };
     window.readQImage=function(input,pid,qi){
       const f=input.files[0]; if(!f) return;
       const rd=new FileReader();
@@ -3078,7 +3124,8 @@ function renderSub(g){
     };
     if(papers.length>0){
       renderQArea(papers[0].id);
-      document.getElementById('Q-paperSel').onchange=e=>renderQArea(e.target.value);
+      document.getElementById('Q-paperSel').onchange=e=>{renderQArea(e.target.value); setTimeout(bindAllQImg,100);};
+      setTimeout(bindAllQImg,100);
     }
   }
   if(g==='cloud'){
@@ -3385,7 +3432,7 @@ function saveQuestion(pid, i){
   const savedY=window.scrollY;
   toast('第'+(i+1)+'題已儲存');
   renderSub('questions');
-  requestAnimationFrame(()=>window.scrollTo(0,savedY));
+  requestAnimationFrame(()=>{window.scrollTo(0,savedY); setTimeout(bindAllQImg,50);});
 }
 function delQuestion(pid, qi){
   const papers=getPapers();
