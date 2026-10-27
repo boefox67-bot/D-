@@ -2637,9 +2637,26 @@ function renderSub(g){
   if(g==='papers'){
     const papers=getPapers().slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'zh-Hans-CN'));
     el.innerHTML=subHead('考卷管理')+`
-      <div>${papers.map(p=>`<div style="padding:12px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px">
+      <p class="muted" style="font-size:12px;margin-bottom:8px">💡 拖拉卡片可以排序，次序會同步到出卷揀卷同改卷頁面</p>
+      <div id="paper-list">${papers.map((p,idx)=>`<div draggable="true" data-pid="${p.id}" style="padding:12px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;cursor:grab;user-select:none">
+        <span style="display:inline-block;color:#94a3b8;margin-right:8px">⋮⋮</span>
         <b>${esc(p.name)}</b> <span class="muted">（${p.questions.length} 題）</span>
-        <button class="btn danger" style="margin-top:8px" onclick="delPaper(${p.id})">拆除呢張卷</button></div>`).join('')||'<span class="muted">未導入考卷</span>'}</div>`;
+        <span style="float:right">
+          <button class="btn secondary" style="width:auto;padding:3px 8px;font-size:12px;margin-left:4px" onclick="movePaper(${p.id},-1)">↑</button>
+          <button class="btn secondary" style="width:auto;padding:3px 8px;font-size:12px;margin-left:4px" onclick="movePaper(${p.id},1)">↓</button>
+          <button class="btn danger" style="width:auto;padding:3px 8px;font-size:12px;margin-left:4px" onclick="delPaper(${p.id})">拆除</button>
+        </span></div>`).join('')||'<span class="muted">未導入考卷</span>'}</div>`;
+    // 拖放排序
+    const listEl=document.getElementById('paper-list');
+    if(listEl){
+      let dragId=null;
+      listEl.querySelectorAll('[draggable]').forEach(el=>{
+        el.ondragstart=e=>{ dragId=Number(el.dataset.pid); el.style.opacity='0.4'; };
+        el.ondragend=()=>{ el.style.opacity='1'; };
+        el.ondragover=e=>{ e.preventDefault(); };
+        el.ondrop=e=>{ e.preventDefault(); if(!dragId) return; const dropId=Number(el.dataset.pid); if(dragId===dropId) return; reorderPapers(dragId,dropId); };
+      });
+    }
   }
   if(g==='import'){
     el.innerHTML=subHead('導入 X 檔題庫')+`
@@ -3435,6 +3452,26 @@ function renderActiveExams(){
   }).join('') : '<span class="muted">冇進行中考試</span>';
 }
 function delPaper(id){ if(!confirm('確認拆除呢張卷？'))return; DB.set(K.papers, getPapers().filter(p=>p.id!==id)); renderSub('papers'); }
+function reorderPapers(dragId,dropId){
+  const ps=getPapers();
+  const di=ps.findIndex(p=>p.id===dragId);
+  const pi=ps.findIndex(p=>p.id===dropId);
+  if(di<0||pi<0) return;
+  const [item]=ps.splice(di,1);
+  ps.splice(pi,0,item);
+  DB.set(K.papers,ps);
+  toast('已排序');
+  renderSub('papers');
+}
+function movePaper(id,dir){
+  const ps=getPapers();
+  const i=ps.findIndex(p=>p.id===id);
+  const j=i+dir;
+  if(i<0||j<0||j>=ps.length) return;
+  [ps[i],ps[j]]=[ps[j],ps[i]];
+  DB.set(K.papers,ps);
+  renderSub('papers');
+}
 function endExam(code){
   const list=getExams().map(e=>{
     if(e.code===code){ e.closed=true; e.expireAt=Date.now()-1; }
