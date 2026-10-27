@@ -89,10 +89,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   #quiz-card > *:not(.wm),.wm-zone > *:not(.wm){position:relative;z-index:1}
   .wm-zone{position:relative;overflow:hidden}
   .wm{position:absolute;inset:-24px;z-index:0;opacity:.10;pointer-events:none;transform:rotate(-18deg);display:flex;flex-wrap:wrap;align-content:space-around;justify-content:space-around;gap:28px 46px;overflow:hidden;color:#0f172a;font-weight:700;font-size:14px;line-height:1.4;white-space:nowrap;background-repeat:repeat;background-size:92px 104px;background-position:center}
-  .content-img{display:block;max-width:min(100%,260px);max-height:220px;height:auto;margin:8px 0;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  .content-img{display:inline-block;max-width:min(100%,260px);max-height:2.2em;height:auto;margin:0 2px;vertical-align:middle;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
   .admin-imgbox{padding:10px;overflow-x:auto;overflow-y:hidden;background:#fff;border:1px solid var(--line);border-radius:8px;margin:6px 0}
-  .admin-imgbox .content-img{max-width:100%;max-height:260px}
-  details.qfold{background:#fff;border-radius:10px}
+  .admin-imgbox .content-img{max-width:100%;max-height:260px}  details.qfold{background:#fff;border-radius:10px}
   details.qfold[open]{box-shadow:0 1px 4px rgba(18,38,68,.08)}
   details.qfold summary::-webkit-details-marker{color:var(--blue)}
   .calc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
@@ -2816,29 +2815,68 @@ function renderSub(g){
     window.insertQImage=function(pid,qi){
       document.getElementById('q_img_'+qi).click();
     };
+    // 共用：壓縮圖片並插入到 textarea 游標位置，即時更新預覽
+    function insertImageAtCursor(pid, qi, dataUrl){
+      const img=new Image();
+      img.onload=()=>{
+        const canvas=document.createElement('canvas');
+        const maxW=300;
+        const ratio=Math.min(1, maxW/img.width);
+        canvas.width=img.width*ratio;
+        canvas.height=img.height*ratio;
+        const ctx=canvas.getContext('2d');
+        ctx.drawImage(img,0,0,canvas.width,canvas.height);
+        const compressed=canvas.toDataURL('image/jpeg',0.7);
+        const imgTag='![圖片]('+compressed+')';
+        const ta=document.getElementById('q_text_'+qi);
+        if(!ta) return;
+        // 插入到游標位置
+        const start=ta.selectionStart||ta.value.length;
+        const end=ta.selectionEnd||ta.value.length;
+        const before=ta.value.substring(0,start);
+        const after=ta.value.substring(end);
+        ta.value=before+imgTag+after;
+        // 游標移到圖後
+        ta.selectionStart=ta.selectionEnd=start+imgTag.length;
+        // 即時更新預覽
+        const pv=document.getElementById('q_preview_'+qi);
+        if(pv) pv.innerHTML=renderOptContent(ta.value);
+        // 即時儲存（唔彈 confirm）
+        const papers=getPapers();
+        const p=papers.find(x=>x.id===Number(pid));
+        if(p&&p.questions[qi]){
+          p.questions[qi].question=ta.value;
+          DB.set(K.papers,papers);
+          toast('圖片已插入題目');
+        }
+      };
+      img.src=dataUrl;
+    }
     window.readQImage=function(input,pid,qi){
       const f=input.files[0]; if(!f) return;
       const rd=new FileReader();
-      rd.onload=e=>{
-        // 壓縮圖片到 300px 寬，JPEG 0.7 質量
-        const img=new Image();
-        img.onload=()=>{
-          const canvas=document.createElement('canvas');
-          const maxW=300;
-          const ratio=Math.min(1, maxW/img.width);
-          canvas.width=img.width*ratio;
-          canvas.height=img.height*ratio;
-          const ctx=canvas.getContext('2d');
-          ctx.drawImage(img,0,0,canvas.width,canvas.height);
-          const compressed=canvas.toDataURL('image/jpeg',0.7);
-          const imgTag='![圖片]('+compressed+')';
-          const ta=document.getElementById('q_text_'+qi);
-          ta.value=ta.value? ta.value+' '+imgTag : imgTag;
-          editQText(pid,qi,ta.value);
-        };
-        img.src=e.target.result;
-      };
+      rd.onload=e=>insertImageAtCursor(pid,qi,e.target.result);
       rd.readAsDataURL(f);
+    };
+    window.pasteQImage=function(pid,qi){
+      openPastePanel(function(dataUrl){
+        insertImageAtCursor(pid,qi,dataUrl);
+      });
+    };
+    // 直接 Ctrl+V 喺題目 textarea 貼截圖
+    window.handleQTextPaste=function(e,pid,qi){
+      const items=(e.clipboardData||window.clipboardData||{items:[]}).items;
+      for(let i=0;i<items.length;i++){
+        if(items[i].type.indexOf('image')===0){
+          e.preventDefault();
+          const f=items[i].getAsFile(); if(!f) continue;
+          const rd=new FileReader();
+          rd.onload=ev=>insertImageAtCursor(pid,qi,ev.target.result);
+          rd.readAsDataURL(f);
+          return;
+        }
+      }
+      // 冇圖片就照原樣貼文字
     };
     function partBlock(pid,qi,pi,pt){
       let h=`<div style="margin:8px 0;padding:10px;border:1px dashed var(--line);border-radius:8px;background:#fafbfd">
@@ -2931,9 +2969,10 @@ function renderSub(g){
             <label><input type="checkbox" data-type-toggle="${i}" value="img" ${chk('img')}> 插圖(H)</label>
           </div>
           <label>題目內容</label>
-          <div class="admin-imgbox" style="padding:8px;background:#f8fafc;margin-bottom:6px;min-height:40px">${renderOptContent(q.question)}</div>
-          <textarea id="q_text_${i}" style="width:100%;padding:8px;min-height:60px" onchange="editQText(${p.id},${i},this.value)">${esc(q.question)}</textarea>
+          <div class="admin-imgbox" id="q_preview_${i}" style="padding:8px;background:#f8fafc;margin-bottom:6px;min-height:40px">${renderOptContent(q.question)}</div>
+          <textarea id="q_text_${i}" style="width:100%;padding:8px;min-height:60px" onchange="editQText(${p.id},${i},this.value)" onpaste="handleQTextPaste(event,${p.id},${i})">${esc(q.question)}</textarea>
           <button class="btn secondary" style="width:auto;padding:2px 8px;margin-top:4px;font-size:11px" onclick="insertQImage(${p.id},${i})">＋插入圖片</button>
+          <button class="btn secondary" style="width:auto;padding:2px 8px;margin-top:4px;font-size:11px;border:1.5px dashed #94a3b8" onclick="pasteQImage(${p.id},${i})">📋 長按貼圖</button>
           <input type="file" id="q_img_${i}" accept="image/*" style="display:none" onchange="readQImage(this,${p.id},${i})">`;
         // 渲染 visible parts（混合題模式）
         const visibleParts=(q.parts||[]).map((pt,idx)=>({pt,idx})).filter(x=>x.pt.visible!==false);
@@ -3340,8 +3379,13 @@ function saveQuestion(pid, i){
     });
   }
   DB.set(K.papers,papers);
+  // 記住捲動位置同展開狀態，避免跳返第一頁
+  window._qFold=window._qFold||{};
+  window._qFold[pid+'|'+i]=true;
+  const savedY=window.scrollY;
   toast('第'+(i+1)+'題已儲存');
   renderSub('questions');
+  requestAnimationFrame(()=>window.scrollTo(0,savedY));
 }
 function delQuestion(pid, qi){
   const papers=getPapers();
