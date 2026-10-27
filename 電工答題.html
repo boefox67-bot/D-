@@ -2214,6 +2214,10 @@ function renderSub(g){
     el.innerHTML=subHead('發起考試碼')+`
       <label>揀班次</label><select id="L-cls">${cls.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
       <label>揀考卷（可多張混合；唔勾選＝全部題庫）</label>
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <button type="button" class="btn secondary" style="width:auto;padding:3px 10px;font-size:12px" onclick="sortPapersAndRerender('asc')">號碼細→大</button>
+        <button type="button" class="btn secondary" style="width:auto;padding:3px 10px;font-size:12px" onclick="sortPapersAndRerender('desc')">號碼大→細</button>
+      </div>
       <div style="max-height:140px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px">
         <label class="L-opt" style="font-size:13px;cursor:pointer"><input type="checkbox" class="L-pchk" value="0"> 全部題庫（${getQuestions().length}題）</label>
         ${paperBoxes}
@@ -2637,15 +2641,18 @@ function renderSub(g){
   if(g==='papers'){
     const papers=getPapers().slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'zh-Hans-CN'));
     el.innerHTML=subHead('考卷管理')+`
-      <p class="muted" style="font-size:12px;margin-bottom:8px">💡 拖拉卡片可以排序，次序會同步到出卷揀卷同改卷頁面</p>
+      <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
+        <span class="muted" style="font-size:12px">排序：</span>
+        <button class="btn secondary" style="width:auto;padding:5px 12px;font-size:13px" onclick="sortPapers('asc')">① 號碼細→大</button>
+        <button class="btn secondary" style="width:auto;padding:5px 12px;font-size:13px" onclick="sortPapers('desc')">② 號碼大→細</button>
+        <span class="muted" style="font-size:12px;margin-left:8px">或拖拉卡片自訂次序</span>
+      </div>
       <div id="paper-list">${papers.map((p,idx)=>`<div draggable="true" data-pid="${p.id}" style="padding:12px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;cursor:grab;user-select:none">
         <span style="display:inline-block;color:#94a3b8;margin-right:8px">⋮⋮</span>
         <b>${esc(p.name)}</b> <span class="muted">（${p.questions.length} 題）</span>
-        <span style="float:right">
-          <button class="btn secondary" style="width:auto;padding:3px 8px;font-size:12px;margin-left:4px" onclick="movePaper(${p.id},-1)">↑</button>
-          <button class="btn secondary" style="width:auto;padding:3px 8px;font-size:12px;margin-left:4px" onclick="movePaper(${p.id},1)">↓</button>
-          <button class="btn danger" style="width:auto;padding:3px 8px;font-size:12px;margin-left:4px" onclick="delPaper(${p.id})">拆除</button>
-        </span></div>`).join('')||'<span class="muted">未導入考卷</span>'}</div>`;
+        <button class="btn danger" style="width:auto;padding:3px 8px;font-size:12px;float:right" onclick="delPaper(${p.id})">拆除</button>
+        <span style="float:right;margin-right:8px;color:#94a3b8;font-size:12px">#${p.id}</span>
+      </div>`).join('')||'<span class="muted">未導入考卷</span>'}</div>`;
     // 拖放排序
     const listEl=document.getElementById('paper-list');
     if(listEl){
@@ -3463,14 +3470,19 @@ function reorderPapers(dragId,dropId){
   toast('已排序');
   renderSub('papers');
 }
-function movePaper(id,dir){
+function sortPapers(dir){
   const ps=getPapers();
-  const i=ps.findIndex(p=>p.id===id);
-  const j=i+dir;
-  if(i<0||j<0||j>=ps.length) return;
-  [ps[i],ps[j]]=[ps[j],ps[i]];
+  ps.sort((a,b)=>dir==='asc'?Number(a.id)-Number(b.id):Number(b.id)-Number(a.id));
   DB.set(K.papers,ps);
+  toast(dir==='asc'?'已按號碼細→大排序':'已按號碼大→細排序');
   renderSub('papers');
+}
+function sortPapersAndRerender(dir){
+  const ps=getPapers();
+  ps.sort((a,b)=>dir==='asc'?Number(a.id)-Number(b.id):Number(b.id)-Number(a.id));
+  DB.set(K.papers,ps);
+  toast(dir==='asc'?'已按號碼細→大排序':'已按號碼大→細排序');
+  renderSub('launch');
 }
 function endExam(code){
   const list=getExams().map(e=>{
