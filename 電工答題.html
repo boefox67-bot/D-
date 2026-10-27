@@ -2447,6 +2447,7 @@ function renderSub(g){
           <option value="1">有圖片作答</option>
           <option value="0">冇圖片作答</option>
         </select></div>
+        <div><label>關鍵字搵人</label><input type="text" id="A-kw" placeholder="學生名/卷名/題目" style="padding:7px 10px;border-radius:6px;border:1px solid var(--line);width:200px"></div>
         <button class="btn secondary" id="A-filter">篩選時段</button>
         <button class="btn" id="A-export">導出Excel（冇圖片）</button>
         <button class="btn" id="A-exportImg">導出Excel（含圖片）</button>
@@ -2502,6 +2503,14 @@ function renderSub(g){
       const hasImg=a=>(a.detail||[]).some(d=>d.type===5&&d.userAnswer&&(d.userAnswer.img||d.userAnswer.imgS));
       if(imgF==='1') list=list.filter(hasImg);
       else if(imgF==='0') list=list.filter(a=>!hasImg(a));
+      // 關鍵字搜尋：學生名、班別、卷名、日期
+      const kw=(document.getElementById('A-kw').value||'').trim().toLowerCase();
+      if(kw){
+        list=list.filter(a=>{
+          const hay=[a.name,a.className,a.paperName,a.date].join(' ').toLowerCase();
+          return hay.indexOf(kw)>=0;
+        });
+      }
       curList=list; renderTable(curList);
       document.querySelectorAll('[data-del-attempt]').forEach(b=>{
         b.onclick=()=>{
@@ -2530,6 +2539,7 @@ function renderSub(g){
     }
     refreshTable();
     document.getElementById('A-filter').onclick=()=>{ refreshTable(); toast('已篩選 '+curList.length+' 筆'); };
+    document.getElementById('A-kw').oninput=()=>{ refreshTable(); };
     document.getElementById('A-export').onclick=()=>{
       try{
         const rows1=buildRows1();
