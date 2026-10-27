@@ -794,11 +794,13 @@ function saveDraft(){
   all[dk]={name:QZ.name, key:QZ.key||'', code:QZ.exam.code, exam:QZ.exam, list:QZ.list, answers:QZ.answers, idx:QZ.idx, startAt:QZ.startAt};
   DB.set(K.draft,all);
 }
-function loadDraft(name,code,key){
+function loadDraft(name,code,key,curSession){
   const all=getDrafts();
   const dk = draftKey(key || name, code);
   const d = all[dk] || all[draftKey(name,code)] || null;
   if(!d||d.name!==name||String(d.code)!==String(code)) return null;
+  // 場次唔同就唔載舊草稿（新場全新開始）
+  if(curSession && d.exam && Number(d.exam.session) !== Number(curSession)) return null;
   if(!Array.isArray(d.list)||!Array.isArray(d.answers)) return null;
   return d;
 }
@@ -1146,7 +1148,7 @@ let QZ = null; // { exam, name, list, answers, idx }
 window.addEventListener('beforeunload', saveDraft);
 function startQuiz(exam, name, key){
   const isOpen=(exam&&(exam.openBook||exam.phoneOpen))===true;
-  const saved=loadDraft(name,exam.code,key);
+  const saved=loadDraft(name,exam.code,key,exam.session);
   let list, answers, idx, startAt;
   if(saved){
     list=saved.list; answers=saved.answers; idx=Math.min(saved.idx||0,list.length-1); startAt=saved.startAt||Date.now();
@@ -1172,6 +1174,19 @@ function startQuiz(exam, name, key){
           QZ=null;
           if(window._kickT){ clearInterval(window._kickT); window._kickT=null; }
           alert('考場已被老師清空，你已退出考場（作答草稿已保留）');
+          go('home');
+          return;
+        }
+        // 偵測考場場次變咗（admin 重開咗新場）→ 自動踢出去重新入新場
+        const cloudExams=toArr(await Cloud.raw('exams','GET'));
+        const curEx=cloudExams.find(x=>String(x.code)===String(exam.code) && x.expireAt>=Date.now());
+        if(curEx && Number(curEx.session)!==Number(exam.session)){
+          const nm=name;
+          sessClear(exam,nm);
+          kickClearLock(QZ.key||nm, exam.code);
+          QZ=null;
+          if(window._kickT){ clearInterval(window._kickT); window._kickT=null; }
+          alert('考場已開新場次，請重新輸入考試碼入場');
           go('home');
         }
       }catch(e){}
