@@ -2444,18 +2444,42 @@ function renderSub(g){
     }
     el.innerHTML=subHead('圖片作答批改')+`
       <p class="muted" style="margin-bottom:10px;font-size:13px">未批改卷（導師未改分）＝左欄；改好分嘅卷＝右欄。覺得邊份卷嘅分唔啱，喺右欄撳「重新改分」搵返出嚟改就得。</p>
+      <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
+        <input type="text" id="IG-kw" placeholder="🔍 搵學生名/班別/卷名..." style="padding:8px 12px;border-radius:6px;border:1px solid var(--line);width:260px">
+        <span class="muted" style="font-size:12px">輸入即時篩選</span>
+      </div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
         <div style="flex:1;min-width:280px">
-          <div class="card" style="padding:12px"><h3 style="font-size:15px;color:#ea580c">⏳ 未批改（${pending.length}份）</h3>
-            <div>${pending.map(a=>igCard(a,withImg.indexOf(a),'批改')).join('')||'<div class="muted">冇未批改嘅圖片作答卷 🎉</div>'}</div>
+          <div class="card" style="padding:12px"><h3 style="font-size:15px;color:#ea580c">⏳ 未批改（<span id="IG-pendingN">${pending.length}</span>份）</h3>
+            <div id="IG-pendingList">${pending.map(a=>igCard(a,withImg.indexOf(a),'批改')).join('')||'<div class="muted">冇未批改嘅圖片作答卷 🎉</div>'}</div>
           </div>
         </div>
         <div style="flex:1;min-width:280px">
-          <div class="card" style="padding:12px"><h3 style="font-size:15px;color:#16a34a">✅ 已批改（${done.length}份）</h3>
-            <div>${done.map(a=>igCard(a,withImg.indexOf(a),'重新改分')).join('')||'<div class="muted">（仲未有改好分嘅卷）</div>'}</div>
+          <div class="card" style="padding:12px"><h3 style="font-size:15px;color:#16a34a">✅ 已批改（<span id="IG-doneN">${done.length}</span>份）</h3>
+            <div id="IG-doneList">${done.map(a=>igCard(a,withImg.indexOf(a),'重新改分')).join('')||'<div class="muted">（仲未有改好分嘅卷）</div>'}</div>
           </div>
         </div>
       </div>`;
+    // 關鍵字篩選
+    document.getElementById('IG-kw').oninput=function(){
+      const kw=this.value.trim().toLowerCase();
+      const match=a=>{ if(!kw) return true; const hay=(a.name+' '+(a.className||'')+' '+(a.paperName||'')).toLowerCase(); return hay.includes(kw); };
+      const pList=pending.filter(match), dList=done.filter(match);
+      document.getElementById('IG-pendingN').textContent=pList.length;
+      document.getElementById('IG-doneN').textContent=dList.length;
+      document.getElementById('IG-pendingList').innerHTML=pList.map(a=>igCard(a,withImg.indexOf(a),'批改')).join('')||'<div class="muted">冇符合</div>';
+      document.getElementById('IG-doneList').innerHTML=dList.map(a=>igCard(a,withImg.indexOf(a),'重新改分')).join('')||'<div class="muted">冇符合</div>';
+      document.querySelectorAll('[data-ig-card]').forEach(b=>{
+        b.onclick=()=>{
+          const gi=Number(b.dataset.igCard);
+          const a=window.__igAttempts[gi]; if(!a) return;
+          const box=document.getElementById('igBox-'+gi);
+          const show=box.style.display==='none';
+          box.style.display=show?'block':'none';
+          if(show) renderGradeBox(a, box, gi);
+        };
+      });
+    };
     el.querySelectorAll('[data-ig-card]').forEach(b=>{
       b.onclick=()=>{
         const gi=Number(b.dataset.igCard);
