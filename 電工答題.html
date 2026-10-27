@@ -2663,19 +2663,31 @@ function renderSub(g){
   }
   /* ===== 圖片作答評分（全局，見上方）===== */
   if(g==='papers'){
-    const papers=getPapers();
+    const allPapers=getPapers();
+    // 排序狀態：window._paperSort = {key:'name'|'id'|'count', dir:1|-1}
+    if(!window._paperSort) window._paperSort={key:'id',dir:1};
+    const ps=[...allPapers].sort((a,b)=>{
+      const k=window._paperSort.key;
+      let va,vb;
+      if(k==='name'){ va=String(a.name||''); vb=String(b.name||''); return va.localeCompare(vb,'zh-Hans-CN')*window._paperSort.dir; }
+      if(k==='count'){ va=(a.questions||[]).length; vb=(b.questions||[]).length; return (va-vb)*window._paperSort.dir; }
+      // id = 修改日期（新卷ID大）
+      va=Number(a.id); vb=Number(b.id); return (va-vb)*window._paperSort.dir;
+    });
+    const arrow=k=>window._paperSort.key===k?(window._paperSort.dir===1?' ▲':' ▼'):'';
     el.innerHTML=subHead('考卷管理')+`
-      <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
-        <span class="muted" style="font-size:12px">排序：</span>
-        <button class="btn secondary" style="width:auto;padding:5px 12px;font-size:13px" onclick="sortPapers('asc')">① 號碼細→大</button>
-        <button class="btn secondary" style="width:auto;padding:5px 12px;font-size:13px" onclick="sortPapers('desc')">② 號碼大→細</button>
-        <span class="muted" style="font-size:12px;margin-left:8px">或拖拉卡片自訂次序</span>
+      <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid var(--line);padding-bottom:6px;align-items:center">
+        <button onclick="togglePaperSort('name')" style="flex:2;text-align:left;background:none;border:none;cursor:pointer;font-size:13px;font-weight:600;color:#334155;padding:4px">考卷名稱${arrow('name')}</button>
+        <button onclick="togglePaperSort('id')" style="flex:1;text-align:center;background:none;border:none;cursor:pointer;font-size:13px;font-weight:600;color:#334155;padding:4px">修改日期${arrow('id')}</button>
+        <button onclick="togglePaperSort('count')" style="flex:1;text-align:center;background:none;border:none;cursor:pointer;font-size:13px;font-weight:600;color:#334155;padding:4px">題數${arrow('count')}</button>
+        <span style="flex:0 0 40px"></span>
       </div>
-      <div id="paper-list">${papers.map((p,idx)=>`<div draggable="true" data-pid="${p.id}" style="padding:12px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;cursor:grab;user-select:none">
-        <span style="display:inline-block;color:#94a3b8;margin-right:8px">⋮⋮</span>
-        <b>${esc(p.name)}</b> <span class="muted">（${p.questions.length} 題）</span>
-        <button class="btn danger" style="width:auto;padding:3px 8px;font-size:12px;float:right" onclick="delPaper(${p.id})">拆除</button>
-        <span style="float:right;margin-right:8px;color:#94a3b8;font-size:12px">#${p.id}</span>
+      <div id="paper-list">${ps.map(p=>`<div draggable="true" data-pid="${p.id}" style="padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;cursor:grab;user-select:none;display:flex;align-items:center">
+        <span style="display:inline-block;color:#94a3b8;margin-right:8px;flex:0 0 auto">⋮⋮</span>
+        <b style="flex:2">${esc(p.name)}</b>
+        <span class="muted" style="flex:1;text-align:center;font-size:12px">#${p.id}</span>
+        <span class="muted" style="flex:1;text-align:center;font-size:12px">${(p.questions||[]).length}題</span>
+        <button class="btn danger" style="width:auto;padding:3px 8px;font-size:12px;flex:0 0 auto;margin-left:8px" onclick="delPaper(${p.id})">拆除</button>
       </div>`).join('')||'<span class="muted">未導入考卷</span>'}</div>`;
     // 拖放排序
     const listEl=document.getElementById('paper-list');
@@ -3499,6 +3511,12 @@ function sortPapers(dir){
   ps.sort((a,b)=>dir==='asc'?Number(a.id)-Number(b.id):Number(b.id)-Number(a.id));
   DB.set(K.papers,ps);
   toast(dir==='asc'?'已按號碼細→大排序':'已按號碼大→細排序');
+  renderSub('papers');
+}
+function togglePaperSort(key){
+  if(!window._paperSort) window._paperSort={key:'id',dir:1};
+  if(window._paperSort.key===key){ window._paperSort.dir*=-1; }
+  else { window._paperSort={key:key,dir:1}; }
   renderSub('papers');
 }
 function sortPapersAndRerender(dir){
