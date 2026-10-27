@@ -2266,14 +2266,21 @@ function renderSub(g){
       const mode=(document.querySelector('input[name="L-mode"]:checked')||{}).value||'fixed';
       const phoneOpen=mode==='phone';
       const list=getExams().filter(e=>!(e.code===code));
-      const examObj={code,paperId:paperIds[0]||0,paperIds,useAll,order,drawCount,durationMin:hours*60,className,launchedAt:now,unlimited:hours===0};
+      // 場次編號：搵返過往同碼嘅場次，遞增
+      const oldSessions=getExams().filter(e=>String(e.code)===String(code)).map(e=>Number(e.session)||0);
+      const session=(oldSessions.length?Math.max(...oldSessions):0)+1;
+      const examObj={code,session,paperId:paperIds[0]||0,paperIds,useAll,order,drawCount,durationMin:hours*60,className,launchedAt:now,unlimited:hours===0};
       if(phoneOpen){ examObj.phoneOpen=true; examObj.expireAt=now+30*24*3600*1000; examObj.closed=false; }
       else if(hours===0){ examObj.expireAt=now+100*365*24*3600*1000; }
       else { examObj.expireAt=now+hours*3600*1000; }
       list.push(examObj);
       DB.set(K.exams, list);
-      // 用同一個號碼重開：清走該碼舊嘅進場／交卷鎖，等學生可以重新刷題；舊成績歷史保留
+      // 用同一個號碼重開：清走該碼舊嘅進場／交卷鎖，同埋晒舊草稿，等學生全新開始；舊成績歷史保留
       const locks=getLocks(); clearLockCode(locks,code); DB.set(K.locks,locks);
+      // 清晒該考碼嘅草稿（舊答案），新場全新開始
+      const allD=getDrafts();
+      Object.keys(allD).forEach(k=>{ if(k.endsWith('__'+String(code))) delete allD[k]; });
+      DB.set(K.drafts, allD);
       toast(phoneOpen ? ('已生成考試碼 '+code+'（電話開放・長期有效，喺「進行中考試」關卷先停）') : (hours===0 ? ('已生成考試碼 '+code+'（無限時間・直到關閉考場先停）') : ('已生成考試碼 '+code+'（'+hours+' 小時有效）')));
       renderSub('launch');
     };
@@ -3401,7 +3408,7 @@ function renderActiveExams(){
     const showN=drawN>0?drawN:poolN;
     const ordTxt=e.order==='rand'?'隨機出題':'順序出題';
     return `<div style="padding:8px;border-bottom:1px solid var(--line)">
-      <b>碼 ${e.code}</b> · ${esc(e.className)} · ${esc(pname)} · ${ordTxt} · ${showN}題 · ${e.phoneOpen?'<span class="tag" style="background:#ea580c;color:#fff">電話開放・無限刷</span> · <span style="color:#ea580c">長期開放（關卷先停）</span>':(e.unlimited?'<span style="color:#16a34a">無限時間（直到關閉考場）</span>':'剩餘 '+Math.max(0,Math.round((e.expireAt-Date.now())/3600000*10)/10)+'小時')}
+      <b>碼 ${e.code}${e.session?' · 第'+e.session+'場':''}</b> · ${esc(e.className)} · ${esc(pname)} · ${ordTxt} · ${showN}題 · ${e.phoneOpen?'<span class="tag" style="background:#ea580c;color:#fff">電話開放・無限刷</span> · <span style="color:#ea580c">長期開放（關卷先停）</span>':(e.unlimited?'<span style="color:#16a34a">無限時間（直到關閉考場）</span>':'剩餘 '+Math.max(0,Math.round((e.expireAt-Date.now())/3600000*10)/10)+'小時')}
       ${paperList}
       <div style="margin:6px 0;font-size:13px">
         <span style="color:#16a34a">已完成 ${done}</span> ·
