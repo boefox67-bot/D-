@@ -2663,7 +2663,7 @@ function renderSub(g){
   }
   /* ===== 圖片作答評分（全局，見上方）===== */
   if(g==='papers'){
-    const papers=getPapers().slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'zh-Hans-CN'));
+    const papers=getPapers();
     el.innerHTML=subHead('考卷管理')+`
       <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
         <span class="muted" style="font-size:12px">排序：</span>
