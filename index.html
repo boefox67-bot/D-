@@ -2175,6 +2175,7 @@ function renderSub(g){
   if(!g){ el.innerHTML='<div class="card"><p class="muted">揀上面功能開始。</p></div>'; return; }
   if(g==='logo'){
     el.innerHTML=subHead('刷新界面 Logo')+`
+      <p class="muted" style="font-size:12px;margin-bottom:10px">💾 3 個 Logo 檔案放喺 <code>D:\BB\水印+Logo</code>（主 Logo／水印 Logo／底部 Logo）</p>
       <div class="card" style="padding:16px">
         <p class="muted" style="margin-bottom:10px">撳下面按鈕，所有界面嘅 Logo（首頁／答題頁／成績頁／水印）會即時刷新到最新位置。</p>
         <button class="btn" onclick="refreshBrandLogo()">刷新界面 Logo 位置</button>
@@ -2361,11 +2362,14 @@ function renderSub(g){
   if(g==='classes'){
     const cls=getClasses(), sts=getStudents();
     el.innerHTML=subHead('學生管理（班次加減）')+`
-      <div style="display:flex;gap:8px;margin-bottom:12px">
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+        <select id="C-expCls" style="padding:5px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--text)"><option value="">全部班次</option>${cls.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select>
         <button class="btn secondary" style="width:auto;padding:5px 12px;font-size:13px" onclick="exportStudents()">📥 匯出名單CSV</button>
+        <select id="C-impCls" style="padding:5px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--text)"><option value="">照CSV班別</option>${cls.map(c=>`<option value="${esc(c)}">入去「${esc(c)}」</option>`).join('')}</select>
         <button class="btn secondary" style="width:auto;padding:5px 12px;font-size:13px" onclick="document.getElementById('C-impFile').click()">📤 匯入名單CSV</button>
         <input type="file" id="C-impFile" accept=".csv" style="display:none" onchange="importStudents(this)">
       </div>
+      <p class="muted" style="font-size:12px;margin:0 0 8px">💾 匯入／匯出嘅 CSV 放喺 <code>D:\BB\班加學生</code></p>
       <label>現有班次（撳改名變確定，直接同步雲端）</label>
       <div id="C-clsList">${cls.map((c,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid var(--line)"><span id="C-cls-name-${i}">${esc(c)}</span><span style="display:flex;gap:6px"><button class="btn secondary" style="width:auto;padding:4px 12px;margin:0;font-size:13px" id="C-cls-rn-${i}" onclick="startRenameCls(${i})">改名</button><button class="btn danger" style="width:auto;padding:4px 12px;margin:0;font-size:13px" data-delcls="${esc(c)}">拆除</button></span></div>`).join('')||'<span class="muted">暫無班次</span>'}</div>
       <label>加新班次名</label>
@@ -2568,6 +2572,7 @@ function renderSub(g){
         <button class="btn" id="A-export">導出Excel（冇圖片）</button>
         <button class="btn" id="A-exportImg">導出Excel（含圖片）</button>
       </div>
+      <p class="muted" style="font-size:12px;margin:0 0 8px">💾 導出嘅成績 Excel 放喺 <code>D:\BB\分數</code></p>
       <div class="grade-wrap"><div class="grade-list" id="A-tbody"></div></div>`;
     function renderTable(list){
       document.getElementById('A-tbody').innerHTML=list.map((a,ri)=>{
@@ -2747,7 +2752,15 @@ function renderSub(g){
         <span class="muted" style="flex:1;text-align:center;font-size:12px">#${p.id}</span>
         <span class="muted" style="flex:1;text-align:center;font-size:12px">${(p.questions||[]).length}題</span>
         <button class="btn danger" style="width:auto;padding:3px 8px;font-size:12px;flex:0 0 auto;margin-left:8px" onclick="delPaper(${p.id})">拆除</button>
-      </div>`).join('')||'<span class="muted">未導入考卷</span>'}</div>`;
+      </div>`).join('')||'<span class="muted">未導入考卷</span>'}</div>
+      <div style="margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:10px">
+        <b style="font-size:14px">匯出考卷</b>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center">
+          <select id="P-expSel" style="padding:5px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--text)"><option value="">全部考卷</option>${ps.map(p=>`<option value="${p.id}">${esc(p.name)}（${(p.questions||[]).length}題）</option>`).join('')}</select>
+          <select id="P-expImg" style="padding:5px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--text)"><option value="noimg">冇圖（淨文字）</option><option value="withimg">有圖（連圖）</option></select>
+          <button class="btn" style="padding:5px 14px" onclick="exportPapers()">📥 匯出</button>
+        </div>
+      </div>`;
     // 拖放排序
     const listEl=document.getElementById('paper-list');
     if(listEl){
@@ -2763,6 +2776,7 @@ function renderSub(g){
   if(g==='import'){
     el.innerHTML=subHead('導入 X 檔題庫')+`
       <p class="muted">揀標準考卷範本格式嘅 .xlsx（38欄，跟表頭自動對位：題型標記=1 先打開，「多少分題」欄寫分數；「插圖題(1/0)」欄寫 1 就係圖片作答題，支援 WPS 嵌入式圖片）。導入後會存為一張考卷，老師開考時揀呢張卷。</p>
+      <p class="muted" style="font-size:12px">💾 要匯入嘅 X 檔放喺 <code>D:\BB\考卷</code></p>
       <input type="file" id="I-file" accept=".xlsx,.xls" style="margin:12px 0">
       <div style="margin:10px 0;font-size:13px">
         <label style="display:block;margin:4px 0;cursor:pointer"><input type="radio" name="I-mode" value="new" checked onchange="toggleImportMode()"> 新建文件檔（導入後建立一個新檔案）</label>
@@ -3629,6 +3643,30 @@ function renderActiveExams(){
   }).join('') : '<span class="muted">冇進行中考試</span>';
 }
 function delPaper(id){ if(!confirm('確認拆除呢張卷？'))return; DB.set(K.papers, getPapers().filter(p=>p.id!==id)); renderSub('papers'); }
+function stripImgsDeep(o){
+  if(typeof o==='string') return o.replace(/!\[[^\]]*\]\(data:[^)]*\)/g,'');
+  if(Array.isArray(o)) return o.map(stripImgsDeep);
+  if(o&&typeof o==='object'){ const r={}; for(const k in o){ r[k]=stripImgsDeep(o[k]); } return r; }
+  return o;
+}
+function exportPapers(){
+  const sel=document.getElementById('P-expSel');
+  const want=sel?sel.value:'';
+  const imgEl=document.getElementById('P-expImg');
+  const withImg=imgEl&&imgEl.value==='withimg';
+  const all=want?getPapers().filter(p=>String(p.id)===want):getPapers();
+  if(!all.length){ toast('冇考卷可匯出'); return; }
+  const out=withImg?all:all.map(p=>stripImgsDeep(p));
+  const blob=new Blob([JSON.stringify(out,null,1)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const now=new Date();
+  const ts=String(now.getHours()).padStart(2,'0')+'時'+String(now.getMinutes()).padStart(2,'0')+'分';
+  const pn=want?all[0].name:'全部';
+  a.href=url; a.download='考卷_'+(withImg?'有圖':'冇圖')+'_'+pn+'_'+ts+'.json';
+  a.click(); URL.revokeObjectURL(url);
+  toast('已匯出'+out.length+'張考卷（'+(withImg?'有圖':'冇圖')+'）');
+}
 function reorderPapers(dragId,dropId){
   const ps=getPapers();
   const di=ps.findIndex(p=>p.id===dragId);
@@ -3737,12 +3775,15 @@ function delBackup(i){
   renderSub('datamgmt');
 }
 function exportStudents(){
-  const sts=getStudents();
-  const cls=getClasses();
-  let csv='\ufeff姓名,班別\n';
-  sts.forEach(s=>{
+  const sel=document.getElementById('C-expCls');
+  const want=sel?sel.value:'';
+  const sts=getStudents().filter(s=>!want||stuCls(s).includes(want));
+  let csv='\ufeff序號,姓名,班別1,班別2,班別3,班別4,班別5,班別6,班別7,班別8\n';
+  sts.forEach((s,i)=>{
     const nm=stuName(s), arr=stuCls(s);
-    csv+=nm+','+arr.join(';')+'\n';
+    const cells=[i+1,nm];
+    for(let j=0;j<8;j++) cells.push(arr[j]||'');
+    csv+=cells.join(',')+'\n';
   });
   const now=new Date();
   const ts=String(now.getHours()).padStart(2,'0')+'時'+String(now.getMinutes()).padStart(2,'0')+'分'+String(now.getSeconds()).padStart(2,'0')+'秒';
@@ -3750,9 +3791,9 @@ function exportStudents(){
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=url; a.download='學生名單_'+ts+'_'+ds+'.csv';
+  a.href=url; a.download='學生名單_'+(want?want+'_':'')+ts+'_'+ds+'.csv';
   a.click(); URL.revokeObjectURL(url);
-  toast('已下載'+sts.length+'名學生');
+  toast('已下載'+sts.length+'名學生'+(want?'（班次：'+want+'）':'（全部班次）'));
 }
 function importStudents(input){
   const file=input.files[0]; if(!file) return;
@@ -3761,23 +3802,30 @@ function importStudents(input){
     const text=e.target.result.replace(/^\ufeff/,'');
     const lines=text.split(/\r?\n/).filter(l=>l.trim());
     if(lines.length<2){ toast('CSV冇數據'); return; }
+    const isNew=/序號|班別1/.test(lines[0]);
+    const sel=document.getElementById('C-impCls');
+    const forceCls=sel?sel.value:'';
     const existing=getStudents();
     const existingNames=new Set(existing.map(s=>stuName(s)));
     const existingCls=new Set(getClasses());
     let added=0, newCls=0;
     for(let i=1;i<lines.length;i++){
       const parts=lines[i].split(',');
-      const nm=(parts[0]||'').trim();
+      const nm=isNew?(parts[1]||'').trim():(parts[0]||'').trim();
       if(!nm||existingNames.has(nm)) continue;
-      const clsArr=(parts[1]||'').split(';').map(s=>s.trim()).filter(Boolean);
-      clsArr.forEach(c=>{ if(!existingCls.has(c)){ existingCls.add(c); newCls++; } });
+      let clsArr;
+      if(forceCls){ clsArr=[forceCls]; if(!existingCls.has(forceCls)){ existingCls.add(forceCls); newCls++; } }
+      else{
+        clsArr=isNew?parts.slice(2,10).map(s=>s.trim()).filter(Boolean):(parts[1]||'').split(';').map(s=>s.trim()).filter(Boolean);
+        clsArr.forEach(c=>{ if(!existingCls.has(c)){ existingCls.add(c); newCls++; } });
+      }
       existing.push({name:nm,cls:clsArr});
       existingNames.add(nm);
       added++;
     }
     DB.set(K.students,existing);
     DB.set(K.classes,[...existingCls]);
-    toast('已匯入'+added+'名學生'+(newCls?'，新班次'+newCls+'個':''));
+    toast('已匯入'+added+'名學生'+(forceCls?'（入去「'+forceCls+'」）':newCls?'，新班次'+newCls+'個':''));
     renderSub('classes');
   };
   reader.readAsText(file,'utf-8');
