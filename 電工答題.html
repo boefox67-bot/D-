@@ -429,6 +429,22 @@ const Cloud={
       }
     }catch(e){ console.warn('雲端上傳失敗',bare,e); }
   },
+  // 學生登入專用：只拉學生要嘅節點（考場、考卷、題庫、考場開關、品牌、版本），
+  // 唔拉老師後台（成績 attempts、鎖 locks、密碼 pwd、名單 students/classes——固定模式先拉名單），慳流量加快登入
+  async pullStudent(needRoster){
+    if(!this.enabled()) return false;
+    const want=['exams','papers','questions','exopen','logo','btext','footerLogo','ver'];
+    if(needRoster) want.push('students','classes');
+    let changed=false;
+    for(const b of want){
+      try{
+        const v=await this.raw(b,'GET');
+        if(v!==undefined){ DB.set(SERVER_MAP[b],v); changed=true; }
+      }catch(e){ console.warn('學生節點拉取失敗',b,e); }
+    }
+    try{ applyBranding(); }catch(e){}
+    return changed;
+  },
   async pull(){
     if(!this.enabled()) return false;
     let data; try{ data=await this.raw('','GET'); }catch(e){ console.warn('雲端讀取失敗',e); return false; }
@@ -957,13 +973,13 @@ document.getElementById('btn-start').onclick = async function(){
   const warn=document.getElementById('home-warn'); warn.style.display='none';
   const code=document.getElementById('in-code').value.trim();
   if(!code){ warnMsg('請輸入考試碼'); return; }
-  // 入場前先由雲端拉最新考試碼同考卷，避免本機未同步就誤判無效
+  // 入場前只拉「學生要嘅嘢」：考場／考卷／題庫／考場開關／品牌；唔拉老師後台（成績、鎖、密碼、名單）
   let cloudPapers=[], cloudExams=[];
-  try{ await Cloud.pull(); }catch(e){}
-  // 直接重拉考卷同考試碼兩節，寫入本機並留低雲端原陣列做權威核對
+  try{ await Cloud.pullStudent(false); }catch(e){}
+  // 由本機讀返啱啱拉到嘅雲端權威陣列（拉失敗就保留本機舊值，容錯）
   try{
-    cloudPapers=toArr(await Cloud.raw('papers','GET')); DB.set(K.papers,cloudPapers);
-    cloudExams=toArr(await Cloud.raw('exams','GET')); DB.set(K.exams,cloudExams);
+    cloudPapers=toArr(DB.get(K.papers,[]));
+    cloudExams=toArr(DB.get(K.exams,[]));
   }catch(e){}
   let exam=examByCode(code);
   if(!exam && cloudExams.length) exam=cloudExams.find(x=>String(x.code)===String(code) && x.expireAt>=Date.now());
@@ -1004,6 +1020,18 @@ document.getElementById('btn-start').onclick = async function(){
   const syncEntryUI=()=>{
     const mode=(document.querySelector('input[name="entryMode"]:checked')||{}).value||'stu';
     const isPhone=mode==='phone';
+    document.querySelectorAll('input[name="entryMode"]').forEach(r=>{
+      const lb=r.closest('label'); if(!lb) return;
+      const on=r.checked;
+      lb.style.color=on?'#16a34a':'';
+      lb.style.fontWeight=on?'700':'';
+      lb.style.borderColor=on?'#16a34a':'';
+    });
+    // 揀學生名（固定模式）先拉名單落本機（只拉一次）；電話模式唔使
+    if(!isPhone && !window._rosterPulled){
+      window._rosterPulled=true;
+      Cloud.pullStudent(true).then(()=>{ try{ reloadNameList(); }catch(e){} });
+    }
     sb.style.display=isPhone?'none':'block';
     pb.style.display=isPhone?'block':'none';
     // 揀班次：淨係「揀學生名」模式顯示；電話模式唔顯示班次；考試鎖定咗班次都唔顯示（自動分流）
@@ -1587,12 +1615,21 @@ function showResult(a){
 }
 
 /* ================= 老師後台 ================= */
-document.getElementById('t-login').onclick=()=>{
+document.getElementById('t-login').onclick=async ()=>{
   const p=document.getElementById('t-pwd').value.trim();
   if(!p){ toast('請輸入密碼'); return; }
   if(p!==String(DB.get(K.pwd,'20261010'))){ toast('密碼唔啱'); return; }
+  // 有效密碼先通過，先可以進入後台＋下載後台
   DB.set(K.isTeacher, true);
   renderTeacher();
+  // 進入時問：要唔要同步下載雲端老師後台（覆蓋本機）——淨係有效密碼先可以落
+  if(confirm('已驗證主管密碼。要唔要而家同步下載雲端老師後台（覆蓋本機資料）？\n\n撳「確定」＝下載雲端最新後台；撳「取消」＝用本機資料照入。')){
+    try{
+      const r=await Cloud.forceDownload();
+      toast(r.ok?('已同步下載後台（'+r.n+' 項）'):'下載失敗（雲端空白或連線錯誤）');
+      renderSub('');
+    }catch(err){ toast('下載失敗：'+err.message); }
+  }
   Cloud.seedMissing();
 };
 function teacherDevId(){
@@ -2263,6 +2300,10 @@ function renderSub(g){
         const lb=r.closest('label'); if(!lb) return;
         lb.style.color=r.checked?'#16a34a':''; lb.style.fontWeight=r.checked?'700':'';
       });
+      document.querySelectorAll('input[name="L-mode"]').forEach(r=>{
+        const lb=r.closest('label'); if(!lb) return;
+        lb.style.color=r.checked?'#16a34a':''; lb.style.fontWeight=r.checked?'700':'';
+      });
     };
     document.querySelectorAll('.L-pchk').forEach(cb=>cb.onchange=()=>{
       if(cb.value==='0'&&cb.checked){ document.querySelectorAll('.L-pchk').forEach(x=>{ if(x.value!=='0') x.checked=false; }); }
@@ -2270,6 +2311,7 @@ function renderSub(g){
       syncLaunchOpt();
     });
     document.querySelectorAll('input[name="L-order"]').forEach(r=>r.onchange=syncLaunchOpt);
+    document.querySelectorAll('input[name="L-mode"]').forEach(r=>r.onchange=syncLaunchOpt);
     syncLaunchOpt();
     document.getElementById('L-go').onclick=()=>{
       const code=document.getElementById('L-code').value.trim();
@@ -2442,27 +2484,6 @@ function renderSub(g){
   }
   if(g==='imgGrade'){
     // 圖片作答批改：未批改卷＝左欄，改好分嘅卷＝右欄；覺得分唔啱可以喺右欄重新改分
-    // 先拉雲端最新attempts（包含其他機批改過嘅結果）
-    if(window.Cloud && Cloud.enabled() && !window._igSynced){
-      window._igSynced=true;
-      el.innerHTML=subHead('圖片作答批改')+'<p class="muted" style="padding:20px">☁️ 同步雲端最新批改結果...</p>';
-      (async()=>{
-        try{
-          const cloudAtt=toArr(await Cloud.raw('attempts','GET'));
-          const localAtt=getAttempts();
-          const cloudKeys=new Set(cloudAtt.map(a=>(a.name||'')+(a.date||'')));
-          const merged=cloudAtt.slice();
-          localAtt.forEach(a=>{
-            const k=(a.name||'')+(a.date||'');
-            if(!cloudKeys.has(k)) merged.push(a);
-          });
-          DB.set(K.attempts,merged);
-        }catch(e){}
-        renderSub('imgGrade');
-      })();
-      return;
-    }
-    window._igSynced=false;
     const att=getAttempts();
     const withImg=att.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).filter(a=>(a.detail||[]).some(d=>d.type===5));
     window.__igAttempts=withImg;
@@ -3100,14 +3121,38 @@ function renderSub(g){
       h+=`</div>`;
       return h;
     }
+    if(!window._qSort) window._qSort={by:'name',dir:1};
+    window.qSortList=function(arr){
+      const s=window._qSort||{by:'name',dir:1};
+      return arr.slice().sort((x,y)=>{
+        let r=0;
+        if(s.by==='name') r=String(x.name||'').localeCompare(String(y.name||''),'zh-Hans-CN');
+        else if(s.by==='date') r=(x.createdAt||0)-(y.createdAt||0);
+        else r=(x.questions?x.questions.length:0)-(y.questions?y.questions.length:0);
+        return r*s.dir;
+      });
+    };
+    window.qFmtDate=function(t){ if(!t) return '—'; const d=new Date(t); return d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0'); };
+    window.setQSort=function(by){
+      const s=window._qSort||{by:'name',dir:1};
+      if(s.by===by) s.dir*=-1; else { s.by=by; s.dir=1; }
+      window._qSort=s; renderSub('questions');
+    };
     el.innerHTML=subHead('題庫管理（改題目同答案）')+`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <p class="muted" style="margin:0">先揀考卷，再睇嗰卷題目。直接改下面欄位就會即時儲存；改選項做正確答案請撳旁邊圓圈。</p>
         <button class="btn" style="width:auto;padding:6px 14px;font-size:13px;background:#10b981;color:#fff" onclick="exportPaperXlsx()">導出X檔</button>
       </div>
       ${papers.length===0?'<div class="muted" style="padding:20px;text-align:center">未導入考卷，請先去「導入 X 檔題庫」</div>':`
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0;font-size:13px">
+          <span class="muted">排序：</span>
+          <button class="btn secondary" style="width:auto;padding:3px 10px;margin:0;font-size:12px" onclick="setQSort('name')">名稱 ${window._qSort&&window._qSort.by==='name'?(window._qSort.dir===1?'▲':'▼'):''}</button>
+          <button class="btn secondary" style="width:auto;padding:3px 10px;margin:0;font-size:12px" onclick="setQSort('date')">日期 ${window._qSort&&window._qSort.by==='date'?(window._qSort.dir===1?'▲':'▼'):''}</button>
+          <button class="btn secondary" style="width:auto;padding:3px 10px;margin:0;font-size:12px" onclick="setQSort('count')">題目量 ${window._qSort&&window._qSort.by==='count'?(window._qSort.dir===1?'▲':'▼'):''}</button>
+          <span class="muted" style="font-size:12px">再撳同一鍵轉升／降</span>
+        </div>
         <label>揀考卷</label>
-        <select id="Q-paperSel">${papers.map(p=>`<option value="${p.id}">${esc(p.name)}（${p.questions?p.questions.length:0} 題）</option>`).join('')}</select>
+        <select id="Q-paperSel">${qSortList(papers).map(p=>`<option value="${p.id}">${esc(p.name)}（${p.questions?p.questions.length:0} 題 · ${qFmtDate(p.createdAt)}）</option>`).join('')}</select>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
           <button class="btn secondary" style="width:auto;padding:5px 12px;margin:0;font-size:12px" onclick="foldAllQ(true)">全部展開</button>
           <button class="btn secondary" style="width:auto;padding:5px 12px;margin:0;font-size:12px" onclick="foldAllQ(false)">全部摺疊</button>
