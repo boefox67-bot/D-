@@ -3588,7 +3588,10 @@ function cleanOldAttempts(days){
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=url; a.download='成績備份_'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'_'+new Date().toTimeString().slice(0,8).replace(/:/g,'')+'_'+days+'日前.csv';
+  const now=new Date();
+  const ts=String(now.getHours()).padStart(2,'0')+'時'+String(now.getMinutes()).padStart(2,'0')+'分'+String(now.getSeconds()).padStart(2,'0')+'秒';
+  const ds=now.getFullYear()+'年'+(now.getMonth()+1)+'月'+now.getDate()+'日';
+  a.href=url; a.download='成績備份_'+days+'日前_'+ts+'_'+ds+'.csv';
   a.click(); URL.revokeObjectURL(url);
   // 等2秒俾佢下載完，再確認清除
   setTimeout(()=>{
@@ -3620,7 +3623,10 @@ function exportAllAttempts(){
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=url; a.download='成績備份_'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'_'+new Date().toTimeString().slice(0,8).replace(/:/g,'')+'_全部.csv';
+  const now=new Date();
+  const ts=String(now.getHours()).padStart(2,'0')+'時'+String(now.getMinutes()).padStart(2,'0')+'分'+String(now.getSeconds()).padStart(2,'0')+'秒';
+  const ds=now.getFullYear()+'年'+(now.getMonth()+1)+'月'+now.getDate()+'日';
+  a.href=url; a.download='成績備份_全部_'+ts+'_'+ds+'.csv';
   a.click(); URL.revokeObjectURL(url);
   toast('已下載'+att.length+'條成績CSV');
 }
