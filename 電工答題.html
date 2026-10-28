@@ -2759,6 +2759,10 @@ function renderSub(g){
           <select id="P-expImg" style="padding:5px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--text)"><option value="noimg">冇圖（淨文字）</option><option value="withimg">有圖（連圖）</option></select>
           <button class="btn" style="padding:5px 14px" onclick="exportPapers()">📥 匯出</button>
         </div>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn secondary" style="width:auto;padding:5px 12px;font-size:13px" onclick="pickPaperDir()">📁 揀存放路徑</button>
+          <span id="P-dirName" class="muted" style="font-size:12px">未揀路徑＝下載去瀏覽器默認下載資料夾</span>
+        </div>
       </div>`;
     // 拖放排序
     const listEl=document.getElementById('paper-list');
@@ -3623,6 +3627,26 @@ function stripImgsDeep(o){
   if(o&&typeof o==='object'){ const r={}; for(const k in o){ r[k]=stripImgsDeep(o[k]); } return r; }
   return o;
 }
+let paperDirHandle=null;
+function pickPaperDir(){
+  if(!window.showDirectoryPicker){ toast('瀏覽器唔支持揀資料夾（請用 Chrome／Edge）'); return; }
+  window.showDirectoryPicker({mode:'readwrite'}).then(h=>{
+    paperDirHandle=h;
+    const d=document.getElementById('P-dirName');
+    if(d) d.textContent='📁 '+h.name;
+    toast('已揀路徑：'+h.name);
+  }).catch(()=>{});
+}
+async function writeXlsxToDir(wb, fname){
+  if(!paperDirHandle) return false;
+  try{
+    const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+    const fh=await paperDirHandle.getFileHandle(fname,{create:true});
+    const w=await fh.createWritable();
+    await w.write(buf); await w.close();
+    return true;
+  }catch(err){ return false; }
+}
 function exportPapers(){
   const sel=document.getElementById('P-expSel');
   const want=sel?sel.value:'';
@@ -3639,7 +3663,7 @@ function exportPapers(){
     '單選題A(學生)','單選題B(學生)','單選題C(學生)','單選題D(學生)','單選題E(學生)','單選題F(學生)',
     '多選題A(學生)','多選題B(學生)','多選題C(學生)','多選題D(學生)','多選題E(學生)','多選題F(學生)',
     '是非題對(學生)','是非題錯(學生)','多少分題'];
-  let cnt=0;
+  let cnt=0, okPath=0, okDown=0;
   all.forEach(p=>{
     const rows=[H];
     (p.questions||[]).forEach(q=>{
@@ -3669,10 +3693,13 @@ function exportPapers(){
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,'題庫');
     const safe=(p.name||'考卷').replace(/[\\/:*?"<>|]/g,'_').slice(0,60);
-    XLSX.writeFile(wb,'考卷_'+(withImg?'有圖':'冇圖')+'_'+safe+'_'+ts+'.xlsx');
-    cnt++;
+    const fname='考卷_'+(withImg?'有圖':'冇圖')+'_'+safe+'_'+ts+'.xlsx';
+    writeXlsxToDir(wb,fname).then(ok=>{
+      if(ok) okPath++; else { XLSX.writeFile(wb,fname); okDown++; }
+      cnt++;
+      if(cnt===all.length) toast('已匯出'+all.length+'張考卷（'+(withImg?'有圖':'冇圖')+'）'+(okPath?'·已寫入路徑 '+paperDirHandle.name:'·已下載'+okDown+'張'));
+    });
   });
-  toast('已匯出'+cnt+'張考卷（'+(withImg?'有圖':'冇圖')+'）·每卷一檔');
 }
 function reorderPapers(dragId,dropId){
   const ps=getPapers();
@@ -3785,22 +3812,28 @@ function exportStudents(){
   const sel=document.getElementById('C-expCls');
   const want=sel?sel.value:'';
   const sts=getStudents().filter(s=>!want||stuCls(s).includes(want));
-  const rows=[['序號','姓名','班別1','班別2','班別3','班別4','班別5','班別6','班別7','班別8']];
+  const H=['序號','姓名']; for(let j=1;j<=12;j++) H.push('班別'+j);
+  const rows=[H];
   sts.forEach((s,i)=>{
     const nm=stuName(s), arr=stuCls(s);
     const r=[i+1,nm];
-    for(let j=0;j<8;j++) r.push(arr[j]||'');
+    for(let j=0;j<12;j++) r.push(arr[j]||'');
     rows.push(r);
   });
-  const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=rows[0].map((h,i)=>({wch:i===0?6:i===1?14:22}));
+  const ws1=XLSX.utils.aoa_to_sheet(rows);
+  ws1['!cols']=H.map((h,i)=>({wch:i===0?6:i===1?14:22}));
+  const clsRows=[['序號','班別']];
+  getClasses().forEach((c,i)=>clsRows.push([i+1,c]));
+  const ws2=XLSX.utils.aoa_to_sheet(clsRows);
+  ws2['!cols']=[{wch:6},{wch:22}];
   const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'學生名單');
+  XLSX.utils.book_append_sheet(wb,ws1,'學生名單');
+  XLSX.utils.book_append_sheet(wb,ws2,'班別');
   const now=new Date();
   const ts=String(now.getHours()).padStart(2,'0')+'時'+String(now.getMinutes()).padStart(2,'0')+'分'+String(now.getSeconds()).padStart(2,'0')+'秒';
   const ds=now.getFullYear()+'年'+(now.getMonth()+1)+'月'+now.getDate()+'日';
   XLSX.writeFile(wb,'學生名單_'+(want?want+'_':'')+ts+'_'+ds+'.xlsx');
-  toast('已下載'+sts.length+'名學生'+(want?'（班次：'+want+'）':'（全部班次）'));
+  toast('已下載'+sts.length+'名學生'+(want?'（班次：'+want+'）':'（全部班次）')+'·分2頁');
 }
 function importStudents(input){
   const file=input.files[0]; if(!file) return;
@@ -3829,7 +3862,7 @@ function importStudents(input){
       const parts=lines[i].map(c=>String(c==null?'':c).trim());
       const nm=isNew?(parts[1]||''):(parts[0]||'');
       if(!nm||existingNames.has(nm)) continue;
-      const clsArr=isNew?parts.slice(2,10).filter(Boolean):(parts[1]||'').split(';').map(s=>s.trim()).filter(Boolean);
+      const clsArr=isNew?parts.slice(2).filter(Boolean):(parts[1]||'').split(';').map(s=>s.trim()).filter(Boolean);
       clsArr.forEach(c=>{ if(!existingCls.has(c)){ existingCls.add(c); newCls++; } });
       existing.push({name:nm,cls:clsArr});
       existingNames.add(nm);
