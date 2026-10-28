@@ -3588,7 +3588,7 @@ function cleanOldAttempts(days){
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=url; a.download='舊成績備份_'+days+'日前_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.href=url; a.download='成績備份_'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'_'+new Date().toTimeString().slice(0,8).replace(/:/g,'')+'_'+days+'日前.csv';
   a.click(); URL.revokeObjectURL(url);
   // 等2秒俾佢下載完，再確認清除
   setTimeout(()=>{
@@ -3620,7 +3620,7 @@ function exportAllAttempts(){
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=url; a.download='全部成績備份_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.href=url; a.download='成績備份_'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'_'+new Date().toTimeString().slice(0,8).replace(/:/g,'')+'_全部.csv';
   a.click(); URL.revokeObjectURL(url);
   toast('已下載'+att.length+'條成績CSV');
 }
