@@ -394,6 +394,20 @@ const SERVER_MAP={
   tsesh:K.tsesh, logo:K.logo, btext:K.btext, exopen:K.examOpen, wmkey:K.wm,
   footerLogo:K.footerLogo
 };
+// 作答紀錄合併：以 ts 為唯一 key；同 ts 兩邊都有時，取「圖片題批改進度較多」嗰份（平手取 add）——手機／電腦批改唔會互相覆蓋
+function mergeAttempts(base, add){
+  const map=new Map();
+  (base||[]).forEach(a=>{ if(a&&a.ts!=null) map.set(a.ts,a); });
+  (add||[]).forEach(a=>{
+    if(!a||a.ts==null) return;
+    const cur=map.get(a.ts);
+    if(!cur){ map.set(a.ts,a); return; }
+    const gc=(a.detail||[]).filter(d=>d.type===5&&d.graded).length;
+    const gl=(cur.detail||[]).filter(d=>d.type===5&&d.graded).length;
+    map.set(a.ts, gc>=gl?a:cur);
+  });
+  return Array.from(map.values());
+}
 const Cloud={
   _timers:{},
   url(){ let u=(DEFAULT_CLOUD_URL||localStorage.getItem(CLOUD_KEY)||'').trim(); return u?u.replace(/\/+$/,''):''; },
@@ -418,12 +432,12 @@ const Cloud={
   async pushKey(bare,val){
     try{
       if(bare==='attempts'){
-        // 作答紀錄合併：新卷追加，同 ts（同一份卷）以最新本地版本覆蓋雲端，批改／改名唔會俾舊版覆蓋
+        // 作答紀錄合併：新卷追加，同 ts 以「批改進度較多」者勝——兩部裝置各自批改唔會互相覆蓋
         let cur=[]; try{ cur=(await this.raw('attempts','GET'))||[]; }catch(e){ cur=[]; }
         if(!Array.isArray(cur)) cur=[];
-        const byTs=new Map(cur.map(a=>[a&&a.ts, a]));
-        (val||[]).forEach(a=>{ if(a&&a.ts!=null) byTs.set(a.ts, a); });
-        await this.raw('attempts','PUT',Array.from(byTs.values()));
+        const merged=mergeAttempts(cur,val||[]);
+        await this.raw('attempts','PUT',merged);
+        DB.set(SERVER_MAP[bare],merged);
       } else {
         await this.raw(bare,'PUT',val);
       }
@@ -451,7 +465,15 @@ const Cloud={
     if(!data||typeof data!=='object') return false;
     let changed=false;
     SERVER_KEYS.forEach(b=>{
-      if(b==='attempts') return; // 作答紀錄以本機為準：批改／改名等修改唔會被雲端舊版覆蓋（雲端只做追加同步）
+      if(b==='attempts'){
+        // 作答紀錄：雲端＋本地合併（批改進度多者勝）——手機／電腦先睇到彼此批改，唔會互相覆蓋
+        if(Array.isArray(data[b])){
+          const merged=mergeAttempts(DB.get(SERVER_MAP[b],[]),data[b]);
+          DB.set(SERVER_MAP[b],merged);
+          changed=true;
+        }
+        return;
+      }
       if(data[b]!==undefined){ DB.set(SERVER_MAP[b],data[b]); changed=true; }
     });
     if(data['logo']!==undefined || data['btext']!==undefined || data['footerLogo']!==undefined){ applyBranding(); }
