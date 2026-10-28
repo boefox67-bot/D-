@@ -2442,6 +2442,27 @@ function renderSub(g){
   }
   if(g==='imgGrade'){
     // 圖片作答批改：未批改卷＝左欄，改好分嘅卷＝右欄；覺得分唔啱可以喺右欄重新改分
+    // 先拉雲端最新attempts（包含其他機批改過嘅結果）
+    if(window.Cloud && Cloud.enabled() && !window._igSynced){
+      window._igSynced=true;
+      el.innerHTML=subHead('圖片作答批改')+'<p class="muted" style="padding:20px">☁️ 同步雲端最新批改結果...</p>';
+      (async()=>{
+        try{
+          const cloudAtt=toArr(await Cloud.raw('attempts','GET'));
+          const localAtt=getAttempts();
+          const cloudKeys=new Set(cloudAtt.map(a=>(a.name||'')+(a.date||'')));
+          const merged=cloudAtt.slice();
+          localAtt.forEach(a=>{
+            const k=(a.name||'')+(a.date||'');
+            if(!cloudKeys.has(k)) merged.push(a);
+          });
+          DB.set(K.attempts,merged);
+        }catch(e){}
+        renderSub('imgGrade');
+      })();
+      return;
+    }
+    window._igSynced=false;
     const att=getAttempts();
     const withImg=att.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).filter(a=>(a.detail||[]).some(d=>d.type===5));
     window.__igAttempts=withImg;
