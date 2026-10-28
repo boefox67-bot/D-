@@ -375,9 +375,10 @@ const K = {
   questions:'quiz_questions_v2', papers:'quiz_papers_v1', activePaper:'quiz_active_paper',
   exams:'quiz_exams_v1', curExam:'quiz_cur_exam', classes:'quiz_classes_v1',
   students:'quiz_students_v1', locks:'quiz_name_locks', attempts:'quiz_attempts_v1',
+  backups:'quiz_backups_v1',
   lastAttempt:'quiz_last_attempt', isTeacher:'quiz_is_teacher', pwd:'quiz_teacher_pwd',
   curClass:'quiz_cur_class', userName:'quiz_user_name', ver:'quiz_paper_version',
-  tsesh:'quiz_teacher_session', draft:'quiz_draft_v1', logo:'quiz_logo_custom', btext:'quiz_brand_text', examOpen:'quiz_exam_open', wm:'quiz_wm_custom', footerLogo:'quiz_footer_logo'
+  tsesh:'quiz_teacher_session', draft:'quiz_draft_v1', logo:'quiz_logo_custom', btext:'quiz_brand_text', examOpen:'quiz_exam_open', wm:'quiz_wm_custom', footerLogo:'quiz_footer_logo', backups:'quiz_backups_v1'
 };
 const LEAP_LOGO_URL=(document.querySelector('#splash img')||{}).src||'';
 
@@ -2318,6 +2319,11 @@ function renderSub(g){
   if(g==='classes'){
     const cls=getClasses(), sts=getStudents();
     el.innerHTML=subHead('學生管理（班次加減）')+`
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn secondary" style="width:auto;padding:5px 12px;font-size:13px" onclick="exportStudents()">📥 匯出名單CSV</button>
+        <button class="btn secondary" style="width:auto;padding:5px 12px;font-size:13px" onclick="document.getElementById('C-impFile').click()">📤 匯入名單CSV</button>
+        <input type="file" id="C-impFile" accept=".csv" style="display:none" onchange="importStudents(this)">
+      </div>
       <label>現有班次（撳改名變確定，直接同步雲端）</label>
       <div id="C-clsList">${cls.map((c,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid var(--line)"><span id="C-cls-name-${i}">${esc(c)}</span><span style="display:flex;gap:6px"><button class="btn secondary" style="width:auto;padding:4px 12px;margin:0;font-size:13px" id="C-cls-rn-${i}" onclick="startRenameCls(${i})">改名</button><button class="btn danger" style="width:auto;padding:4px 12px;margin:0;font-size:13px" data-delcls="${esc(c)}">拆除</button></span></div>`).join('')||'<span class="muted">暫無班次</span>'}</div>
       <label>加新班次名</label>
@@ -3249,29 +3255,40 @@ function renderSub(g){
     const att=getAttempts();
     const drafts=getDrafts();
     const closedExams=getExams().filter(e=>e.closed);
-    // 估算儲存用量
+    const backups=DB.get(K.backups,[]);
     function sizeOf(obj){ return JSON.stringify(obj||{}).length; }
-    const attSize=sizeOf(att), draftSize=sizeOf(drafts);
+    const attSize=sizeOf(att), draftSize=sizeOf(drafts), backupSize=sizeOf(backups);
     const mb=n=>(n/1024/1024).toFixed(2)+'MB';
     const now=Date.now();
     const old30=att.filter(a=>new Date(a.date).getTime()<now-30*24*3600*1000);
     const old90=att.filter(a=>new Date(a.date).getTime()<now-90*24*3600*1000);
+    const backupList=backups.map((b,i)=>`<div style="padding:8px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;font-size:12px;display:flex;align-items:center;gap:8px">
+      <span style="flex:1">${esc(b.fname)}（${b.count}條）</span>
+      <button class="btn secondary" style="width:auto;padding:2px 8px;font-size:11px" onclick="dlBackup(${i})">下載</button>
+      <button class="btn danger" style="width:auto;padding:2px 8px;font-size:11px" onclick="delBackup(${i})">刪除</button>
+    </div>`).join('')||'<span class="muted" style="font-size:13px">未有雲端備份</span>';
     el.innerHTML=subHead('數據管理')+`
       <div class="card" style="padding:16px">
         <h3 style="font-size:16px;margin-bottom:12px">💾 儲存用量估算</h3>
         <table style="width:100%;font-size:13px;border-collapse:collapse">
           <tr style="border-bottom:1px solid var(--line)"><td style="padding:6px">成績紀錄（${att.length}條）</td><td style="text-align:right;padding:6px">${mb(attSize)}</td></tr>
           <tr style="border-bottom:1px solid var(--line)"><td style="padding:6px">學生草稿（${Object.keys(drafts).length}條，含base64圖）</td><td style="text-align:right;padding:6px">${mb(draftSize)}</td></tr>
+          <tr style="border-bottom:1px solid var(--line)"><td style="padding:6px">雲端備份倉庫（${backups.length}個，最多24個）</td><td style="text-align:right;padding:6px">${mb(backupSize)}</td></tr>
           <tr style="border-bottom:1px solid var(--line)"><td style="padding:6px">已關閉考場</td><td style="text-align:right;padding:6px">${closedExams.length}個</td></tr>
         </table>
       </div>
       <div class="card" style="padding:16px;margin-top:12px">
+        <h3 style="font-size:16px;margin-bottom:8px">☁️ 雲端備份倉庫</h3>
+        <p class="muted" style="font-size:12px;margin-bottom:10px">清舊成績時自動存入，最多保留24個（約一年），爆滿自動覆蓋最舊。</p>
+        ${backupList}
+      </div>
+      <div class="card" style="padding:16px;margin-top:12px">
         <h3 style="font-size:16px;margin-bottom:8px">🗑️ 清理舊數據</h3>
-        <p class="muted" style="font-size:13px;margin-bottom:12px">雲端儲存空間有限，建議定期清理舊成績。清理後唔可以還原。</p>
+        <p class="muted" style="font-size:13px;margin-bottom:12px">雲端儲存空間有限，建議定期清理舊成績。清理後自動存入備份倉庫。</p>
         <div style="display:flex;flex-direction:column;gap:10px">
-          <button class="btn danger" onclick="cleanOldAttempts(30)">清除30日前成績（${old30.length}條）</button>
-          <button class="btn danger" onclick="cleanOldAttempts(90)">清除90日前成績（${old90.length}條）</button>
-          <button class="btn secondary" onclick="exportAllAttempts()">📥 匯出全部成績CSV（備份用）</button>
+          <button class="btn danger" onclick="cleanOldAttempts(30)">清除30日前成績（${old30.length}條）→ 自動備份</button>
+          <button class="btn danger" onclick="cleanOldAttempts(90)">清除90日前成績（${old90.length}條）→ 自動備份</button>
+          <button class="btn secondary" onclick="exportAllAttempts()">📥 匯出全部成績CSV（本機下載）</button>
           <button class="btn secondary" onclick="clearAllDrafts()">清除所有學生草稿（釋放空間畀Logo同題目圖片）</button>
           <button class="btn secondary" onclick="clearClosedExams()">清除已關閉考場紀錄</button>
         </div>
@@ -3580,22 +3597,27 @@ function cleanOldAttempts(days){
   const cutoff=Date.now()-days*24*3600*1000;
   const oldOnes=getAttempts().filter(a=>new Date(a.date).getTime()<cutoff);
   if(oldOnes.length===0){ toast('冇'+days+'日前嘅成績要清'); return; }
-  // 先匯出CSV備份
   let csv='\ufeff姓名,班別,卷名,分數,日期,用時秒\n';
   oldOnes.forEach(a=>{
     csv+=[a.name,a.cls,a.paper,a.score,a.date,a.sec||''].map(v=>{v=String(v||'');return v.includes(',')?'"'+v+'"':v;}).join(',')+'\n';
   });
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
   const now=new Date();
   const ts=String(now.getHours()).padStart(2,'0')+'時'+String(now.getMinutes()).padStart(2,'0')+'分'+String(now.getSeconds()).padStart(2,'0')+'秒';
   const ds=now.getFullYear()+'年'+(now.getMonth()+1)+'月'+now.getDate()+'日';
-  a.href=url; a.download='成績備份_'+days+'日前_'+ts+'_'+ds+'.csv';
+  const fname='成績備份_'+days+'日前_'+ts+'_'+ds+'.csv';
+  // 下載落本機
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=fname;
   a.click(); URL.revokeObjectURL(url);
-  // 等2秒俾佢下載完，再確認清除
+  // 存入雲端備份倉庫
   setTimeout(()=>{
-    if(confirm('已下載備份CSV。確定要清除 '+oldOnes.length+' 條'+days+'日前嘅成績嗎？\n（清咗唔可以還原）')){
+    const backups=DB.get(K.backups,[]);
+    backups.push({fname:fname,csv:csv,count:oldOnes.length,at:now.getTime()});
+    while(backups.length>24) backups.shift();
+    DB.set(K.backups,backups);
+    if(confirm('已下載並存入雲端備份倉庫（'+fname+'）。\n確定要清除 '+oldOnes.length+' 條'+days+'日前嘅成績嗎？\n（清咗唔可以還原，但備份已保留）')){
       const att=getAttempts().filter(a=>new Date(a.date).getTime()>=cutoff);
       DB.set(K.attempts,att);
       toast('已備份並清除'+oldOnes.length+'條，剩'+att.length+'條');
@@ -3629,6 +3651,71 @@ function exportAllAttempts(){
   a.href=url; a.download='成績備份_全部_'+ts+'_'+ds+'.csv';
   a.click(); URL.revokeObjectURL(url);
   toast('已下載'+att.length+'條成績CSV');
+}
+function dlBackup(i){
+  const backups=DB.get(K.backups,[]);
+  const b=backups[i]; if(!b) return;
+  const blob=new Blob([b.csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=b.fname;
+  a.click(); URL.revokeObjectURL(url);
+  toast('下載中：'+b.fname);
+}
+function delBackup(i){
+  const backups=DB.get(K.backups,[]);
+  if(!confirm('確定刪除備份「'+backups[i].fname+'」？')) return;
+  backups.splice(i,1);
+  DB.set(K.backups,backups);
+  toast('已刪除備份');
+  renderSub('datamgmt');
+}
+function exportStudents(){
+  const sts=getStudents();
+  const cls=getClasses();
+  let csv='\ufeff姓名,班別\n';
+  sts.forEach(s=>{
+    const nm=stuName(s), arr=stuCls(s);
+    csv+=nm+','+arr.join(';')+'\n';
+  });
+  const now=new Date();
+  const ts=String(now.getHours()).padStart(2,'0')+'時'+String(now.getMinutes()).padStart(2,'0')+'分'+String(now.getSeconds()).padStart(2,'0')+'秒';
+  const ds=now.getFullYear()+'年'+(now.getMonth()+1)+'月'+now.getDate()+'日';
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='學生名單_'+ts+'_'+ds+'.csv';
+  a.click(); URL.revokeObjectURL(url);
+  toast('已下載'+sts.length+'名學生');
+}
+function importStudents(input){
+  const file=input.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const text=e.target.result.replace(/^\ufeff/,'');
+    const lines=text.split(/\r?\n/).filter(l=>l.trim());
+    if(lines.length<2){ toast('CSV冇數據'); return; }
+    const existing=getStudents();
+    const existingNames=new Set(existing.map(s=>stuName(s)));
+    const existingCls=new Set(getClasses());
+    let added=0, newCls=0;
+    for(let i=1;i<lines.length;i++){
+      const parts=lines[i].split(',');
+      const nm=(parts[0]||'').trim();
+      if(!nm||existingNames.has(nm)) continue;
+      const clsArr=(parts[1]||'').split(';').map(s=>s.trim()).filter(Boolean);
+      clsArr.forEach(c=>{ if(!existingCls.has(c)){ existingCls.add(c); newCls++; } });
+      existing.push({name:nm,cls:clsArr});
+      existingNames.add(nm);
+      added++;
+    }
+    DB.set(K.students,existing);
+    DB.set(K.classes,[...existingCls]);
+    toast('已匯入'+added+'名學生'+(newCls?'，新班次'+newCls+'個':''));
+    renderSub('classes');
+  };
+  reader.readAsText(file,'utf-8');
+  input.value='';
 }
 function sortPapersAndRerender(dir){
   const ps=getPapers();
