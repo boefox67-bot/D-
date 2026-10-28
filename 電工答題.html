@@ -3271,6 +3271,7 @@ function renderSub(g){
         <div style="display:flex;flex-direction:column;gap:10px">
           <button class="btn danger" onclick="cleanOldAttempts(30)">清除30日前成績（${old30.length}條）</button>
           <button class="btn danger" onclick="cleanOldAttempts(90)">清除90日前成績（${old90.length}條）</button>
+          <button class="btn secondary" onclick="exportAllAttempts()">📥 匯出全部成績CSV（備份用）</button>
           <button class="btn secondary" onclick="clearAllDrafts()">清除所有學生草稿（釋放空間畀Logo同題目圖片）</button>
           <button class="btn secondary" onclick="clearClosedExams()">清除已關閉考場紀錄</button>
         </div>
@@ -3577,10 +3578,27 @@ function togglePaperSortLaunch(key){
 }
 function cleanOldAttempts(days){
   const cutoff=Date.now()-days*24*3600*1000;
-  const att=getAttempts().filter(a=>new Date(a.date).getTime()>=cutoff);
-  DB.set(K.attempts,att);
-  toast('已清除'+(days)+'日前成績，剩'+att.length+'條');
-  renderSub('datamgmt');
+  const oldOnes=getAttempts().filter(a=>new Date(a.date).getTime()<cutoff);
+  if(oldOnes.length===0){ toast('冇'+days+'日前嘅成績要清'); return; }
+  // 先匯出CSV備份
+  let csv='\ufeff姓名,班別,卷名,分數,日期,用時秒\n';
+  oldOnes.forEach(a=>{
+    csv+=[a.name,a.cls,a.paper,a.score,a.date,a.sec||''].map(v=>{v=String(v||'');return v.includes(',')?'"'+v+'"':v;}).join(',')+'\n';
+  });
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='舊成績備份_'+days+'日前_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click(); URL.revokeObjectURL(url);
+  // 等2秒俾佢下載完，再確認清除
+  setTimeout(()=>{
+    if(confirm('已下載備份CSV。確定要清除 '+oldOnes.length+' 條'+days+'日前嘅成績嗎？\n（清咗唔可以還原）')){
+      const att=getAttempts().filter(a=>new Date(a.date).getTime()>=cutoff);
+      DB.set(K.attempts,att);
+      toast('已備份並清除'+oldOnes.length+'條，剩'+att.length+'條');
+      renderSub('datamgmt');
+    }
+  },2000);
 }
 function clearAllDrafts(){
   DB.set(K.drafts,{});
@@ -3592,6 +3610,19 @@ function clearClosedExams(){
   DB.set(K.exams,ex);
   toast('已清除已關閉考場');
   renderSub('datamgmt');
+}
+function exportAllAttempts(){
+  const att=getAttempts();
+  let csv='\ufeff姓名,班別,卷名,分數,日期,用時秒\n';
+  att.forEach(a=>{
+    csv+=[a.name,a.cls,a.paper,a.score,a.date,a.sec||''].map(v=>{v=String(v||'');return v.includes(',')?'"'+v+'"':v;}).join(',')+'\n';
+  });
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='全部成績備份_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click(); URL.revokeObjectURL(url);
+  toast('已下載'+att.length+'條成績CSV');
 }
 function sortPapersAndRerender(dir){
   const ps=getPapers();
