@@ -1664,7 +1664,7 @@ function renderTeacher(){
   document.getElementById('teacher-loginCard').style.display=logged?'none':'block';
   document.getElementById('teacher-panel').style.display=logged?'block':'none';
   const only=document.getElementById('t-only'); if(only) only.style.display=logged?'block':'none';
-  if(logged){ renderSub(''); registerOnline(); refreshTeacherOnline(); checkCloudSignout(); }
+  if(logged){ renderSub(''); registerOnline(); refreshTeacherOnline(); checkCloudSignout(); quickRefresh(); }
 }
 function zoomLogo(img){
   const ov=document.getElementById('logo-zoom');
