@@ -2281,7 +2281,7 @@ function renderSub(g){
       va=Number(a.id); vb=Number(b.id); return (va-vb)*window._paperSort.dir;
     });
     const arrow=k=>window._paperSort.key===k?(window._paperSort.dir===1?' ▲':' ▼'):'';
-    const paperBoxes=papers.map(p=>`<label class="L-opt" style="display:block;font-size:13px;margin:4px 0;cursor:pointer"><input type="checkbox" class="L-pchk" value="${p.id}"> ${esc(p.name)}（${p.questions.length}題）</label>`).join('')||'<span class="muted">未有考卷，先去導入</span>';
+    const paperBoxes=papers.map(p=>`<label class="L-opt" style="display:block;font-size:13px;margin:4px 0;cursor:pointer"><input type="checkbox" class="L-pchk" value="${p.id}"> ${esc(p.name)}（${Array.isArray(p.questions)?p.questions.length:0}題）</label>`).join('')||'<span class="muted">未有考卷，先去導入</span>';
     el.innerHTML=subHead('發起考試碼')+`
       <label>揀班次</label><select id="L-cls">${cls.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
       <label>揀考卷（可多張混合；唔勾選＝全部題庫）</label>
