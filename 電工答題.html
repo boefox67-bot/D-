@@ -2810,6 +2810,7 @@ function renderSub(g){
       const f=document.getElementById('I-file').files[0];
       if(!f) return toast('揀 X 檔');
       const name=document.getElementById('I-name').value.trim()||f.name.replace(/\.xlsx?$/i,'');
+      const mode='new'; let targetId=null; // fix: mode is not defined
       const rd=new FileReader();
       rd.onload=async e=>{
         try{
