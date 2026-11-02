@@ -1545,6 +1545,7 @@ document.getElementById('btn-submit').onclick=()=>{
     score100: totalScore?Math.min(100, Math.round(gotScore/totalScore*100)):0,
     pct: totalScore?Math.min(100, Math.round(gotScore/totalScore*1000)/10):0,
     order:exam.order==='rand'?'随机':'順序',
+    reviewMode:exam.reviewMode||'wrongOnly',
     date:new Date().toLocaleString('zh-HK'),
     ts:Date.now(),
     startAt:QZ.startAt,
@@ -1658,13 +1659,17 @@ function showResult(a){
       </div>`;
     }
     const ok=isCorrect(d, d.userAnswer);
+    // reviewMode='wrongOnly'：全對嘅題唔顯示答案
+    const reviewMode=a.reviewMode||'wrongOnly';
+    const showAns=reviewMode==='showAns'||!ok;
     const tag=ok?'<span class="tag ok">啱</span>':'<span class="tag bad">錯</span>';
     const sc=Number(d.score)||0;
     const src=d.paper?`《${esc(d.paper)}》原第 ${d.orig||(i+1)} 題`:`原第 ${d.orig||(i+1)} 題`;
+    const ansTxt=showAns?esc(ansText(d, d.userAnswer)):'<span class="muted" style="font-size:12px">（答案未顯示）</span>';
     return `<div style="padding:8px;border-bottom:1px solid var(--line)">
       <div><b>第${i+1}題</b> ${tag} <span class="muted" style="font-size:12px">（${sc}分）· ${src}</span></div>
       <div style="color:var(--muted);margin:4px 0">${esc(d.question)}</div>
-      <div style="font-size:13px">${esc(ansText(d, d.userAnswer))}</div>
+      <div style="font-size:13px">${ansTxt}</div>
     </div>`;
   }).join('');
 }
@@ -2337,6 +2342,11 @@ function renderSub(g){
         <label class="L-opt" style="cursor:pointer"><input type="radio" name="L-order" value="seq" checked> 順序出題</label>
         <label class="L-opt" style="margin-left:12px;cursor:pointer"><input type="radio" name="L-order" value="rand"> 隨機出題</label>
       </div>
+      <label>考後檢討模式</label>
+      <div style="font-size:13px">
+        <label class="L-opt" style="cursor:pointer"><input type="radio" name="L-review" value="wrongOnly" checked> 只顯示錯題、唔顯示答案</label>
+        <label class="L-opt" style="margin-left:12px;cursor:pointer"><input type="radio" name="L-review" value="showAns"> 錯題＋正確答案都顯示</label>
+      </div>
       <label>抽題數量（0＝全部；混合時隨機抽指定題數）</label>
       <input id="L-count" type="number" min="0" value="0" inputmode="numeric">
       <label>考試碼（阿拉伯數字）</label><input id="L-code" inputmode="numeric" placeholder="例如 1234">
@@ -2360,6 +2370,10 @@ function renderSub(g){
         const lb=r.closest('label'); if(!lb) return;
         lb.style.color=r.checked?'#16a34a':''; lb.style.fontWeight=r.checked?'700':'';
       });
+      document.querySelectorAll('input[name="L-review"]').forEach(r=>{
+        const lb=r.closest('label'); if(!lb) return;
+        lb.style.color=r.checked?'#16a34a':''; lb.style.fontWeight=r.checked?'700':'';
+      });
     };
     document.querySelectorAll('.L-pchk').forEach(cb=>cb.onchange=()=>{
       if(cb.value==='0'&&cb.checked){ document.querySelectorAll('.L-pchk').forEach(x=>{ if(x.value!=='0') x.checked=false; }); }
@@ -2368,6 +2382,7 @@ function renderSub(g){
     });
     document.querySelectorAll('input[name="L-order"]').forEach(r=>r.onchange=syncLaunchOpt);
     document.querySelectorAll('input[name="L-mode"]').forEach(r=>r.onchange=syncLaunchOpt);
+    document.querySelectorAll('input[name="L-review"]').forEach(r=>r.onchange=syncLaunchOpt);
     syncLaunchOpt();
     document.getElementById('L-go').onclick=()=>{
       const code=document.getElementById('L-code').value.trim();
@@ -2394,11 +2409,12 @@ function renderSub(g){
       const now=Date.now();
       const mode=(document.querySelector('input[name="L-mode"]:checked')||{}).value||'fixed';
       const phoneOpen=mode==='phone';
+      const reviewMode=(document.querySelector('input[name="L-review"]:checked')||{}).value||'wrongOnly';
       const list=getExams().filter(e=>!(e.code===code));
       // 場次編號：搵返過往同碼嘅場次，遞增
       const oldSessions=getExams().filter(e=>String(e.code)===String(code)).map(e=>Number(e.session)||0);
       const session=(oldSessions.length?Math.max(...oldSessions):0)+1;
-      const examObj={code,session,paperId:paperIds[0]||0,paperIds,useAll,order,drawCount,durationMin:hours*60,className,launchedAt:now,unlimited:hours===0};
+      const examObj={code,session,paperId:paperIds[0]||0,paperIds,useAll,order,drawCount,durationMin:hours*60,className,launchedAt:now,unlimited:hours===0,reviewMode};
       if(phoneOpen){ examObj.phoneOpen=true; examObj.expireAt=now+30*24*3600*1000; examObj.closed=false; }
       else if(hours===0){ examObj.expireAt=now+100*365*24*3600*1000; }
       else { examObj.expireAt=now+hours*3600*1000; }
