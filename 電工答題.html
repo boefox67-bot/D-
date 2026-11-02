@@ -3325,6 +3325,13 @@ function renderSub(g){
         const visibleParts=(q.parts||[]).map((pt,idx)=>({pt,idx})).filter(x=>x.pt.visible!==false);
         if(visibleParts.length>0){
           x+=visibleParts.map(({pt,idx})=>partBlock(p.id,i,idx,pt)).join('');
+          // 混合題：加「＋添加填空位」按鈕（如果有 fill part 且未滿 6 個）
+          const fillCount=visibleParts.filter(x=>x.pt.kind==='fill').length;
+          if(fillCount>0 && fillCount<6){
+            x+=`<div style="margin-top:6px;text-align:center">
+              <button class="btn secondary" style="width:auto;padding:4px 14px;font-size:12px" onclick="editFillPartAdd(${p.id},${i})">＋添加填空位（${'ABCDEF'.charAt(fillCount)}）</button>
+            </div>`;
+          }
         } else if(q.type===3){
           // 填充題：預設 1 個答案欄（A），撳「＋添加」加多個（B/C/D/E/F）
           const fillParts=(q.parts||[]).filter(pt=>pt.kind==='fill');
