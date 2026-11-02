@@ -3353,6 +3353,7 @@ function renderSub(g){
           <summary style="cursor:pointer;display:flex;align-items:center;gap:10px;list-style-position:inside;flex-wrap:wrap">
             <b>第${i+1}題</b> <span class="qmeta">${TYPE_LABELS[q.type-1]||''}</span>
             <button class="btn danger" style="width:auto;padding:3px 10px;margin:0;font-size:11px" onclick="event.stopPropagation();delQuestion(${p.id},${i})">拆除</button>
+            <button class="btn" style="width:auto;padding:3px 10px;margin:0;font-size:11px;background:#7c3aed;color:#fff" onclick="event.stopPropagation();copyQuestion(${p.id},${i})">複製</button>
             <span style="font-size:12px;color:var(--muted)">分數（%）：<input type="number" min="0" step="0.5" style="width:70px;padding:4px" value="${Number(q.score)||0}" onclick="event.stopPropagation()" onchange="editPaperQScore(${p.id},${i},this.value)"></span>
           </summary>
           <div style="padding:10px 4px">
@@ -3425,6 +3426,7 @@ function renderSub(g){
           <button class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:13px" onclick="addQuestion(${p.id},3)">＋填寫/計算</button>
           <button class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:13px" onclick="addQuestion(${p.id},4)">＋混合題</button>
           <button class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:13px;background:#ea580c;color:#fff" onclick="addQuestion(${p.id},5)">＋圖片作答</button>
+          <button class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:13px;background:#7c3aed;color:#fff" onclick="pasteQuestion(${p.id})">📋 貼上題目</button>
         </div>
       </div>`;
       qa.innerHTML=h;
@@ -4136,6 +4138,25 @@ function delQuestion(pid, qi){
   renderSub('questions');
   toast('已拆除第'+(qi+1)+'題');
 }
+window.copyQuestion=function(pid, qi){
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid));
+  if(!p||!p.questions||!p.questions[qi]) return;
+  window._clipQ=JSON.parse(JSON.stringify(p.questions[qi]));
+  toast('已複製第'+(qi+1)+'題（去另一張考卷撳「貼上題目」）');
+};
+window.pasteQuestion=function(pid){
+  if(!window._clipQ){ toast('未複製任何題目'); return; }
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid));
+  if(!p) return;
+  p.questions=p.questions||[];
+  const cloned=JSON.parse(JSON.stringify(window._clipQ));
+  p.questions.push(cloned);
+  DB.set(K.papers,papers);
+  renderSub('questions');
+  toast('已貼上題目（第'+p.questions.length+'題）');
+};
 function foldAllQ(open){
   window._qFold=window._qFold||{};
   document.querySelectorAll('#Q-area details.qfold').forEach(d=>{
