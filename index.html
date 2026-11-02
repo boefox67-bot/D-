@@ -230,6 +230,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <p id="quiz-className"></p>
     </div>
     <div class="progress" id="quiz-progress"></div>
+    <div style="display:flex;gap:6px;align-items:center;margin:0 0 10px;font-size:13px">
+      <span style="color:var(--muted);white-space:nowrap">跳去第</span>
+      <input id="quiz-goto" type="number" min="1" max="1" placeholder="題號" style="width:64px;padding:6px 4px;border:1px solid var(--line);border-radius:6px;font-size:14px;text-align:center">
+      <span style="color:var(--muted);white-space:nowrap">題</span>
+      <button class="btn secondary" id="btn-goto" style="padding:6px 12px;font-size:13px;margin:0">跳去</button>
+    </div>
     <button class="btn secondary" id="btn-exit" style="padding:8px;font-size:13px;margin:0 0 10px">換考場（未交卷離開，草稿保留）</button>
     <div class="card" id="quiz-card"></div>
     <div class="row">
@@ -1302,6 +1308,8 @@ function renderQuiz(){
   const {list, answers, idx}=QZ;
   const q=list[idx];
   document.getElementById('quiz-progress').textContent=`第 ${idx+1} / ${list.length} 題 · ${TYPE_LABELS[q.type-1]||''}`+(q.score?` · ${q.score}分`:'');
+  const gotoInp=document.getElementById('quiz-goto');
+  if(gotoInp){ gotoInp.max=list.length; }
   let html='';
   html+=wmHtml();
   html+=`<div class="qbox">
@@ -1490,6 +1498,17 @@ document.getElementById('btn-calc').onclick=()=>{
 };
 document.getElementById('btn-prev').onclick=()=>{ if(QZ.idx>0){ QZ.idx--; renderQuiz(); saveDraft(); } };
 document.getElementById('btn-next').onclick=()=>{ if(QZ.idx<QZ.list.length-1){ QZ.idx++; renderQuiz(); saveDraft(); } };
+function gotoQuestion(){
+  if(!QZ) return;
+  const inp=document.getElementById('quiz-goto');
+  const n=parseInt(inp.value,10);
+  if(isNaN(n)||n<1||n>QZ.list.length){ alert('請輸入 1 到 '+QZ.list.length+' 之間嘅題號'); inp.value=''; inp.focus(); return; }
+  QZ.idx=n-1;
+  renderQuiz(); saveDraft();
+  inp.value=''; inp.blur();
+}
+document.getElementById('btn-goto').onclick=gotoQuestion;
+document.getElementById('quiz-goto').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); gotoQuestion(); } });
 document.getElementById('btn-exit').onclick=()=>{
   if(!QZ){ go('home'); return; }
   if(!confirm('未交卷離開，草稿會保留；返入本場可以由原題繼續。確定離開返首頁？')) return;
@@ -3352,9 +3371,9 @@ function renderSub(g){
           <button class="btn secondary" style="width:auto;padding:2px 8px;margin-top:4px;font-size:11px" onclick="insertQImage(${p.id},${i})">＋插入圖片</button>
           <button class="btn secondary" style="width:auto;padding:2px 8px;margin-top:4px;font-size:11px;border:1.5px dashed #94a3b8" onclick="pasteQImage(${p.id},${i})">📋 長按貼圖</button>
           <input type="file" id="q_img_${i}" accept="image/*" style="display:none" onchange="readQImage(this,${p.id},${i})">`;
-        // 渲染 visible parts（混合題模式）
+        // 渲染 visible parts（混合題模式，僅限 type===4）
         const visibleParts=(q.parts||[]).map((pt,idx)=>({pt,idx})).filter(x=>x.pt.visible!==false);
-        if(visibleParts.length>0){
+        if(q.type===4 && visibleParts.length>0){
           x+=visibleParts.map(({pt,idx})=>partBlock(p.id,i,idx,pt)).join('');
           // 混合題：加「＋添加填空位」按鈕（如果有 fill part 且未滿 6 個）
           const fillCount=visibleParts.filter(x=>x.pt.kind==='fill').length;
