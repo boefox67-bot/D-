@@ -2992,6 +2992,8 @@ function renderSub(g){
           document.getElementById('I-msg').textContent=debugMsg;
           alert(debugMsg); // 彈出視窗
           const papers=getPapers();
+          const mode='new'; // 預設新建考卷
+          const targetId=null;
           if(mode==='exist' && targetId){
             const _idx=papers.findIndex(pp=>String(pp.id)===targetId);
             if(_idx<0){ document.getElementById('I-msg').textContent='揀唔到嗰個文件檔'; return; }
