@@ -4251,9 +4251,9 @@ function editFillPartAdd(pid, qi){
   if(!q.parts) q.parts=[];
   let fillParts=q.parts.filter(pt=>pt.kind==='fill');
   if(fillParts.length>=6) return; // 最多 6 個
-  // 如果未有 fill parts，將現有 q.answer 轉成第一個 part
-  if(fillParts.length===0 && q.answer){
-    fillParts.push({kind:'fill', answer:String(q.answer), visible:true});
+  // 如果未有 fill parts，將現有 q.answer 轉成第一個 part（就算 q.answer 係空都要加 A）
+  if(fillParts.length===0){
+    fillParts.push({kind:'fill', answer:String(q.answer||''), visible:true});
   }
   // 加新 fill part
   fillParts.push({kind:'fill', answer:'', visible:true});
