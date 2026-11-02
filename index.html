@@ -230,11 +230,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <p id="quiz-className"></p>
     </div>
     <div class="progress" id="quiz-progress"></div>
-    <div style="display:flex;gap:6px;align-items:center;margin:0 0 10px;font-size:13px">
-      <span style="color:var(--muted);white-space:nowrap">跳去第</span>
-      <input id="quiz-goto" type="number" min="1" max="1" placeholder="題號" style="width:64px;padding:6px 4px;border:1px solid var(--line);border-radius:6px;font-size:14px;text-align:center">
-      <span style="color:var(--muted);white-space:nowrap">題</span>
-      <button class="btn secondary" id="btn-goto" style="padding:6px 12px;font-size:13px;margin:0">跳去</button>
+    <div style="display:flex;gap:8px;align-items:center;margin:0 0 12px;font-size:16px">
+      <span style="color:var(--muted);white-space:nowrap;font-weight:600">跳去第</span>
+      <input id="quiz-goto" type="number" min="1" max="1" placeholder="題號" style="width:110px;padding:10px 8px;border:2px solid var(--blue);border-radius:8px;font-size:20px;text-align:center;font-weight:700">
+      <span style="color:var(--muted);white-space:nowrap;font-weight:600">題</span>
+      <button class="btn secondary" id="btn-goto" style="padding:10px 20px;font-size:16px;margin:0;font-weight:700">跳去</button>
     </div>
     <button class="btn secondary" id="btn-exit" style="padding:8px;font-size:13px;margin:0 0 10px">換考場（未交卷離開，草稿保留）</button>
     <div class="card" id="quiz-card"></div>
@@ -598,18 +598,18 @@ function renderOptContent(text){
   // 如果圖獨立一行（前後係換行或首尾），就 block 獨佔一行；否則 inline
   s=s.replace(/(^|\n)!\[([^\]]*)\]\(([^)|]+)(?:\|([SML]))?\)(?=\n|$)/g, function(m,pre,alt,url,sz){
     const h = sz==='L' ? '9em' : sz==='M' ? '4.5em' : '2em';
-    return pre+'<div style="text-align:center;margin:6px 0"><img class="content-img content-img-'+(sz||'S')+'" style="height:'+h+'" src="'+url+'" alt="'+alt+'" data-size="'+(sz||'S')+'"></div>';
+    return pre+'<div style="text-align:center;margin:6px 0"><img class="content-img content-img-'+(sz||'S')+'" style="height:'+h+';cursor:zoom-in" src="'+url+'" alt="'+alt+'" data-size="'+(sz||'S')+'" onclick="zoomImgAns(this)"></div>';
   });
   s=s.replace(/!\[([^\]]*)\]\(([^)|]+)(?:\|([SML]))?\)/g, function(m,alt,url,sz){
     const h = sz==='L' ? '9em' : sz==='M' ? '4.5em' : '2em';
-    return '<img class="content-img content-img-'+(sz||'S')+'" style="height:'+h+'" src="'+url+'" alt="'+alt+'" data-size="'+(sz||'S')+'">';
+    return '<img class="content-img content-img-'+(sz||'S')+'" style="height:'+h+';cursor:zoom-in" src="'+url+'" alt="'+alt+'" data-size="'+(sz||'S')+'" onclick="zoomImgAns(this)">';
   });
   // DISPIMG 公式 =DISPIMG("ID_xxx",1)
   const m=s.match(/^=DISPIMG\(["']([^"']+)["']/);
   if(m){
     const imgUrl=(window._xlsImages&&window._xlsImages[m[1]]);
     if(imgUrl){
-      return `<img class="content-img" src="${imgUrl}" alt="圖片">`;
+      return `<img class="content-img" style="cursor:zoom-in" src="${imgUrl}" alt="圖片" onclick="zoomImgAns(this)">`;
     }
     return `<span style="display:inline-block;padding:4px 8px;background:#fef3c7;border:1px dashed #f59e0b;border-radius:4px;font-size:12px;color:#92400e">[圖片 ${m[1].slice(0,20)}...]</span>`;
   }
