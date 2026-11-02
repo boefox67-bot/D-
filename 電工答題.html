@@ -2882,16 +2882,18 @@ function renderSub(g){
       <div id="I-msg" class="warn"></div>`;
     document.getElementById('I-go').onclick=()=>{
       const f=document.getElementById('I-file').files[0];
-      if(!f) return toast('揀 X 檔');
+      if(!f){ toast('請先揀 X 檔'); document.getElementById('I-msg').textContent='❌ 未揀文件，請撳「選擇文件」揀 .xlsx 檔'; return; }
       const name=document.getElementById('I-name').value.trim()||f.name.replace(/\.xlsx?$/i,'');
+      document.getElementById('I-msg').textContent='⏳ 讀取緊 '+f.name+'...';
       const rd=new FileReader();
       rd.onload=async e=>{
         try{
           const buf=new Uint8Array(e.target.result);
           const wb=XLSX.read(buf,{type:'array'});
           const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+          document.getElementById('I-msg').textContent='⏳ 讀到 '+rows.length+' 行，分析格式...';
           const d=detectColumns(rows);
-          if(!d.fmt){ document.getElementById('I-msg').textContent='認唔到 X 檔格式，請用標準考卷範本（要有「問題」「單選題答案位A內容」等表頭）'; return; }
+          if(!d.fmt){ document.getElementById('I-msg').textContent='❌ 認唔到格式！表头要有「問題」「填寫題」「單選題」等標準欄位。你個檔案第一行係：'+(rows[0]||[]).slice(0,5).join(' | '); return; }
           // 讀取 XLSX 入面嘅圖片（DISPIMG）
           let imgMap={};
           try{
