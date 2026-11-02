@@ -2321,38 +2321,53 @@ function renderSub(g){
     const arrow=k=>window._paperSort.key===k?(window._paperSort.dir===1?' ▲':' ▼'):'';
     const paperBoxes=papers.map(p=>`<label class="L-opt" style="display:block;font-size:13px;margin:4px 0;cursor:pointer"><input type="checkbox" class="L-pchk" value="${p.id}"> ${esc(p.name)}（${Array.isArray(p.questions)?p.questions.length:0}題）</label>`).join('')||'<span class="muted">未有考卷，先去導入</span>';
     el.innerHTML=subHead('發起考試碼')+`
-      <label>揀班次</label><select id="L-cls">${cls.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
-      <label>揀考卷（可多張混合；唔勾選＝全部題庫）</label>
-      <div style="display:flex;gap:0;margin-bottom:6px;border-bottom:1px solid var(--line);padding-bottom:4px">
-        <button type="button" onclick="togglePaperSortLaunch('name')" style="flex:2;text-align:left;background:none;border:none;cursor:pointer;font-size:12px;color:#64748b;padding:2px">名稱${arrow('name')}</button>
-        <button type="button" onclick="togglePaperSortLaunch('id')" style="flex:1;text-align:center;background:none;border:none;cursor:pointer;font-size:12px;color:#64748b;padding:2px">日期${arrow('id')}</button>
-        <button type="button" onclick="togglePaperSortLaunch('count')" style="flex:1;text-align:center;background:none;border:none;cursor:pointer;font-size:12px;color:#64748b;padding:2px">題數${arrow('count')}</button>
+      <!-- 考卷設置 -->
+      <div style="border:2px solid #3b82f6;border-radius:10px;padding:10px;margin-bottom:10px;background:#eff6ff">
+        <div style="font-size:14px;font-weight:700;color:#1e40af;margin-bottom:8px">📋 考卷設置</div>
+        <label>揀班次</label><select id="L-cls">${cls.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
+        <label>揀考卷（可多張混合；唔勾選＝全部題庫）</label>
+        <div style="display:flex;gap:0;margin-bottom:6px;border-bottom:1px solid var(--line);padding-bottom:4px">
+          <button type="button" onclick="togglePaperSortLaunch('name')" style="flex:2;text-align:left;background:none;border:none;cursor:pointer;font-size:12px;color:#64748b;padding:2px">名稱${arrow('name')}</button>
+          <button type="button" onclick="togglePaperSortLaunch('id')" style="flex:1;text-align:center;background:none;border:none;cursor:pointer;font-size:12px;color:#64748b;padding:2px">日期${arrow('id')}</button>
+          <button type="button" onclick="togglePaperSortLaunch('count')" style="flex:1;text-align:center;background:none;border:none;cursor:pointer;font-size:12px;color:#64748b;padding:2px">題數${arrow('count')}</button>
+        </div>
+        <div style="max-height:140px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff">
+          <label class="L-opt" style="font-size:13px;cursor:pointer"><input type="checkbox" class="L-pchk" value="0"> 全部題庫（${getQuestions().length}題）</label>
+          ${paperBoxes}
+        </div>
+        <label>出題順序</label>
+        <div style="font-size:13px">
+          <label class="L-opt" style="cursor:pointer"><input type="radio" name="L-order" value="seq" checked> 順序出題</label>
+          <label class="L-opt" style="margin-left:12px;cursor:pointer"><input type="radio" name="L-order" value="rand"> 隨機出題</label>
+        </div>
+        <label>抽題數量（0＝全部；混合時隨機抽指定題數）</label>
+        <input id="L-count" type="number" min="0" value="0" inputmode="numeric">
       </div>
-      <div style="max-height:140px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px">
-        <label class="L-opt" style="font-size:13px;cursor:pointer"><input type="checkbox" class="L-pchk" value="0"> 全部題庫（${getQuestions().length}題）</label>
-        ${paperBoxes}
+
+      <!-- 學生入場 -->
+      <div style="border:2px solid #10b981;border-radius:10px;padding:10px;margin-bottom:10px;background:#ecfdf5">
+        <div style="font-size:14px;font-weight:700;color:#047857;margin-bottom:8px">👤 學生入場</div>
+        <label>入場方式</label>
+        <div style="font-size:13px">
+          <label class="L-opt" style="cursor:pointer"><input type="radio" name="L-mode" value="fixed" checked> 固定學生（舊規矩：揀學號・交卷鎖名）</label>
+          <label class="L-opt" style="margin-left:12px;cursor:pointer"><input type="radio" name="L-mode" value="phone"> 只要電話（電話號碼即身份・無限刷題・關卷先停）</label>
+        </div>
+        <label>考試碼（阿拉伯數字）</label><input id="L-code" inputmode="numeric" placeholder="例如 1234">
+        <label>開放時長（小時；0＝無限時間直到關閉考場，平時默認2）</label>
+        <input id="L-hours" type="number" min="0" max="168" value="2" inputmode="numeric">
+        <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:4px">填 0 = 無限時間：直到你喺「進行中考試」撳關閉考場先停（唔受 168 上限）</div>
       </div>
-      <label>入場方式</label>
-      <div style="font-size:13px">
-        <label class="L-opt" style="cursor:pointer"><input type="radio" name="L-mode" value="fixed" checked> 固定學生（舊規矩：揀學號・交卷鎖名）</label>
-        <label class="L-opt" style="margin-left:12px;cursor:pointer"><input type="radio" name="L-mode" value="phone"> 只要電話（電話號碼即身份・無限刷題・關卷先停）</label>
+
+      <!-- 考後檢討 -->
+      <div style="border:2px solid #f59e0b;border-radius:10px;padding:10px;margin-bottom:10px;background:#fffbeb">
+        <div style="font-size:14px;font-weight:700;color:#b45309;margin-bottom:8px">📝 考後檢討</div>
+        <label>考後檢討模式</label>
+        <div style="font-size:13px">
+          <label class="L-opt" style="cursor:pointer"><input type="radio" name="L-review" value="wrongOnly" checked> 只顯示錯題、唔顯示答案</label>
+          <label class="L-opt" style="margin-left:12px;cursor:pointer"><input type="radio" name="L-review" value="showAns"> 錯題＋正確答案都顯示</label>
+        </div>
       </div>
-      <label>出題順序</label>
-      <div style="font-size:13px">
-        <label class="L-opt" style="cursor:pointer"><input type="radio" name="L-order" value="seq" checked> 順序出題</label>
-        <label class="L-opt" style="margin-left:12px;cursor:pointer"><input type="radio" name="L-order" value="rand"> 隨機出題</label>
-      </div>
-      <label>考後檢討模式</label>
-      <div style="font-size:13px">
-        <label class="L-opt" style="cursor:pointer"><input type="radio" name="L-review" value="wrongOnly" checked> 只顯示錯題、唔顯示答案</label>
-        <label class="L-opt" style="margin-left:12px;cursor:pointer"><input type="radio" name="L-review" value="showAns"> 錯題＋正確答案都顯示</label>
-      </div>
-      <label>抽題數量（0＝全部；混合時隨機抽指定題數）</label>
-      <input id="L-count" type="number" min="0" value="0" inputmode="numeric">
-      <label>考試碼（阿拉伯數字）</label><input id="L-code" inputmode="numeric" placeholder="例如 1234">
-      <label>開放時長（小時；0＝無限時間直到關閉考場，平時默認2）</label>
-      <input id="L-hours" type="number" min="0" max="168" value="2" inputmode="numeric">
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:4px">填 0 = 無限時間：直到你喺「進行中考試」撳關閉考場先停（唔受 168 上限）</div>
+
       <button class="btn" id="L-go">生成考試碼</button></div>
       <div class="card"><h2>進行中考試</h2><div id="L-list"></div></div>`;
     renderActiveExams();
