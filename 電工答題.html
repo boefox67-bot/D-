@@ -214,7 +214,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="warn" id="home-warn" style="display:none"></div>
       
     </div>
-    <footer>© 2026 豆包工作 版權所有・飛躍教育中心 電工答題系統<br>換 X 檔就係新考試・考試碼 1 小時有效 版本 <span id="footer-ver">1.0</span> ・<a id="link-teacher" style="display:none;color:#94a3b8;cursor:pointer;text-decoration:underline;position:relative;z-index:100001;user-select:none;-webkit-user-select:none">AC</a></footer>
+    <footer>© 2026 飛躍教育中心 LEAP EDUCATION CENTER 版權所有<br>本系統採用 GPLv3 開源協議：教學用途免費使用，禁止商業閉源抄襲<br>換 X 檔就係新考試・考試碼 1 小時有效 版本 <span id="footer-ver">1.0</span> ・<a id="link-teacher" style="display:none;color:#94a3b8;cursor:pointer;text-decoration:underline;position:relative;z-index:100001;user-select:none;-webkit-user-select:none">AC</a></footer>
     <div id="home-footlogo-box" style="text-align:center;margin:14px 0 20px">
       <img id="home-footlogo" alt="底部Logo" style="width:100%;max-width:520px;height:auto;object-fit:contain;border-radius:8px;padding:6px;background:#fff">
       <div class="muted" style="font-size:11px;margin-top:2px">飛躍教育中心</div>
@@ -2871,9 +2871,10 @@ function renderSub(g){
       <button class="btn" id="I-go">導入並存考卷</button>
       <div style="margin-top:16px;padding:12px;border-top:1px dashed var(--line)">
         <b style="font-size:14px">📋 複製貼上匯入（快捷方式）</b>
-        <p class="muted" style="font-size:12px;margin:6px 0">直接喺 Excel 揀全張表 → 右鍵複製 → 貼上下面個框 → 撳「貼上匯入」</p>
-        <textarea id="I-paste" placeholder="喺 Excel 複製全張考卷表格，然後貼上喺度…" style="width:100%;height:120px;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:12px;font-family:monospace"></textarea>
-        <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <p class="muted" style="font-size:12px;margin:6px 0">直接喺 Excel 揀全張表 → 右鍵複製 → 撳下面「一鍵貼上」→ 撳「貼上匯入」</p>
+        <textarea id="I-paste" placeholder="撳下面「一鍵貼上」按鈕，或者先撳呢個框再 Ctrl+V" style="width:100%;height:120px;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:12px;font-family:monospace"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn secondary" id="I-pasteClip" style="padding:6px 14px">📋 一鍵貼上</button>
           <input id="I-pasteName" placeholder="卷名（例如 電工初級52期A卷）" style="flex:1;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:13px">
           <button class="btn" id="I-pasteGo" style="padding:6px 14px">📋 貼上匯入</button>
         </div>
@@ -3009,6 +3010,17 @@ function renderSub(g){
         }catch(err){ document.getElementById('I-msg').textContent='解析失敗：'+err.message; }
       };
       rd.readAsArrayBuffer(f);
+    };
+    // 一鍵貼上：從剪貼簿讀取內容
+    document.getElementById('I-pasteClip').onclick=async()=>{
+      try{
+        const text=await navigator.clipboard.readText();
+        if(!text){ toast('剪貼簿冇內容，請先喺 Excel 複製'); return; }
+        document.getElementById('I-paste').value=text;
+        toast('已貼上 '+text.length+' 字元');
+      }catch(err){
+        toast('讀唔到剪貼簿，請先撳文字框再 Ctrl+V');
+      }
     };
     // 複製貼上匯入：直接由 Excel 複製文字貼上
     document.getElementById('I-pasteGo').onclick=()=>{
