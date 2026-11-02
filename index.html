@@ -669,17 +669,31 @@ function isCorrect(q, ua){
     if(parts.length!==up.length) return false;
     return parts.every((pt,i)=>partCorrect(pt, up[i]));
   }
-  if(q.type===3) return matchCalc(q.answer, ua);
+  if(q.type===3){
+    const parts=(q.parts||[]).filter(pt=>pt.kind==='fill'&&pt.visible!==false);
+    if(parts.length>1){
+      const up=ua&&ua.parts?ua.parts:[];
+      return parts.every((pt,i)=>partCorrect(pt,up[i]));
+    }
+    return matchCalc(q.answer,ua);
+  }
   const a=(q.answer||[]).slice().sort(), b=(ua||[]).slice().sort();
   return a.length===b.length && a.every((v,i)=>v===b[i]);
 }
 function questionScore(q, ua){
   const base=Number(q.score)||1;
-  if(q.type===5) return 0; // 圖片作答：即刻唔計分，等導師改好（百分比×題分）先計
+  if(q.type===5) return 0;
   if(q.type===4){
     const parts=q.parts||[]; if(!parts.length) return 0;
     const per=base/parts.length, up=(ua&&ua.parts)||[];
     return parts.reduce((s,pt,i)=>partCorrect(pt,up[i])?s+per:s,0);
+  }
+  if(q.type===3){
+    const parts=(q.parts||[]).filter(pt=>pt.kind==='fill'&&pt.visible!==false);
+    if(parts.length>1){
+      const per=base/parts.length, up=(ua&&ua.parts)||[];
+      return parts.reduce((s,pt,i)=>partCorrect(pt,up[i])?s+per:s,0);
+    }
   }
   return isCorrect(q,ua)?base:0;
 }
@@ -702,7 +716,7 @@ function compressImg(dataUrl, maxW, cb){
       canvas.width=Math.max(1,Math.round(img.width*ratio));
       canvas.height=Math.max(1,Math.round(img.height*ratio));
       canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-      cb(canvas.toDataURL('image/jpeg',0.72));
+      cb(canvas.toDataURL('image/jpeg',0.88));
     }catch(e){ cb(dataUrl); }
   };
   img.onerror=()=>cb(dataUrl);
@@ -1309,8 +1323,17 @@ function renderQuiz(){
       }
     });
   } else if(q.type===3){
-    const cur=answers[idx]==null?'':answers[idx];
-    html+=`<input data-kind="fill" class="fill-input" inputmode="decimal" placeholder="輸入計算答案" value="${esc(cur)}">`;
+    const parts=(q.parts||[]).filter(pt=>pt.kind==='fill'&&pt.visible!==false);
+    if(parts.length>1){
+      parts.forEach((pt,pi)=>{
+        const cur=(answers[idx]&&answers[idx].parts&&typeof answers[idx].parts[pi]==='string')?answers[idx].parts[pi]:'';
+        html+=`<div style="margin:8px 0 4px;font-size:13px;color:var(--muted);font-weight:700">填充位 ${'ABCDEF'.charAt(pi)}</div>`;
+        html+=`<input data-part="${pi}" data-kind="fill" class="fill-input" inputmode="decimal" placeholder="輸入答案" value="${esc(cur)}">`;
+      });
+    } else {
+      const cur=answers[idx]==null?'':answers[idx];
+      html+=`<input data-kind="fill" class="fill-input" inputmode="decimal" placeholder="輸入計算答案" value="${esc(cur)}">`;
+    }
   } else if(q.type===5){
     const ua=answers[idx];
     const hasImg=!!(ua&&ua.img);
@@ -1354,8 +1377,17 @@ function renderQuiz(){
           html+=`<div style="margin:3px 0">第${pi+1}部分：${ok?'<span class="tag ok">啱</span>':'<span class="tag bad">錯</span>'}　正確答案「${esc(fmtOpenAns(pt))}」${ok?'':'　你答「'+esc(upTxt)+'」'}</div>`;
         });
       } else if(q.type===3){
-        const ok=isCorrect(q,ua);
-        html+=`<div>${ok?'<span class="tag ok">啱</span>':'<span class="tag bad">錯</span>'}　正確答案「${esc(String(q.answer==null?'':q.answer))}」${ok?'':'　你答「'+esc(String(ua==null?'':ua))+'」'}</div>`;
+        const parts=(q.parts||[]).filter(pt=>pt.kind==='fill'&&pt.visible!==false);
+        if(parts.length>1){
+          parts.forEach((pt,i)=>{
+            const up=ua&&ua.parts?ua.parts[i]:null;
+            const ok=partCorrect(pt,up);
+            html+=`<div style="margin:3px 0">填充位 ${'ABCDEF'.charAt(i)}：${ok?'<span class="tag ok">啱</span>':'<span class="tag bad">錯</span>'}　正確答案「${esc(String(pt.answer==null?'':pt.answer))}」${ok?'':'　你答「'+esc(String(up==null?'':up))+'」'}</div>`;
+          });
+        } else {
+          const ok=isCorrect(q,ua);
+          html+=`<div>${ok?'<span class="tag ok">啱</span>':'<span class="tag bad">錯</span>'}　正確答案「${esc(String(q.answer==null?'':q.answer))}」${ok?'':'　你答「'+esc(String(ua==null?'':ua))+'」'}</div>`;
+        }
       } else {
         const opts=q.options||[];
         const co=Array.isArray(q.answer)?q.answer:[q.answer];
@@ -1400,9 +1432,10 @@ function renderQuiz(){
   document.querySelectorAll('#quiz-card .fill-input').forEach(el=>{
     el.oninput=()=>{
       const qq=QZ.list[QZ.idx];
-      if(qq.type===4){
+      if(qq.type===4||(qq.type===3&&el.dataset.part!==undefined)){
         const pi=Number(el.dataset.part);
-        if(!QZ.answers[QZ.idx]||!QZ.answers[QZ.idx].parts) QZ.answers[QZ.idx]={parts:qq.parts.map((p,i)=>p.kind==='fill'?'':[])};
+        const parts=qq.type===4?qq.parts:(qq.parts||[]).filter(pt=>pt.kind==='fill'&&pt.visible!==false);
+        if(!QZ.answers[QZ.idx]||!QZ.answers[QZ.idx].parts) QZ.answers[QZ.idx]={parts:parts.map((p,i)=>p.kind==='fill'?'':[])};
         QZ.answers[QZ.idx].parts[pi]=el.value;
       } else { QZ.answers[QZ.idx]=el.value; }
       saveDraft();
@@ -2978,17 +3011,17 @@ function renderSub(g){
       const f=input.files[0]; if(!f) return;
       const rd=new FileReader();
       rd.onload=e=>{
-        // 壓縮圖片到 200px 寬，JPEG 0.7 質量
+        // 壓縮圖片到 800px 寬，JPEG 0.85 質量
         const img=new Image();
         img.onload=()=>{
           const canvas=document.createElement('canvas');
-          const maxW=200;
+          const maxW=800;
           const ratio=Math.min(1, maxW/img.width);
           canvas.width=img.width*ratio;
           canvas.height=img.height*ratio;
           const ctx=canvas.getContext('2d');
           ctx.drawImage(img,0,0,canvas.width,canvas.height);
-          const compressed=canvas.toDataURL('image/jpeg',0.7);
+          const compressed=canvas.toDataURL('image/jpeg',0.85);
           const imgTag='![圖片]('+compressed+')';
           const inp=document.getElementById('opt_input_'+qi+'_'+pi+'_'+oi);
           inp.value=inp.value? inp.value+' '+imgTag : imgTag;
@@ -3005,13 +3038,13 @@ function renderSub(g){
       const img=new Image();
       img.onload=()=>{
         const canvas=document.createElement('canvas');
-        const maxW=300;
+        const maxW=1200;
         const ratio=Math.min(1, maxW/img.width);
         canvas.width=img.width*ratio;
         canvas.height=img.height*ratio;
         const ctx=canvas.getContext('2d');
         ctx.drawImage(img,0,0,canvas.width,canvas.height);
-        const compressed=canvas.toDataURL('image/jpeg',0.7);
+        const compressed=canvas.toDataURL('image/jpeg',0.88);
         const imgTag='![圖片]('+compressed+')';
         const ta=document.getElementById('q_text_'+qi);
         if(!ta) return;
