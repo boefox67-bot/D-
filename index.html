@@ -3079,6 +3079,7 @@ function renderSub(g){
     };
   }
   if(g==='questions'){
+    const _savedY=window.scrollY;
     const allPapers=getPapers();
     if(!window._paperSort) window._paperSort={key:'id',dir:1};
     const papers=[...allPapers].sort((a,b)=>{
@@ -3322,9 +3323,11 @@ function renderSub(g){
         <div id="Q-area" style="margin-top:12px"></div>`}
     `;
     const qArea=document.getElementById('Q-area');
-    function renderQArea(pid){
-      const p=getPapers().find(x=>x.id===Number(pid)); if(!p){ qArea.innerHTML=''; return; }
-      if(!(p.questions||[]).length){ qArea.innerHTML='<div class="muted" style="padding:20px;text-align:center">呢張卷冇題目，請重新導入 X 檔</div>'; return; }
+    window.renderQArea=function(pid){
+      const qa=document.getElementById('Q-area')||qArea;
+      if(!qa) return;
+      const p=getPapers().find(x=>x.id===Number(pid)); if(!p){ qa.innerHTML=''; return; }
+      if(!(p.questions||[]).length){ qa.innerHTML='<div class="muted" style="padding:20px;text-align:center">呢張卷冇題目，請重新導入 X 檔</div>'; return; }
       let h=(p.questions||[]).map((q,i)=>{
         const isMix=q.type===4;
         // 如果 q.parts 為空（舊數據），根據 q.type 預設勾選
@@ -3424,16 +3427,16 @@ function renderSub(g){
           <button class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:13px;background:#ea580c;color:#fff" onclick="addQuestion(${p.id},5)">＋圖片作答</button>
         </div>
       </div>`;
-      qArea.innerHTML=h;
+      qa.innerHTML=h;
       // 記住每題摺疊/展開狀態（改題型後保持）
-      qArea.querySelectorAll('details.qfold').forEach(d=>{
+      qa.querySelectorAll('details.qfold').forEach(d=>{
         d.addEventListener('toggle',()=>{
           window._qFold=window._qFold||{};
           window._qFold[d.dataset.qk]=d.open;
         });
       });
       // 題型 toggle（D-G 直行對應 checkbox）
-      qArea.querySelectorAll('[data-type-toggle]').forEach(cb=>{
+      qa.querySelectorAll('[data-type-toggle]').forEach(cb=>{
         cb.onchange=()=>{
           const qi=Number(cb.dataset.typeToggle);
           const papers=getPapers();
@@ -3453,7 +3456,7 @@ function renderSub(g){
             }
           });
           // checkbox 只係切換 visible 屬性，唔拆除唔改寫
-          const marks=Array.from(qArea.querySelectorAll(`[data-type-toggle="${qi}"]:checked`)).map(c=>c.value);
+          const marks=Array.from(qa.querySelectorAll(`[data-type-toggle="${qi}"]:checked`)).map(c=>c.value);
           q.parts.forEach(pt=>{ pt.visible=marks.includes(pt.kind); });
           // 點擊切換觸發：插圖(H)勾選＝圖片作答題型（type 5）；單一種＝單選/多選/填寫；多過一種＝混合
           if(marks.includes('img')){
@@ -3492,10 +3495,21 @@ function renderSub(g){
       }catch(err){ alert('新增失敗：'+err.message+'\n'+err.stack); }
     };
     if(papers.length>0){
-      renderQArea(papers[0].id);
-      document.getElementById('Q-paperSel').onchange=e=>{renderQArea(e.target.value); setTimeout(bindAllQImg,100);};
+      const prevPid = window._lastQPid || papers[0].id;
+      const exist = papers.find(p=>p.id===Number(prevPid));
+      const initPid = exist ? exist.id : papers[0].id;
+      window._lastQPid = initPid;
+      const sel = document.getElementById('Q-paperSel');
+      if(sel) sel.value = String(initPid);
+      renderQArea(initPid);
+      document.getElementById('Q-paperSel').onchange=e=>{
+        window._lastQPid = e.target.value;
+        renderQArea(e.target.value);
+        setTimeout(bindAllQImg,100);
+      };
       setTimeout(bindAllQImg,100);
     }
+    window.scrollTo(0,_savedY);
   }
   if(g==='datamgmt'){
     const att=getAttempts();
