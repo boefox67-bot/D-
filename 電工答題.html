@@ -2854,6 +2854,15 @@ function renderSub(g){
       <input type="file" id="I-file" accept=".xlsx,.xls" style="margin:12px 0">
       <div id="I-newBox" style="margin:8px 0"><label>新文件檔名稱（留空＝用 X 檔名）</label><input id="I-name" placeholder="例如 電工初級52期A卷"></div>
       <button class="btn" id="I-go">導入並存考卷</button>
+      <div style="margin-top:16px;padding:12px;border-top:1px dashed var(--line)">
+        <b style="font-size:14px">📋 複製貼上匯入（快捷方式）</b>
+        <p class="muted" style="font-size:12px;margin:6px 0">直接喺 Excel 揀全張表 → 右鍵複製 → 貼上下面個框 → 撳「貼上匯入」</p>
+        <textarea id="I-paste" placeholder="喺 Excel 複製全張考卷表格，然後貼上喺度…" style="width:100%;height:120px;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:12px;font-family:monospace"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+          <input id="I-pasteName" placeholder="卷名（例如 電工初級52期A卷）" style="flex:1;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:13px">
+          <button class="btn" id="I-pasteGo" style="padding:6px 14px">📋 貼上匯入</button>
+        </div>
+      </div>
       <div id="I-msg" class="warn"></div>`;
     document.getElementById('I-go').onclick=()=>{
       const f=document.getElementById('I-file').files[0];
@@ -2985,6 +2994,38 @@ function renderSub(g){
         }catch(err){ document.getElementById('I-msg').textContent='解析失敗：'+err.message; }
       };
       rd.readAsArrayBuffer(f);
+    };
+    // 複製貼上匯入：直接由 Excel 複製文字貼上
+    document.getElementById('I-pasteGo').onclick=()=>{
+      const txt=document.getElementById('I-paste').value.trim();
+      if(!txt){ toast('請先貼上 Excel 內容'); return; }
+      const pasteName=document.getElementById('I-pasteName').value.trim();
+      try{
+        // Excel 複製出嚟係 Tab 分隔，每行一個 \n
+        const rows=txt.split(/\r?\n/).map(line=>line.split('\t'));
+        const d=detectColumns(rows);
+        if(!d.fmt){ document.getElementById('I-msg').textContent='認唔到格式，請用標準考卷範本複製全張表（要有「問題」「單選題答案位A內容」等表頭）'; return; }
+        const qs=rowsToQuestions(rows, d.col);
+        if(!qs.length){ document.getElementById('I-msg').textContent='搵唔到題目，檢查格式'; return; }
+        // 自動讀取卷名（如果有「卷名」欄位）
+        let autoName=pasteName||'貼上匯入考卷';
+        if(d.col.paperName){
+          for(let ri=1; ri<rows.length; ri++){
+            const v=String(rows[ri][d.col.paperName-1]||'').trim();
+            if(v){ autoName=v; break; }
+          }
+        }
+        const debugMsg='✅ 貼上匯入成功：'+qs.length+' 題\n卷名：'+autoName;
+        document.getElementById('I-msg').textContent=debugMsg;
+        const papers=getPapers();
+        const newPid=Date.now()*100+Math.floor(Math.random()*900);
+        papers.push({id:newPid,name:autoName,createdAt:Date.now(),questions:qs});
+        DB.set(K.papers,papers);
+        DB.set(K.activePaper,newPid);
+        document.getElementById('I-paste').value='';
+        document.getElementById('I-pasteName').value='';
+        toast('貼上匯入成功：'+qs.length+' 題');
+      }catch(err){ document.getElementById('I-msg').textContent='貼上解析失敗：'+err.message; }
     };
   }
   if(g==='questions'){
