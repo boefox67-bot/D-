@@ -3392,7 +3392,7 @@ function renderSub(g){
           const partCount=fillParts.length>0?fillParts.length:1;
           x+=`<div style="margin:4px 0;padding:6px;background:#f8fafc;border-radius:8px">`;
           for(let pi=0;pi<partCount;pi++){
-            const pt=fillParts[pi]||{answer:''};
+            const pt=fillParts[pi]||{answer: pi===0?(q.answer==null?'':String(q.answer)):''};
             const label='ABCDEF'.charAt(pi);
             x+=`<div style="display:flex;gap:6px;margin-top:4px;align-items:center">
               <label style="flex:0 0 30px;font-size:13px;color:#64748b;font-weight:700">${label}：</label>
@@ -3876,7 +3876,13 @@ function exportPapers(){
       r[1]=q.question||'';
       r[35]=(q.score&&q.score>0)?q.score:'';
       if(q.type===5){ r[6]='1'; }
-      else if(q.type===3){ r[2]='1'; r[7]=Array.isArray(q.answer)?q.answer.join(';'):(q.answer==null?'':q.answer); }
+      else if(q.type===3){
+        r[2]='1';
+        const fillParts=(q.parts||[]).filter(pt=>pt.kind==='fill'&&pt.visible!==false);
+        let fillAns=Array.isArray(q.answer)?q.answer.join(';'):(q.answer==null?'':q.answer);
+        if(fillParts.length>1) fillAns=fillParts.map(p=>p.answer==null?'':String(p.answer)).join(';');
+        r[7]=fillAns;
+      }
       else if(q.type===4){
         (q.parts||[]).forEach(part=>{
           if(part.kind==='single'){ r[3]='1'; (part.options||[]).forEach((o,i)=>r[9+i]=o); (part.answer||[]).forEach(i=>r[21+i]='1'); }
@@ -4277,7 +4283,11 @@ function exportPaperXlsx(){
     }
     if(q.type===3){
       row[2]=1; // 填寫題
-      row[7]=cleanText(q.answer); // 填寫答案
+      // 填充題：多個填空位（ABCDEF 格）以「;」分隔寫入「填寫題答案位內容」，匯入時再拆返做多個填空位
+      const fillParts=(q.parts||[]).filter(pt=>pt.kind==='fill'&&pt.visible!==false);
+      let fillAns=(Array.isArray(q.answer)?q.answer.join(';'):(q.answer==null?'':q.answer));
+      if(fillParts.length>1) fillAns=fillParts.map(p=>p.answer==null?'':String(p.answer)).join(';');
+      row[7]=cleanText(fillAns);
     } else if(q.type===1){
       row[3]=1; // 單選題
       const ans=q.answer||[];
@@ -4527,13 +4537,20 @@ function rowToQuestion(cells, col){
       else if(kind==='multi'){ const mo=col.multiOpt.map(get).filter(Boolean); const ma=[]; col.multiStudent.forEach((s,i)=>{ if(isMark(s)&&i<mo.length) ma.push(i); }); if(mo.length) parts.push({kind:'multi',options:mo,answer:ma}); }
       else if(kind==='tf'){ const ta=[]; if(isMark(col.tfTrue)) ta.push(0); if(isMark(col.tfFalse)) ta.push(1); parts.push({kind:'tf',options:['正確','錯誤'],answer:ta}); }
       else { const raw=get(col.fillAns); const vals=String(raw).split(/[;,，；\s]+/).filter(t=>t.trim());
-        if(vals.length>1) parts.push({kind:'fill',answer:vals.map(t=>{const n=parseFloat(t); return isNaN(n)?t:n;})});
-        else if(vals.length===1){ const n=parseFloat(vals[0]); parts.push({kind:'fill',answer:isNaN(n)?vals[0]:n}); }
-        else parts.push({kind:'fill',answer:''});
+        if(vals.length===0) parts.push({kind:'fill',answer:''});
+        else vals.forEach(t=>{ const n=parseFloat(t); parts.push({kind:'fill',answer:isNaN(n)?t:n}); });
       }
     });
     q.type=4; q.parts=parts; q.options=[]; q.answer=[];
-  } else if(type===3){ const n=parseFloat(get(col.fillAns)); q.answer=isNaN(n)?get(col.fillAns):n; }
+  } else if(type===3){
+    // 填充題：答案以「; , ， ；」分隔＝多個填空位（ABCDEF 格）；單一答案=A 格
+    const rawAns=get(col.fillAns);
+    const vals=String(rawAns==null?'':rawAns).split(/[;,，；]+/).map(t=>t.trim()).filter(t=>t!=='');
+    const first=vals.length?vals[0]:'';
+    const nf=parseFloat(first);
+    q.answer=vals.length?(isNaN(nf)?first:nf):'';
+    q.parts=vals.length?vals.map(t=>{const n=parseFloat(t); return {kind:'fill',answer:isNaN(n)?t:n,visible:true};}):[{kind:'fill',answer:'',visible:true}];
+  }
   else if(type===2){ col.multiOpt.forEach(o=>{ const v=get(o); if(v) q.options.push(v); }); while(q.options.length<4) q.options.push('選項'+String.fromCharCode(65+q.options.length)); const idxs=[]; col.multiStudent.forEach((s,i)=>{ if(isMark(s)&&i<q.options.length) idxs.push(i); }); q.answer=idxs; }
   else if(tfHas){ q.options=['正確','錯誤']; q.answer=isMark(col.tfTrue)?[0]:[1]; }
   else { col.singleOpt.forEach(o=>{ const v=get(o); if(v) q.options.push(v); }); while(q.options.length<4) q.options.push('選項'+String.fromCharCode(65+q.options.length)); let idx=-1; col.singleStudent.forEach((s,i)=>{ if(isMark(s)&&i<q.options.length) idx=i; }); q.answer=idx>=0?[idx]:[]; }
