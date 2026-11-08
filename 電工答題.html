@@ -220,6 +220,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <img id="home-footlogo" alt="底部Logo" style="width:100%;max-width:520px;height:auto;object-fit:contain;border-radius:8px;padding:6px;background:#fff">
       <div class="muted" style="font-size:11px;margin-top:2px">飛躍教育中心</div>
     </div>
+    <!-- 獨立離線粵英翻譯 APP 跳轉（只係外部鏈接，功能唔嵌入考試系統） -->
+    <div id="trans-app-link" style="display:none;text-align:center;margin:0 0 18px">
+      <a id="trans-app-a" target="_blank" rel="noopener" style="display:inline-block;padding:8px 16px;border-radius:8px;background:#f1f5f9;border:1px solid var(--line);color:var(--ink);font-size:13px;text-decoration:none">離線粵英翻譯 APP →</a>
+    </div>
     <div id="ver-tag" style="position:fixed;left:8px;bottom:8px;background:#0f172a;color:#fff;font-size:11px;padding:3px 8px;border-radius:10px;opacity:0.7;z-index:99">v1.0</div>
   </div>
 
@@ -271,6 +275,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       </div>
     </div>
     <button class="btn secondary" id="btn-calc" style="padding:8px;font-size:13px;margin:10px 0 0">計算機</button>
+    <button class="btn secondary" id="btn-speak" onclick="speakQuestion()" style="padding:10px;font-size:14px;font-weight:700;margin:10px 0 0">🔊 讀出本題</button>
+    <div id="speak-hint" class="muted" style="font-size:11px;text-align:center;margin-top:4px"></div>
   </div>
 
   <!-- ========== 頁面：成績 ========== -->
@@ -402,8 +408,11 @@ const LEAP_LOGO_URL=(document.querySelector('#splash img')||{}).src||'';
 
 /* ================= 語言切換 examLang（zh / en）================= */
 const LANG_KEY='examLang';
-function getLang(){ try{ const v=localStorage.getItem(LANG_KEY); return v==='en'?'en':'zh'; }catch(e){ return 'zh'; } }
-function setLang(v){ try{ localStorage.setItem(LANG_KEY, v==='en'?'en':'zh'); }catch(e){} }
+/* 獨立離線粵英翻譯 APP 跳轉網址：填實際連結就自動顯示（留空＝唔顯示） */
+const TRANSLATOR_URL='';
+function getLang(){ try{ const v=localStorage.getItem(LANG_KEY)||''; return /^en/i.test(v)?'en':'zh'; }catch(e){ return 'zh'; } }
+function langTag(){ return getLang()==='en'?'en-US':'zh-HK'; }
+function setLang(v){ try{ localStorage.setItem(LANG_KEY, v==='en'?'en-US':'zh-HK'); }catch(e){} }
 const EN_DICT={
   '電工答題':'Electrical Quiz',
   '飛躍教育中心 · 初級維修電工課程':'LEAP Education Center · Basic Electrical Maintenance Course',
@@ -883,6 +892,7 @@ function bumpVersion(){
 
 /* ================= 路由 ================= */
 function go(view){
+  if(view!=='quiz' && typeof stopSpeak==='function') stopSpeak();
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+view).classList.add('active');
   window.scrollTo(0,0);
@@ -1579,8 +1589,70 @@ function fmtOpenAns(pt){
   const arr=Array.isArray(pt.answer)?pt.answer:(pt.answer==null?[]:[pt.answer]);
   return arr.map(i=>opts[i]!==undefined?opts[i]:('選項'+(i+1))).join('、')||'（未作答）';
 }
+/* ================= 讀題朗讀（語言跟 examLang：zh-HK／en-US）================= */
+const SpeakCtl={on:false};
+function stripSpeech(s){
+  return String(s==null?'':s)
+    .replace(/\{\{[\s\S]*?\}\}/g,' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g,' ')
+    .replace(/=DISPIMG\([^)]*\)/g,' ')
+    .replace(/<[^>]+>/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+function pickSpeechVoice(tag){
+  let vs=[];
+  try{ vs=(window.speechSynthesis&&window.speechSynthesis.getVoices())||[]; }catch(e){ vs=[]; }
+  if(!vs.length) return null;
+  const want=String(tag||'').toLowerCase().replace('_','-');
+  let hit=vs.find(v=>String(v.lang||'').toLowerCase().replace('_','-')===want);
+  if(!hit && want.indexOf('zh')===0){
+    hit=vs.find(v=>/zh[-_]?(hk)/i.test(v.lang))||vs.find(v=>/yue/i.test(v.lang))||vs.find(v=>/zh[-_]?(tw)/i.test(v.lang))||vs.find(v=>/^zh/i.test(v.lang));
+  }
+  if(!hit && want.indexOf('en')===0) hit=vs.find(v=>/^en/i.test(v.lang));
+  return hit||null;
+}
+function speakReset(){
+  const btn=document.getElementById('btn-speak');
+  SpeakCtl.on=false;
+  if(btn) btn.textContent='🔊 讀出本題';
+}
+function stopSpeak(){
+  try{ if(window.speechSynthesis) window.speechSynthesis.cancel(); }catch(e){}
+  speakReset();
+}
+function speakQuestion(){
+  if(!window.speechSynthesis||typeof SpeechSynthesisUtterance==='undefined'){ toast('此裝置唔支援語音朗讀'); return; }
+  if(SpeakCtl.on){ stopSpeak(); return; }
+  if(typeof QZ==='undefined'||!QZ||!QZ.list) return;
+  const q=QZ.list[QZ.idx]; if(!q) return;
+  const tag=langTag();
+  const en=getLang()==='en';
+  let txt=(en?('Question '+(QZ.idx+1)+'. '):('第'+(QZ.idx+1)+'題。'));
+  txt += stripSpeech(q.question)+'。';
+  if(q.type===1||q.type===2){
+    (q.options||[]).forEach((op,i)=>{ txt += ('ABCDEF'.charAt(i))+'. '+stripSpeech(op)+'。'; });
+  } else if(q.type===4){
+    (q.parts||[]).forEach((pt,pi)=>{
+      txt += (en?('Part '+(pi+1)+'. '):('第'+(pi+1)+'部分。'))+stripSpeech(pt.text||pt.question||'')+' ';
+      (pt.options||[]).forEach((op,i)=>{ txt += ('ABCDEF'.charAt(i))+'. '+stripSpeech(op)+'。'; });
+    });
+  }
+  const u=new SpeechSynthesisUtterance(txt);
+  u.lang=tag; u.rate=0.95; u.pitch=1;
+  const v=pickSpeechVoice(tag); if(v) u.voice=v;
+  const btn=document.getElementById('btn-speak');
+  u.onstart=function(){ SpeakCtl.on=true; if(btn) btn.textContent='⏹ 停止朗讀'; };
+  u.onend=function(){ speakReset(); };
+  u.onerror=function(){ speakReset(); };
+  try{ window.speechSynthesis.cancel(); }catch(e){}
+  window.speechSynthesis.speak(u);
+  const hint=document.getElementById('speak-hint');
+  if(hint) hint.textContent='語言 '+tag+' ・ '+(v?('語音 '+v.name):'系統預設語音');
+}
 function renderQuiz(){
   if(!QZ){ go('home'); return; }
+  stopSpeak();
   // 檢查考試碼仲存在／未過期（後台可能已關閉考場）；開卷練習唔受呢啲限制
   if(!QZ.exam.openBook && !examByCode(QZ.exam.code)){ alert('呢場考試已被老師關閉，刷新頁面返回首頁'); go('home'); return; }
   const {list, answers, idx}=QZ;
@@ -4841,6 +4913,11 @@ applyBranding();
 refreshLangBtn();
 translateTree(document.body);
 startLangObserver();
+(function initTransLink(){
+  const box=document.getElementById('trans-app-link'), a=document.getElementById('trans-app-a');
+  if(!box||!a) return;
+  if(TRANSLATOR_URL){ a.href=TRANSLATOR_URL; box.style.display='block'; }
+})();
 document.getElementById('view-home').classList.add('active');
 updateVerBadge();
 updateVerDisplay();
