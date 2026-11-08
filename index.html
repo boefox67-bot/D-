@@ -353,6 +353,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="card" id="teacher-transCard" style="padding:12px;margin-top:14px">
         <div class="muted" style="font-size:13px;margin-bottom:8px">離線粵英翻譯 APP：獨立檔案，下載落手機就可以離線用（同考試系統完全分開，唔影響任何考試功能同作答流程）。</div>
         <button class="btn" id="btn-dlTrans" style="width:100%;padding:10px" onclick="downloadTransApp()">⬇ 下載離線粵英翻譯 APP</button>
+        <button class="btn secondary" id="btn-openTrans" style="width:100%;padding:10px;margin-top:8px" onclick="openTransApp()">▶ 直接開啟翻譯 APP（語音＋即時對話）</button>
+        <div class="muted" style="font-size:12px;margin-top:8px">手機開咗之後，用瀏覽器選單「加到主畫面」，就會似 APP 咁一按即開。</div>
         <div id="trans-file-status" class="muted" style="font-size:12px;margin-top:6px"></div>
       </div>
     </div>
@@ -908,6 +910,11 @@ function go(view){
     if(view==='teacher') m.style.display='none';
     else if(typeof checkExamMask==='function') checkExamMask();
   }
+}
+function openTransApp(){
+  if(!TRANSLATOR_URL){ toast('未上傳翻譯 APP 檔案'); return; }
+  window.open(TRANSLATOR_URL,'_blank');
+  toast('已開啟翻譯 APP');
 }
 function downloadTransApp(){
   if(!TRANSLATOR_URL){ toast('未上傳翻譯 APP 檔案'); return; }
