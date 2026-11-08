@@ -413,7 +413,7 @@ const LEAP_LOGO_URL=(document.querySelector('#splash img')||{}).src||'';
 /* ================= 語言切換 examLang（zh / en）================= */
 const LANG_KEY='examLang';
 /* 獨立離線粵英翻譯 APP 檔案位置（相對路徑或完整 URL）；填好就自動出下載掣；留空＝隱藏 */
-const TRANSLATOR_URL='';
+const TRANSLATOR_URL='translator.html';
 function getLang(){ try{ const v=localStorage.getItem(LANG_KEY)||''; return /^en/i.test(v)?'en':'zh'; }catch(e){ return 'zh'; } }
 function langTag(){ return getLang()==='en'?'en-US':'zh-HK'; }
 function setLang(v){ try{ localStorage.setItem(LANG_KEY, v==='en'?'en-US':'zh-HK'); }catch(e){} }
