@@ -57,7 +57,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   .app{max-width:520px;margin:0 auto;min-height:100vh;background:var(--bg);padding:0 0 40px}
   .view{display:none;padding:16px}
   .view.active{display:block}
-  .topbar{background:var(--ink);color:#fff;padding:16px;border-radius:0 0 14px 14px;margin:-16px -16px 18px}
+  .topbar{background:var(--ink);color:#fff;padding:52px 16px 16px;border-radius:0 0 14px 14px;margin:-16px -16px 18px}
   .topbar h1{font-size:20px;font-weight:700}
   .topbar p{font-size:12px;opacity:.8;margin-top:4px}
   .brand-logo{display:block;width:180px;height:auto;margin:0 auto 10px;background:#fff;border-radius:10px;padding:6px}
@@ -275,8 +275,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       </div>
     </div>
     <button class="btn secondary" id="btn-calc" style="padding:8px;font-size:13px;margin:10px 0 0">計算機</button>
-    <button class="btn secondary" id="btn-speak" onclick="speakQuestion()" style="padding:10px;font-size:14px;font-weight:700;margin:10px 0 0">🔊 讀出本題</button>
-    <div id="speak-hint" class="muted" style="font-size:11px;text-align:center;margin-top:4px"></div>
   </div>
 
   <!-- ========== 頁面：成績 ========== -->
@@ -332,6 +330,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <div class="muted" style="font-size:13px;margin-bottom:8px">雲端同步：喺任何手機／電腦登入老師都可以改。改完按「儲存到雲端」，其他裝置按「從雲端重新整理」就會一樣。</div>
         <button class="btn" style="margin-right:8px;padding:8px 16px" onclick="cloudSaveAll()">儲存到雲端（覆蓋其他裝置）</button>
         <button class="btn secondary" style="padding:8px 16px" onclick="cloudRefreshAll()">從雲端重新整理（覆蓋本機）</button>
+      </div>
+      <div class="card" style="padding:12px;margin-bottom:10px">
+        <div class="muted" style="font-size:13px;margin-bottom:8px">離線粵英翻譯 APP：獨立檔案，下載落手機就可以離線用（同考試系統完全分開，唔影響任何考試功能同作答流程）。</div>
+        <button class="btn" id="btn-dlTrans" style="width:100%;padding:10px" onclick="downloadTransApp()">⬇ 下載離線粵英翻譯 APP</button>
+        <div id="trans-file-status" class="muted" style="font-size:12px;margin-top:6px"></div>
       </div>
       <div class="link-grid" id="t-grid1">
         <button data-go="launch">發起考試碼</button>
@@ -408,7 +411,7 @@ const LEAP_LOGO_URL=(document.querySelector('#splash img')||{}).src||'';
 
 /* ================= 語言切換 examLang（zh / en）================= */
 const LANG_KEY='examLang';
-/* 獨立離線粵英翻譯 APP 跳轉網址：填實際連結就自動顯示（留空＝唔顯示） */
+/* 獨立離線粵英翻譯 APP 檔案位置（相對路徑或完整 URL）；填好就自動出下載掣；留空＝隱藏 */
 const TRANSLATOR_URL='';
 function getLang(){ try{ const v=localStorage.getItem(LANG_KEY)||''; return /^en/i.test(v)?'en':'zh'; }catch(e){ return 'zh'; } }
 function langTag(){ return getLang()==='en'?'en-US':'zh-HK'; }
@@ -558,6 +561,7 @@ const EN_DICT={
   '結束':'End'
 };
 const EN_KEYS=Object.keys(EN_DICT).filter(k=>k.length>=2).sort((a,b)=>b.length-a.length);
+
 function langSeg(s){
   if(!s) return s;
   const lead=(s.match(/^\s*/)||[''])[0];
@@ -892,7 +896,6 @@ function bumpVersion(){
 
 /* ================= 路由 ================= */
 function go(view){
-  if(view!=='quiz' && typeof stopSpeak==='function') stopSpeak();
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+view).classList.add('active');
   window.scrollTo(0,0);
@@ -905,8 +908,15 @@ function go(view){
     else if(typeof checkExamMask==='function') checkExamMask();
   }
 }
-function toast(msg){
-  const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
+function downloadTransApp(){
+  if(!TRANSLATOR_URL){ toast('未上傳翻譯 APP 檔案'); return; }
+  const a=document.createElement('a');
+  a.href=TRANSLATOR_URL;
+  a.download=TRANSLATOR_URL.split('/').pop()||'offline-translator';
+  document.body.appendChild(a); a.click(); a.remove();
+  toast('開始下載…');
+}
+function toast(msg){  const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
   clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',2200);
 }
 
@@ -1589,70 +1599,14 @@ function fmtOpenAns(pt){
   const arr=Array.isArray(pt.answer)?pt.answer:(pt.answer==null?[]:[pt.answer]);
   return arr.map(i=>opts[i]!==undefined?opts[i]:('選項'+(i+1))).join('、')||'（未作答）';
 }
-/* ================= 讀題朗讀（語言跟 examLang：zh-HK／en-US）================= */
-const SpeakCtl={on:false};
-function stripSpeech(s){
-  return String(s==null?'':s)
-    .replace(/\{\{[\s\S]*?\}\}/g,' ')
-    .replace(/!\[[^\]]*\]\([^)]*\)/g,' ')
-    .replace(/=DISPIMG\([^)]*\)/g,' ')
-    .replace(/<[^>]+>/g,' ')
-    .replace(/\s+/g,' ')
-    .trim();
+function qStem(q){ return (getLang()==='en'&&q&&q.questionEn)?q.questionEn:(q&&q.question)||''; }
+function qOptText(q,oi){
+  if(getLang()==='en'&&q&&Array.isArray(q.optionsEn)&&q.optionsEn[oi]!=null&&q.optionsEn[oi]!=='') return q.optionsEn[oi];
+  return (q&&q.options)?q.options[oi]:'';
 }
-function pickSpeechVoice(tag){
-  let vs=[];
-  try{ vs=(window.speechSynthesis&&window.speechSynthesis.getVoices())||[]; }catch(e){ vs=[]; }
-  if(!vs.length) return null;
-  const want=String(tag||'').toLowerCase().replace('_','-');
-  let hit=vs.find(v=>String(v.lang||'').toLowerCase().replace('_','-')===want);
-  if(!hit && want.indexOf('zh')===0){
-    hit=vs.find(v=>/zh[-_]?(hk)/i.test(v.lang))||vs.find(v=>/yue/i.test(v.lang))||vs.find(v=>/zh[-_]?(tw)/i.test(v.lang))||vs.find(v=>/^zh/i.test(v.lang));
-  }
-  if(!hit && want.indexOf('en')===0) hit=vs.find(v=>/^en/i.test(v.lang));
-  return hit||null;
-}
-function speakReset(){
-  const btn=document.getElementById('btn-speak');
-  SpeakCtl.on=false;
-  if(btn) btn.textContent='🔊 讀出本題';
-}
-function stopSpeak(){
-  try{ if(window.speechSynthesis) window.speechSynthesis.cancel(); }catch(e){}
-  speakReset();
-}
-function speakQuestion(){
-  if(!window.speechSynthesis||typeof SpeechSynthesisUtterance==='undefined'){ toast('此裝置唔支援語音朗讀'); return; }
-  if(SpeakCtl.on){ stopSpeak(); return; }
-  if(typeof QZ==='undefined'||!QZ||!QZ.list) return;
-  const q=QZ.list[QZ.idx]; if(!q) return;
-  const tag=langTag();
-  const en=getLang()==='en';
-  let txt=(en?('Question '+(QZ.idx+1)+'. '):('第'+(QZ.idx+1)+'題。'));
-  txt += stripSpeech(q.question)+'。';
-  if(q.type===1||q.type===2){
-    (q.options||[]).forEach((op,i)=>{ txt += ('ABCDEF'.charAt(i))+'. '+stripSpeech(op)+'。'; });
-  } else if(q.type===4){
-    (q.parts||[]).forEach((pt,pi)=>{
-      txt += (en?('Part '+(pi+1)+'. '):('第'+(pi+1)+'部分。'))+stripSpeech(pt.text||pt.question||'')+' ';
-      (pt.options||[]).forEach((op,i)=>{ txt += ('ABCDEF'.charAt(i))+'. '+stripSpeech(op)+'。'; });
-    });
-  }
-  const u=new SpeechSynthesisUtterance(txt);
-  u.lang=tag; u.rate=0.95; u.pitch=1;
-  const v=pickSpeechVoice(tag); if(v) u.voice=v;
-  const btn=document.getElementById('btn-speak');
-  u.onstart=function(){ SpeakCtl.on=true; if(btn) btn.textContent='⏹ 停止朗讀'; };
-  u.onend=function(){ speakReset(); };
-  u.onerror=function(){ speakReset(); };
-  try{ window.speechSynthesis.cancel(); }catch(e){}
-  window.speechSynthesis.speak(u);
-  const hint=document.getElementById('speak-hint');
-  if(hint) hint.textContent='語言 '+tag+' ・ '+(v?('語音 '+v.name):'系統預設語音');
-}
+function dStem(d){ return (getLang()==='en'&&d&&d.questionEn)?d.questionEn:(d&&d.question)||''; }
 function renderQuiz(){
   if(!QZ){ go('home'); return; }
-  stopSpeak();
   // 檢查考試碼仲存在／未過期（後台可能已關閉考場）；開卷練習唔受呢啲限制
   if(!QZ.exam.openBook && !examByCode(QZ.exam.code)){ alert('呢場考試已被老師關閉，刷新頁面返回首頁'); go('home'); return; }
   const {list, answers, idx}=QZ;
@@ -1664,7 +1618,7 @@ function renderQuiz(){
   html+=wmHtml();
   html+=`<div class="qbox">
   <span class="qmeta">${TYPE_LABELS[q.type-1]||''}</span>
-  <div class="qtext">${idx+1}. ${renderOptContent(q.question)}</div>`;
+  <div class="qtext">${idx+1}. ${renderOptContent(qStem(q))}</div>`;
   if(q.type===4){
     (q.parts||[]).forEach((pt,pi)=>{
       html+=`<div style="margin:10px 0 4px;font-size:13px;color:var(--muted)">第${pi+1}部分（${pt.kind==='fill'?'填寫':pt.kind==='tf'?'是非':pt.kind==='multi'?'多選':'單選'}）</div>`;
@@ -1710,7 +1664,7 @@ function renderQuiz(){
     q.options.forEach((op,oi)=>{
       const on=selArr.includes(oi);
       html+=`<div class="opt ${kind} ${on?'selected':''}" data-opt="${oi}">
-        <span class="dot">${on?'✓':''}</span><span class="letter">${'ABCDEF'.charAt(oi)}</span><span>${renderOptContent(op)}</span></div>`;
+        <span class="dot">${on?'✓':''}</span><span class="letter">${'ABCDEF'.charAt(oi)}</span><span>${renderOptContent(qOptText(q,oi))}</span></div>`;
     });
   }
   html+='</div>';
@@ -1925,7 +1879,7 @@ document.getElementById('btn-submit').onclick=()=>{
     openBook:!!exam.openBook,
     phoneOpen:!!exam.phoneOpen,
     imgCount:imgCnt,
-    detail:list.map((q,i)=>({question:q.question,type:q.type,parts:q.parts||null,options:q.options,answer:q.answer,score:Number(q.score)||0,orig:q._orig,paper:q._paper,ok:isCorrect(q,answers[i]),userAnswer:answers[i]}))
+    detail:list.map((q,i)=>({question:q.question,questionEn:q.questionEn,optionsEn:q.optionsEn,type:q.type,parts:q.parts||null,options:q.options,answer:q.answer,score:Number(q.score)||0,orig:q._orig,paper:q._paper,ok:isCorrect(q,answers[i]),userAnswer:answers[i]}))
   };
   const key=QZ.key||QZ.name; // 序號綁定：記錄跟序號
   attempt.stuId = key;
@@ -2023,7 +1977,7 @@ function showResult(a){
       const dsrc=d.paper?`《${esc(d.paper)}》原第 ${d.orig||(i+1)} 題`:`原第 ${d.orig||(i+1)} 題`;
       return `<div style="padding:8px;border-bottom:1px solid var(--line)">
         <div><b>第${i+1}題</b> ${tag} <span class="muted" style="font-size:12px">（${dsc}分）· ${dsrc}${pctN}</span></div>
-        <div style="color:var(--muted);margin:4px 0">${esc(d.question)}</div>
+        <div style="color:var(--muted);margin:4px 0">${esc(dStem(d))}</div>
         <div style="font-size:13px">${ua&&ua.img?`<img src="${esc(ua.img)}" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--line);cursor:zoom-in" onclick="zoomImgAns(this)">`:'（未作答）'}</div>
       </div>`;
     }
@@ -2037,7 +1991,7 @@ function showResult(a){
     const ansTxt=showAns?esc(ansText(d, d.userAnswer)):'<span class="muted" style="font-size:12px">（答案未顯示）</span>';
     return `<div style="padding:8px;border-bottom:1px solid var(--line)">
       <div><b>第${i+1}題</b> ${tag} <span class="muted" style="font-size:12px">（${sc}分）· ${src}</span></div>
-      <div style="color:var(--muted);margin:4px 0">${esc(d.question)}</div>
+      <div style="color:var(--muted);margin:4px 0">${esc(dStem(d))}</div>
       <div style="font-size:13px">${ansTxt}</div>
     </div>`;
   }).join('');
@@ -3725,7 +3679,15 @@ function renderSub(g){
           <textarea id="q_text_${i}" style="width:100%;padding:8px;min-height:60px" onchange="editQText(${p.id},${i},this.value)" onpaste="handleQTextPaste(event,${p.id},${i})">${esc(q.question)}</textarea>
           <button class="btn secondary" style="width:auto;padding:2px 8px;margin-top:4px;font-size:11px" onclick="insertQImage(${p.id},${i})">＋插入圖片</button>
           <button class="btn secondary" style="width:auto;padding:2px 8px;margin-top:4px;font-size:11px;border:1.5px dashed #94a3b8" onclick="pasteQImage(${p.id},${i})">📋 長按貼圖</button>
-          <input type="file" id="q_img_${i}" accept="image/*" style="display:none" onchange="readQImage(this,${p.id},${i})">`;
+          <input type="file" id="q_img_${i}" accept="image/*" style="display:none" onchange="readQImage(this,${p.id},${i})">
+          <div style="margin-top:10px;padding:8px;background:#eef2ff;border:1px dashed #a5b4fc;border-radius:8px">
+            <div style="font-size:12px;color:#4338ca;font-weight:800;margin-bottom:4px">English version（語言掣切英文時顯示；留空＝照顯示中文）</div>
+            <label style="font-size:12px">Question (EN)</label>
+            <textarea id="q_en_${i}" style="width:100%;padding:6px;min-height:52px;font-size:13px" placeholder="English question...">${esc(q.questionEn||'')}</textarea>
+            <label style="font-size:12px;margin-top:6px;display:block">Options (EN)：每行一個，順序 A／B／C／D</label>
+            <textarea id="q_opt_en_${i}" style="width:100%;padding:6px;min-height:56px;font-size:13px" placeholder="Line 1 = A&#10;Line 2 = B&#10;Line 3 = C">${esc((q.optionsEn||[]).join('\n'))}</textarea>
+            <button class="btn" style="width:auto;padding:4px 12px;margin-top:6px;font-size:12px;background:#4338ca;color:#fff" onclick="saveQEn(${p.id},${i})">儲存英文版</button>
+          </div>`;
         // 渲染 visible parts（混合題模式，僅限 type===4）
         const visibleParts=(q.parts||[]).map((pt,idx)=>({pt,idx})).filter(x=>x.pt.visible!==false);
         if(q.type===4 && visibleParts.length>0){
@@ -4522,6 +4484,19 @@ function editQText(pid, i, v){
   const p=papers.find(x=>x.id===Number(pid)); if(!p||!p.questions[i]) return;
   p.questions[i].question=v; DB.set(K.papers,papers); toast('題目已更新');
 }
+function saveQEn(pid, i){
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions&&p.questions[i]; if(!q){ toast('搵唔到題目'); return; }
+  const ta=document.getElementById('q_en_'+i);
+  const to=document.getElementById('q_opt_en_'+i);
+  q.questionEn=ta?ta.value.trim():'';
+  if(to){
+    const lines=to.value.split(/\r?\n/).map(s=>s.trim()).filter(s=>s!=='');
+    q.optionsEn=lines;
+  }
+  DB.set(K.papers,papers);
+  toast('英文版已儲存');
+}
 function editOption(pid, qi, oi, v){
   const papers=getPapers();
   const p=papers.find(x=>x.id===Number(pid)); const q=p&&p.questions[qi]; if(!q) return;
@@ -4915,8 +4890,11 @@ translateTree(document.body);
 startLangObserver();
 (function initTransLink(){
   const box=document.getElementById('trans-app-link'), a=document.getElementById('trans-app-a');
-  if(!box||!a) return;
-  if(TRANSLATOR_URL){ a.href=TRANSLATOR_URL; box.style.display='block'; }
+  const st=document.getElementById('trans-file-status'), btn=document.getElementById('btn-dlTrans');
+  const has=!!TRANSLATOR_URL;
+  if(box&&a&&has){ a.href=TRANSLATOR_URL; box.style.display='block'; }
+  if(st) st.textContent=has?('已就緒：'+TRANSLATOR_URL.split('/').pop()):'未上傳檔案——把翻譯 APP 檔放入網站同一位置，再喺 TRANSLATOR_URL 填檔名';
+  if(btn) btn.style.opacity=has?'1':'.6';
 })();
 document.getElementById('view-home').classList.add('active');
 updateVerBadge();
