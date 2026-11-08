@@ -64,6 +64,7 @@
     <button id="d2e" aria-pressed="true">粵 → 英</button>
     <button id="e2d" aria-pressed="false">英 → 粵</button>
   </div>
+  <button class="auto" id="goog" aria-pressed="false">🌐 用 Google 翻譯（連網更準；離線自動回詞庫）</button>
   <button class="auto" id="auto" aria-pressed="false">▶ 即時對話（講完自動翻譯＋自動朗讀，雙向輪替）</button>
   <div class="devline" id="devline"></div>
 
@@ -180,7 +181,13 @@ const MAND_EN={
 '警報':'alarm','應急燈':'emergency light','出口指示':'exit sign','防雷':'lightning protection',
 '螺絲起子':'screwdriver','衝擊鑽':'impact drill','美工刀':'utility knife','水平尺':'spirit level','濾網':'filter',
 '製冷劑':'refrigerant','不斷電系統':'UPS','可程式控制器':'PLC','感測器':'sensor','極限開關':'limit switch',
-'壓接':'crimping','剝線':'stripping','端子':'terminal','接線':'wiring','焊接':'welding','焊錫':'solder','烙鐵':'soldering iron'
+'壓接':'crimping','剝線':'stripping','端子':'terminal','接線':'wiring','焊接':'welding','焊錫':'solder','烙鐵':'soldering iron',
+'後天':'the day after tomorrow','前天':'the day before yesterday','上午':'morning','下午':'afternoon','星期':'week','星期一':'Monday',
+'什麼時候':'when','幾點':"what time",'沒有問題':'no problem','沒事':'no problem','有空':'available','沒空':'busy','很急':'urgent',
+'稍後':'later','早一點':'earlier','剛剛':'just now','對':'correct','不對':'wrong','這麼':'so','這麼多':'so many','很多':'a lot',
+'一點點':'a little','沒什麼':'nothing','關':'close','關閉':'turn off','按':'press','拔':'unplug','找':'find','拿':'take','放':'put',
+'拉':'pull','旋轉':'turn','天花板':'ceiling','關了':'turned off','開了':'turned on','掉了':'fell off','鬆了':'loose','燒了':'burnt',
+'積水':'flooding','渠道堵塞':'blocked drain','疏通管道':'clear the drain','前台':'front desk','三點':"three o'clock",'四點':"four o'clock",'五點':"five o'clock",'六點':"six o'clock",'七點':"seven o'clock",'八點':"eight o'clock",'十點':"ten o'clock",'快一點':'a bit faster','人':'person','開關':'switch','好像':'seems','看一下':'check it','價錢':'cost'
 };
 Object.keys(MAND_EN).forEach(function(k){ if(!T[k]) T[k]=MAND_EN[k]; });
 const MAND_FUNC={
@@ -204,7 +211,12 @@ const CANT2MAND={
 '電掣':'電閘','電制':'電閘','跳掣':'跳閘','跳制':'跳閘','光管':'螢光燈','燈膽':'燈泡','冷氣':'空調',
 '雪種':'製冷劑','師傅':'技工','寫字樓':'辦公室','巴士':'公交車','的士':'出租車','街市':'菜市場','洗手間':'廁所',
 '快啲':'快一點','慢啲':'慢一點','唔使':'不用','唔好':'不要','幫手':'幫忙','壞咗':'壞了','塞咗':'堵了',
-'唔著':'不亮','唔行':'不運行','唔凍':'不冷','開會':'開會','朝早':'早上','好臭':'很臭','好熱':'很熱','好凍':'很冷','好貴':'很貴','好遠':'很遠','好近':'很近'
+'唔著':'不亮','唔行':'不運行','唔凍':'不冷','開會':'開會','朝早':'早上','好臭':'很臭','好熱':'很熱','好凍':'很冷','好貴':'很貴','好遠':'很遠','好近':'很近',
+'後日':'後天','前日':'前天','大前日':'大前天','上晝':'上午','下晝':'下午','晏晝':'下午','禮拜':'星期','幾時':'什麼時候','幾點鐘':'幾點',
+'冇問題':'沒有問題','冇事':'沒事','得閒':'有空','唔得閒':'沒空','好急':'很急','遲啲':'稍後','早啲':'早一點','啱啱':'剛剛','啱':'對','唔啱':'不對',
+'咁':'這麼','咁多':'這麼多','好多':'很多','少少':'一點點','冇乜':'沒什麼','閂':'關','熄':'關閉','撳':'按','掹':'拔','搵':'找',
+'拎':'拿','攞':'拿','擺':'放','扯':'拉','扭':'旋轉','天花':'天花板','熄咗':'關了','開咗':'開了','甩咗':'掉了','鬆咗':'鬆了',
+'燒咗':'燒了','水浸':'積水','塞渠':'渠道堵塞','通渠':'疏通管道','前堂':'前台','燈唔著':'燈不亮','天花板':'天花板','好似':'好像','個掣':'這個開關','掣':'開關'
 };const CANT_KEYS=Object.keys(CANT2MAND).sort(function(a,b){return b.length-a.length;});
 /* ========= 英文 → 粵語（由上面自動反轉，另補常用英文） ========= */
 const EN2ZH={};
@@ -234,7 +246,7 @@ const EN_STOP={
  'and':'\u540c','or':'\u6216\u8005','not':'\u5514','do':'','does':'','did':'','please':'\u5514\u8a72','this':'\u5462\u500b','that':'\u55f0\u500b',
  'my':'\u6211\u5605','your':'\u4f60\u5605','we':'\u6211\u54cb','you':'\u4f60','i':'\u6211','me':'\u6211','need':'\u9700\u8981','want':'\u60f3',
  'can':'\u53ef\u4ee5','will':'\u6703','have':'\u6709','has':'\u6709','there':'','any':'','some':'','running':'\u884c','working':'\u8457',
- 'broken':'\u58de','tripped':'\u8df3\u5217','leakage':'\u6f50\u6c34','touch':'\u64d3','much':'','many':'','time':'\u6642\u9593','long':'\u8010',
+ 'broken':'\u58de','tripped':'\u8df3\u5217','leakage':'漏水','touch':'\u64d3','much':'','many':'','time':'\u6642\u9593','long':'\u8010',
  'how long':'\u5e7e\u8010','how much':'\u5e7e\u9322','what time':'\u5e7e\u9eded','do not':'\u5514\u597d','don t':'\u5514\u597d','dont':'\u5514\u597d','no':'\u5514\u4fc2','not running':'\u5514\u884c','is not running':'\u5514\u884c','is it':'','is not':'\u5514\u4fc2','not working':'\u5514\u8457','out of order':'\u58de\u4e86'
 };
 Object.keys(EN_EXTRA).forEach(function(k){ if(!EN2ZH[k]) EN2ZH[k]=EN_EXTRA[k]; });
@@ -337,12 +349,50 @@ function setDir(d){
   $('tag').textContent='詞庫翻譯';
   lastOut='';
 }
-function run(){
+var GOOG_ON=false;
+async function gTrans(txt,sl,tl){
+  var u='https://translate.googleapis.com/translate_a/single?client=gtx&sl='+sl+'&tl='+tl+'&dt=t&q='+encodeURIComponent(txt);
+  var res=await fetch(u);
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  var j=await res.json();
+  var s='';
+  (j&&j[0]||[]).forEach(function(x){ if(x&&x[0]) s+=x[0]; });
+  return s.trim();
+}
+function toggleGoog(){
+  GOOG_ON=!GOOG_ON;
+  var b=$('goog');
+  b.setAttribute('aria-pressed',GOOG_ON?'true':'false');
+  b.textContent = GOOG_ON ? '🌐 Google 翻譯：開（連網）' : '🌐 用 Google 翻譯（連網更準；離線自動回詞庫）';
+  toast(GOOG_ON?'已開啟 Google 翻譯':'已改用離線詞庫');
+  if(GOOG_ON) refreshNet();
+}
+function refreshNet(){
+  var b=$('goog');
+  if(!b) return;
+  if(GOOG_ON) b.textContent = (navigator.onLine===false?'🌐 Google：開（現時離線，會用詞庫）':'🌐 Google 翻譯：開（連網）');
+}
+window.addEventListener('online',refreshNet);
+window.addEventListener('offline',refreshNet);
+async function run(){
   var v=$('src').value.trim();
   if(!v){ toast('請先輸入內容'); return; }
   var hasCJK=/[\u4e00-\u9fff]/.test(v);
   if(dir==='en2zh' && hasCJK) setDir('zh2en');
   if(dir==='zh2en' && !hasCJK) setDir('en2zh');
+  if(GOOG_ON && navigator.onLine!==false){
+    $('tag').textContent='Google 翻譯中…';
+    try{
+      var gt=await gTrans(v, dir==='zh2en'?'zh-CN':'en', dir==='zh2en'?'en':'zh-TW');
+      if(gt){
+        lastOut=gt; lastLang = dir==='zh2en' ? 'en-US' : 'zh-HK';
+        var oo=$('out'); oo.className='out'; oo.textContent=gt;
+        $('tag').textContent='Google 翻譯（連網）';
+        var nb=$('norm'); nb.style.display='none'; nb.textContent='';
+        return;
+      }
+    }catch(e){ toast('Google 翻譯失敗，改用離線詞庫'); }
+  }
   var r = dir==='zh2en' ? trZH(v) : trEN(v);
   lastOut=r.text;
   lastLang = dir==='zh2en' ? 'en-US' : 'zh-HK';
@@ -420,10 +470,10 @@ function autoTurn(){
   if(!autoOn) return;
   setDir(autoLang);
   $('tag').textContent='等候你講'+(autoLang==='zh2en'?'粵語':'英文')+'…';
-  listenOnce(function(t){
+  listenOnce(async function(t){
     window._recGot=true;
     $('src').value=t;
-    run();
+    await run();
     var say=lastOut, sayLang=(autoLang==='zh2en'?'en-US':'zh-HK');
     $('tag').textContent='朗讀中（'+(autoLang==='zh2en'?'英文':'粵語')+'）';
     speakText(say, sayLang, function(){
@@ -485,13 +535,14 @@ var CHIPS=[
 $('d2e').onclick=function(){ setDir('zh2en'); };
 $('e2d').onclick=function(){ setDir('en2zh'); };
 $('go').onclick=run;
+$('goog').onclick=toggleGoog;
 $('mic').onclick=mic;
 $('auto').onclick=toggleAuto;
 $('speak').onclick=speak;
 $('copy').onclick=copyOut;
 $('clear').onclick=function(){ $('src').value=''; setDir(dir); $('src').focus(); };
 $('src').addEventListener('keydown',function(e){ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)) run(); });
-$('note').textContent='內置離線詞庫 '+Object.keys(T).length+' 條（粵語⇄英文），涵蓋日常、職場、電工與工程術語；短句最準，長句會按詞序組合。翻譯同朗讀完全離線；「即時對話」的語音識別由手機系統提供，多數手機要連網才可識別。聲音經手機喇叭抑或耳機播出，由手機系統決定，網頁無法強制切換。';
+$('note').textContent='內置離線詞庫 '+Object.keys(T).length+' 條（粵語⇄英文），涵蓋日常、職場、電工與工程術語；短句最準，長句會按詞序組合。翻譯同朗讀完全離線；「即時對話」的語音識別由手機系統提供，多數手機要連網才可識別。要最準嘅譯法，可開「🌐 Google 翻譯」（需連網，離線時自動回落詞庫）；聲音經手機喇叭抑或耳機播出，由手機系統決定，網頁無法強制切換。';
 setDir('zh2en');
 if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged=function(){}; }
 refreshDev();
