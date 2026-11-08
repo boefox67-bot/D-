@@ -18,13 +18,14 @@
   header h1{margin:0;font-size:22px;letter-spacing:.5px}
   header p{margin:6px 0 0;font-size:13px;opacity:.78}
   .wrap{padding:16px 14px 40px;max-width:760px;margin:0 auto}
-  .dir{display:flex;gap:8px;margin-bottom:12px}
-  .dir button{flex:1;padding:11px 8px;border-radius:12px;border:1.5px solid var(--line);background:#fff;
-              color:var(--ink);font-size:14px;font-weight:700;cursor:pointer}
+  .dir{display:flex;gap:8px;margin-bottom:10px}
+  .dir button{flex:1;padding:12px 8px;border-radius:12px;border:1.5px solid var(--line);background:#fff;
+              color:var(--ink);font-size:14.5px;font-weight:800;cursor:pointer;line-height:1.25}
   .dir button[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:#1a1207}
+  .dir button small{display:block;font-size:11px;font-weight:600;opacity:.7;margin-top:2px}
   .panel{background:var(--card);border-radius:16px;padding:14px;box-shadow:0 2px 10px rgba(15,42,68,.07);margin-bottom:14px}
   label.mini{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
-  textarea{width:100%;min-height:96px;padding:12px;border:1.5px solid var(--line);border-radius:12px;
+  textarea{width:100%;min-height:92px;padding:12px;border:1.5px solid var(--line);border-radius:12px;
            font-size:17px;line-height:1.5;resize:vertical;font-family:inherit;color:var(--ink);background:#fbfdff}
   textarea:focus{outline:none;border-color:var(--amber);background:#fff}
   .row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
@@ -32,23 +33,24 @@
        background:var(--orange);color:#fff;flex:1;min-width:110px}
   .btn.ghost{background:#eef3f9;color:var(--ink);font-weight:700}
   .btn.ghost:active{background:#e2e9f2}
-  .out{background:#fbfdff;border:1.5px dashed var(--line);border-radius:14px;padding:14px;
-       font-size:19px;min-height:88px;word-break:break-word;color:#0b2540}
+  .out{background:#fbfdff;border:1.5px dashed var(--line);border-radius:14px;padding:13px;
+       font-size:19px;min-height:64px;word-break:break-word;color:#0b2540}
+  .out.mid{font-size:16px;color:#3c556e;min-height:52px;background:#f7fafc}
   .out.empty{color:#9aa9b8;font-size:15px}
-  .norm{font-size:12.5px;color:#7c8b9a;margin-top:8px;line-height:1.5;display:none}
   .tag{display:inline-block;font-size:12px;color:var(--ok);background:#e6f4f1;border-radius:8px;padding:2px 8px;margin-bottom:8px}
   .auto{margin-top:10px;width:100%;border:1.5px solid var(--orange);background:#fff;color:var(--orange);
-        border-radius:12px;padding:11px;font-size:14.5px;font-weight:800;cursor:pointer}
+        border-radius:12px;padding:12px;font-size:15px;font-weight:800;cursor:pointer}
   .auto[aria-pressed="true"]{background:var(--orange);color:#fff}
   .devline{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6}
-  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch}
   .chip{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;font-size:13.5px;
         color:var(--ink);cursor:pointer}
   .chip:active{background:#fff7e6;border-color:var(--amber)}
   h2.sec{font-size:13px;color:var(--muted);font-weight:700;margin:18px 2px 8px;letter-spacing:.4px}
   .note{font-size:12px;color:var(--muted);line-height:1.6;margin-top:10px}
+  .status{font-size:12.5px;color:var(--orange);font-weight:700;margin-top:8px;min-height:18px}
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:rgba(15,42,68,.94);color:#fff;
-         padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .18s}
+         padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .18s;z-index:9}
   .toast.show{opacity:1}
   @media(max-width:520px){ .btn{min-width:0} header h1{font-size:20px} }
 </style>
@@ -56,35 +58,38 @@
 <body>
 <header>
   <h1>離線粵英翻譯</h1>
-  <p>粵語（香港）⇄ 英文　·　離線可用　·　內置電工／工程／職場用語</p>
+  <p>粵語 ⇄ English　·　普通話做中間層　·　整句構造　·　離線翻譯＋朗讀</p>
 </header>
 
 <div class="wrap">
   <div class="dir">
-    <button id="d2e" aria-pressed="true">粵 → 英</button>
-    <button id="e2d" aria-pressed="false">英 → 粵</button>
+    <button id="d2e" aria-pressed="true">粵語 <small>收音 → 普通話 → English</small></button>
+    <button id="e2d" aria-pressed="false">English <small>收音 → 普通話 → 粵語</small></button>
   </div>
-  <button class="auto" id="goog" aria-pressed="false">🌐 用 Google 翻譯（連網更準；離線自動回詞庫）</button>
-  <button class="auto" id="auto" aria-pressed="false">▶ 即時對話（講完自動翻譯＋自動朗讀，雙向輪替）</button>
+  <button class="auto" id="auto" aria-pressed="false">▶ 即時翻譯（鎖定語言，講完自動翻譯＋朗讀）</button>
+  <div class="status" id="status"></div>
   <div class="devline" id="devline"></div>
 
   <div class="panel">
-    <label class="mini">輸入</label>
-    <textarea id="src" placeholder="例如：唔該幫我睇下個冷氣，好似唔凍"></textarea>
+    <label class="mini">原文（收音或鍵盤輸入）</label>
+    <textarea id="src" placeholder="例如：唔該幫我睇下個冷氣，個冷氣唔凍"></textarea>
     <div class="row">
       <button class="btn" id="go">翻譯</button>
-      <button class="btn ghost" id="mic">🎤 語音輸入</button>
+      <button class="btn ghost" id="mic">🎤 收音一次</button>
     </div>
   </div>
 
   <div class="panel">
-    <label class="mini">結果</label>
-    <div class="tag" id="tag">詞庫翻譯</div>
+    <label class="mini">普通話構思（中間層，句子先執齊）</label>
+    <div class="out mid" id="mid">—</div>
+  </div>
+
+  <div class="panel">
+    <label class="mini">譯文</label>
+    <div class="tag" id="tag">整句對譯</div>
     <div class="out empty" id="out">輸入內容後按「翻譯」</div>
-    <div class="norm" id="norm"></div>
     <div class="row">
       <button class="btn ghost" id="speak">🔊 朗讀</button>
-      <button class="btn ghost" id="slow">🐢 慢速：關</button>
       <button class="btn ghost" id="copy">複製</button>
       <button class="btn ghost" id="clear">清空</button>
     </div>
@@ -182,13 +187,7 @@ const MAND_EN={
 '警報':'alarm','應急燈':'emergency light','出口指示':'exit sign','防雷':'lightning protection',
 '螺絲起子':'screwdriver','衝擊鑽':'impact drill','美工刀':'utility knife','水平尺':'spirit level','濾網':'filter',
 '製冷劑':'refrigerant','不斷電系統':'UPS','可程式控制器':'PLC','感測器':'sensor','極限開關':'limit switch',
-'壓接':'crimping','剝線':'stripping','端子':'terminal','接線':'wiring','焊接':'welding','焊錫':'solder','烙鐵':'soldering iron',
-'後天':'the day after tomorrow','前天':'the day before yesterday','上午':'morning','下午':'afternoon','星期':'week','星期一':'Monday',
-'什麼時候':'when','幾點':"what time",'沒有問題':'no problem','沒事':'no problem','有空':'available','沒空':'busy','很急':'urgent',
-'稍後':'later','早一點':'earlier','剛剛':'just now','對':'correct','不對':'wrong','這麼':'so','這麼多':'so many','很多':'a lot',
-'一點點':'a little','沒什麼':'nothing','關':'close','關閉':'turn off','按':'press','拔':'unplug','找':'find','拿':'take','放':'put',
-'拉':'pull','旋轉':'turn','天花板':'ceiling','關了':'turned off','開了':'turned on','掉了':'fell off','鬆了':'loose','燒了':'burnt',
-'積水':'flooding','渠道堵塞':'blocked drain','疏通管道':'clear the drain','前台':'front desk','三點':"three o'clock",'四點':"four o'clock",'五點':"five o'clock",'六點':"six o'clock",'七點':"seven o'clock",'八點':"eight o'clock",'十點':"ten o'clock",'快一點':'a bit faster','人':'person','開關':'switch','好像':'seems','看一下':'check it','價錢':'cost'
+'壓接':'crimping','剝線':'stripping','端子':'terminal','接線':'wiring','焊接':'welding','焊錫':'solder','烙鐵':'soldering iron'
 };
 Object.keys(MAND_EN).forEach(function(k){ if(!T[k]) T[k]=MAND_EN[k]; });
 const MAND_FUNC={
@@ -197,7 +196,7 @@ const MAND_FUNC={
 '會':'will','能':'can','請':'please','幫':'help','給':'for','和':'and','或':'or','但':'but','因為':'because','所以':'so',
 '如果':'if','還':'still','先':'first','已經':'already','什麼':'what','知道':'know','明白':'understand','燈':'light',
 '亮':'on','著':'on','臭':'smelly','早上':'morning','九點':"nine o'clock",'開會':'meeting','行':'run','跳':'trip',
-'熱':'hot','冷':'cold','堵':'clogged','個':'','知':'know','壞':'broken','明天':'tomorrow','今日':'today','昨天':'yesterday','天':'day','廁所':'toilet','個':'the','掂':'touch','不要':'do not'
+'熱':'hot','冷':'cold','堵':'clogged','個':'','知':'know','壞':'broken','明天':'tomorrow','今日':'today','昨天':'yesterday','天':'day','廁所':'toilet','掂':'touch','不要':'do not'
 };
 Object.keys(MAND_FUNC).forEach(function(k){ if(!T[k]) T[k]=MAND_FUNC[k]; });
 
@@ -212,12 +211,7 @@ const CANT2MAND={
 '電掣':'電閘','電制':'電閘','跳掣':'跳閘','跳制':'跳閘','光管':'螢光燈','燈膽':'燈泡','冷氣':'空調',
 '雪種':'製冷劑','師傅':'技工','寫字樓':'辦公室','巴士':'公交車','的士':'出租車','街市':'菜市場','洗手間':'廁所',
 '快啲':'快一點','慢啲':'慢一點','唔使':'不用','唔好':'不要','幫手':'幫忙','壞咗':'壞了','塞咗':'堵了',
-'唔著':'不亮','唔行':'不運行','唔凍':'不冷','開會':'開會','朝早':'早上','好臭':'很臭','好熱':'很熱','好凍':'很冷','好貴':'很貴','好遠':'很遠','好近':'很近',
-'後日':'後天','前日':'前天','大前日':'大前天','上晝':'上午','下晝':'下午','晏晝':'下午','禮拜':'星期','幾時':'什麼時候','幾點鐘':'幾點',
-'冇問題':'沒有問題','冇事':'沒事','得閒':'有空','唔得閒':'沒空','好急':'很急','遲啲':'稍後','早啲':'早一點','啱啱':'剛剛','啱':'對','唔啱':'不對',
-'咁':'這麼','咁多':'這麼多','好多':'很多','少少':'一點點','冇乜':'沒什麼','閂':'關','熄':'關閉','撳':'按','掹':'拔','搵':'找',
-'拎':'拿','攞':'拿','擺':'放','扯':'拉','扭':'旋轉','天花':'天花板','熄咗':'關了','開咗':'開了','甩咗':'掉了','鬆咗':'鬆了',
-'燒咗':'燒了','水浸':'積水','塞渠':'渠道堵塞','通渠':'疏通管道','前堂':'前台','燈唔著':'燈不亮','天花板':'天花板','好似':'好像','個掣':'這個開關','掣':'開關'
+'唔著':'不亮','唔行':'不運行','唔凍':'不冷','開會':'開會','朝早':'早上','好臭':'很臭','好熱':'很熱','好凍':'很冷','好貴':'很貴','好遠':'很遠','好近':'很近'
 };const CANT_KEYS=Object.keys(CANT2MAND).sort(function(a,b){return b.length-a.length;});
 /* ========= 英文 → 粵語（由上面自動反轉，另補常用英文） ========= */
 const EN2ZH={};
@@ -243,207 +237,333 @@ const EN_EXTRA={
  'later':'等陣','immediately':'即刻','done':'搞掂','no problem':'冇問題','ready':'準備','careful':'小心','danger':'危險','safety':'安全'
 };
 const EN_STOP={
- 'the':'','a':'','an':'','is':'\u4fc2','are':'\u4fc2','was':'\u4fc2','it':'','on':'\u55BA','in':'\u55BA','of':'\u5605','for':'','to':'',
- 'and':'\u540c','or':'\u6216\u8005','not':'\u5514','do':'','does':'','did':'','please':'\u5514\u8a72','this':'\u5462\u500b','that':'\u55f0\u500b',
- 'my':'\u6211\u5605','your':'\u4f60\u5605','we':'\u6211\u54cb','you':'\u4f60','i':'\u6211','me':'\u6211','need':'\u9700\u8981','want':'\u60f3',
- 'can':'\u53ef\u4ee5','will':'\u6703','have':'\u6709','has':'\u6709','there':'','any':'','some':'','running':'\u884c','working':'\u8457',
- 'broken':'\u58de','tripped':'\u8df3\u5217','leakage':'漏水','touch':'\u64d3','much':'','many':'','time':'\u6642\u9593','long':'\u8010',
- 'how long':'\u5e7e\u8010','how much':'\u5e7e\u9322','what time':'\u5e7e\u9eded','do not':'\u5514\u597d','don t':'\u5514\u597d','dont':'\u5514\u597d','no':'\u5514\u4fc2','not running':'\u5514\u884c','is not running':'\u5514\u884c','is it':'','is not':'\u5514\u4fc2','not working':'\u5514\u8457','out of order':'\u58de\u4e86'
+ 'the':'','a':'','an':'','is':'係','are':'係','was':'係','it':'','on':'喺','in':'喺','of':'嘅','for':'','to':'',
+ 'and':'同','or':'或者','not':'唔','do':'','does':'','did':'','please':'唔該','this':'呢個','that':'嗰個',
+ 'my':'我嘅','your':'你嘅','we':'我哋','you':'你','i':'我','me':'我','need':'需要','want':'想',
+ 'can':'可以','will':'會','have':'有','has':'有','there':'','any':'','some':'','running':'行','working':'著',
+ 'broken':'壞','tripped':'跳掣','leakage':'漏水','touch':'掂','much':'','many':'','time':'時間','long':'耐',
+ 'how long':'幾耐','how much':'幾錢','what time':'幾點','do not':'唔好','don t':'唔好','dont':'唔好','no':'唔係','not running':'唔行','is not running':'唔行','is it':'','is not':'唔係','not working':'唔著','out of order':'壞了'
 };
 Object.keys(EN_EXTRA).forEach(function(k){ if(!EN2ZH[k]) EN2ZH[k]=EN_EXTRA[k]; });
 Object.keys(EN_STOP).forEach(function(k){ if(!EN2ZH[k]) EN2ZH[k]=EN_STOP[k]; });
 const ZH_KEYS=Object.keys(T).sort(function(a,b){return b.length-a.length;});
 const EN_KEYS=Object.keys(EN2ZH).sort(function(a,b){return b.length-a.length;});
 
-/* ========= 翻譯引擎 ========= */
-function normCant(s){
-  var src=String(s||'').replace(/[\s\u3000]+/g,'');
-  var out=[],i=0,changed=false;
-  while(i<src.length){
+/* ========= 三語整句庫：普通話做中間層，句子齊整 ========= */
+const TRIPLE=[
+['你好','你好','Hello.'],
+['早晨','早上好','Good morning.'],
+['多謝','谢谢','Thank you.'],
+['唔該','请','Please.'],
+['唔該晒','非常感谢','Thank you very much.'],
+['對唔住','对不起','Sorry.'],
+['唔好意思','不好意思','Excuse me.'],
+['再見','再见','Goodbye.'],
+['幾錢','多少钱','How much is it?'],
+['太貴','太贵了','It is too expensive.'],
+['我唔明','我不明白','I do not understand.'],
+['請講慢啲','请说慢一点','Please speak more slowly.'],
+['請再講一次','请再说一次','Please say that again.'],
+['識唔識講英文','你会说英语吗','Do you speak English?'],
+['洗手間喺邊度','洗手间在哪里','Where is the toilet?'],
+['要唔要報價','需要报价吗','Do you need a quotation?'],
+['唔該幫我睇下個冷氣','请帮我检查一下空调','Please check the air conditioner for me.'],
+['唔該幫我睇下個冷氣，個冷氣唔凍','请帮我检查一下空调，空调不制冷','Please check the air conditioner, it is not cooling.'],
+['個冷氣唔凍','空调不制冷','The air conditioner is not cooling.'],
+['個冷氣唔夠凍','空调不够冷','The air conditioner is not cold enough.'],
+['冷氣有異響','空调有异响','The air conditioner is making a noise.'],
+['個濾網好污糟','滤网很脏','The filter is very dirty.'],
+['廁所塞咗','厕所堵了','The toilet is clogged.'],
+['天花板滴水','天花板滴水','Water is dripping from the ceiling.'],
+['天花板漏水','天花板漏水','The ceiling is leaking.'],
+['電掣跳咗','电闸跳了','The breaker has tripped.'],
+['呢條線帶電','这条线带电','This wire is live.'],
+['熄咗總掣先','先关掉总开关','Switch off the main switch first.'],
+['唔好掂','不要碰','Do not touch it.'],
+['小心觸電','小心触电','Beware of electric shock.'],
+['水泵唔行','水泵不运行','The water pump is not running.'],
+['燈唔著','灯不亮','The light is not working.'],
+['個燈閃下閃下','灯在闪烁','The light is flickering.'],
+['電梯壞咗','电梯坏了','The lift is out of order.'],
+['電梯困住人','有人被困在电梯里','Someone is trapped in the lift.'],
+['呢個要幾耐','这个要多久','How long will this take?'],
+['幾時可以做好','什么时候可以做好','When can it be finished?'],
+['我而家過去','我现在过去','I am on my way now.'],
+['麻煩你確認一下','麻烦你确认一下','Please confirm.'],
+['請你簽個名','请你签个名','Please sign here.'],
+['幫我叫人嚟整','帮我叫人来修','Please send someone to fix it.'],
+['今次檢查完','这次检查完了','The inspection is done.'],
+['記錄低','记录下来','Record it.'],
+['交班先','先交接班','Do the handover first.'],
+['我哋要疏散','我们要疏散','We need to evacuate.'],
+['消防鐘響咗','消防警报响了','The fire alarm is ringing.'],
+['戴好安全帶','戴好安全带','Put on the safety harness.'],
+['唔該借過','不好意思，借过','Excuse me, let me pass.'],
+['我等咗好耐','我等了很久','I have been waiting a long time.'],
+['今日唔得閒','今天没空','I am not available today.'],
+['聽日再傾','明天再谈','Let us talk tomorrow.'],
+['我唔舒服','我不舒服','I am not feeling well.'],
+['呢個好急','这个很急','This is urgent.'],
+['慢慢嚟','慢慢来','Take your time.'],
+['有冇第二個選擇','有没有第二个选择','Is there another option?'],
+['開會幾點','几点开会','What time is the meeting?'],
+['我請病假','我请病假','I am taking sick leave.'],
+['巡樓先','先去巡楼','Do the patrol first.'],
+['報價幾錢','报价多少钱','How much is the quotation?'],
+['張單幾時到','账单什么时候到','When will the invoice arrive?'],
+['要換個壓縮機','要换压缩机','The compressor needs to be replaced.'],
+['部冷氣漏水','空调漏水','The air conditioner is leaking water.'],
+['個電掣好熱','电闸很热','The breaker is very hot.'],
+['有冇後備零件','有没有备用零件','Do you have spare parts?']
+];
+function normKey(s){
+  return String(s||'').replace(/[\s\u3000]+/g,'')
+    .replace(/[，。！？、,.!?;；:："“”'‘’（）()—–-]/g,'').toLowerCase();
+}
+const TRI_C={},TRI_E={};
+TRIPLE.forEach(function(row){
+  var c=normKey(row[0]), e=normKey(row[2]);
+  if(!TRI_C[c]) TRI_C[c]=row;
+  if(!TRI_E[e]) TRI_E[e]=row;
+});
+
+/* ========= 結構詞典（動詞／物件／狀態） ========= */
+const C_VERB={
+'睇下':['检查一下','睇下','check',0],'睇':['检查','睇','check',1],'檢查下':['检查一下','檢查下','inspect',0],'檢查':['检查','檢查','inspect',1],
+'整下':['修理一下','整下','fix',0],'整':['修理','整','fix',1],'修理':['修理','修理','repair',0],'維修':['维修','維修','service',0],
+'換':['更换','換','replace',0],'裝':['安装','裝','install',0],'拆':['拆除','拆','remove',0],'開':['打开','開','turn on',0],'關':['关闭','關','turn off',0],
+'試下':['测试一下','試下','test',0],'試':['测试','試','test',1],'量下':['测量一下','量下','measure',0],'量':['测量','量','measure',1],
+'清潔':['清洁','清潔','clean',0],'洗':['清洗','洗','clean',0],'通':['疏通','通','unblock',0]
+};
+const C_STATE={
+'唔凍':['不制冷','is not cooling'],'唔夠凍':['不够冷','is not cold enough'],'唔著':['不亮','is not working'],
+'唔行':['不运行','is not running'],'壞咗':['坏了','is out of order'],'塞咗':['堵了','is clogged'],
+'滴水':['滴水','is dripping'],'漏水':['漏水','is leaking'],'跳掣':['跳闸了','has tripped'],
+'有異響':['有异响','is making a noise'],'好嘈':['很吵','is noisy'],'過熱':['过热','is overheating'],
+'燒咗':['烧坏了','is burnt out'],'閃下閃下':['闪烁','is flickering'],'好污糟':['很脏','is very dirty']
+};
+const OBJ_MAND={'冷氣':'空调','水泵':'水泵','電梯':'电梯','燈':'灯','廁所':'厕所','天花板':'天花板','電掣':'电闸','濾網':'滤网','壓縮機':'压缩机','風機':'风机','馬達':'电机','配電箱':'配电箱','斷路器':'断路器','插座':'插座','電線':'电线','光管':'荧光灯','燈膽':'灯泡','總掣':'总开关','雪種':'制冷剂','水喉':'水管','渠':'排水管','門':'门','窗':'窗','冷氣機':'空调','電制':'电闸'};
+const OBJ_EN={'冷氣':'air conditioner','水泵':'water pump','電梯':'lift','燈':'light','廁所':'toilet','天花板':'ceiling','電掣':'breaker','濾網':'filter','壓縮機':'compressor','風機':'fan','馬達':'motor','配電箱':'distribution board','斷路器':'circuit breaker','插座':'socket','電線':'wire','光管':'fluorescent tube','燈膽':'bulb','總掣':'main switch','雪種':'refrigerant','水喉':'water pipe','渠':'drain','門':'door','窗':'window','冷氣機':'air conditioner','電制':'breaker'};
+const E_VERB={
+'check':['检查','睇',1],'inspect':['检查','檢查',1],'repair':['修理','整',1],'fix':['修理','整',1],
+'replace':['更换','換',0],'install':['安装','裝',0],'remove':['拆除','拆',0],'test':['测试','試',1],
+'turn on':['打开','開',0],'turn off':['关闭','關',0],'measure':['测量','量',1],'clean':['清洁','清潔',0],'unblock':['疏通','通',0]
+};
+const E_STATE={
+'not cooling':['不制冷','唔凍'],'not cold enough':['不够冷','唔夠凍'],'not working':['不亮','唔著'],
+'not running':['不运行','唔行'],'broken':['坏了','壞咗'],'out of order':['坏了','壞咗'],
+'clogged':['堵了','塞咗'],'dripping':['滴水','滴水'],'leaking':['漏水','漏水'],'tripped':['跳闸了','跳掣'],
+'noisy':['很吵','好嘈'],'overheating':['过热','過熱'],'burnt out':['烧坏了','燒咗'],'flickering':['闪烁','閃下閃下'],
+'very dirty':['很脏','好污糟']
+};
+const SUB_MAND={'air conditioner':'空调','water pump':'水泵','lift':'电梯','light':'灯','toilet':'厕所','ceiling':'天花板','breaker':'电闸','filter':'滤网','compressor':'压缩机','fan':'风机','motor':'电机','distribution board':'配电箱','circuit breaker':'断路器','socket':'插座','wire':'电线','fluorescent tube':'荧光灯','bulb':'灯泡','main switch':'总开关','refrigerant':'制冷剂','water pipe':'水管','drain':'排水管','door':'门','window':'窗'};
+const SUB_CANT={'air conditioner':'冷氣','water pump':'水泵','lift':'電梯','light':'燈','toilet':'廁所','ceiling':'天花板','breaker':'電掣','filter':'濾網','compressor':'壓縮機','fan':'風機','motor':'馬達','distribution board':'配電箱','circuit breaker':'斷路器','socket':'插座','wire':'電線','fluorescent tube':'光管','bulb':'燈膽','main switch':'總掣','refrigerant':'雪種','water pipe':'水喉','drain':'渠','door':'門','window':'窗'};
+
+/* ========= 通用詞表推導 ========= */
+const MAND2CANT={};
+Object.keys(CANT2MAND).forEach(function(c){ if(!MAND2CANT[CANT2MAND[c]]) MAND2CANT[CANT2MAND[c]]=c; });
+const MAND2EN={};
+Object.keys(CANT2MAND).forEach(function(c){ if(T[c] && !MAND2EN[CANT2MAND[c]]) MAND2EN[CANT2MAND[c]]=T[c]; });
+Object.keys(MAND_EN).forEach(function(m){ if(!MAND2EN[m]) MAND2EN[m]=MAND_EN[m]; });
+const EN2MAND={};
+Object.keys(EN2ZH).forEach(function(e){ var c=EN2ZH[e]; if(c && CANT2MAND[c] && !EN2MAND[e]) EN2MAND[e]=CANT2MAND[c]; });
+const EN2CANT={};
+Object.keys(EN2ZH).forEach(function(e){ if(!EN2CANT[e]) EN2CANT[e]=EN2ZH[e]; });
+
+/* ========= 工具 ========= */
+function longestReplace(src,dict,maxLen){
+  var out=[],i=0,changed=false, s=String(src||'');
+  while(i<s.length){
     var hit=null,L=0;
-    for(var len=Math.min(6,src.length-i);len>=1;len--){
-      var seg=src.substr(i,len);
-      if(Object.prototype.hasOwnProperty.call(CANT2MAND,seg)){ hit=CANT2MAND[seg]; L=len; break; }
+    for(var len=Math.min(maxLen,s.length-i);len>=1;len--){
+      var seg=s.substr(i,len);
+      if(Object.prototype.hasOwnProperty.call(dict,seg)){ hit=dict[seg]; L=len; break; }
     }
     if(hit!==null){ out.push(hit); i+=L; changed=true; }
-    else { out.push(src.charAt(i)); i++; }
+    else { out.push(s.charAt(i)); i++; }
   }
   return {text:out.join(''),changed:changed};
 }
-function segTrans(str,maxLen){
-  var out=[],i=0,unknown=0;
-  while(i<str.length){
-    var hit=null,L=0;
-    for(var len=Math.min(maxLen,str.length-i);len>=1;len--){
-      var seg=str.substr(i,len);
-      if(Object.prototype.hasOwnProperty.call(T,seg)){ hit=T[seg]; L=len; break; }
-    }
-    if(hit!==null){ if(hit!=='') out.push(hit); i+=L; }
-    else { out.push(str.charAt(i)); unknown++; i++; }
-  }
-  var text=out.join(' ').replace(/\s+/g,' ').replace(/ ([,，。；;:：!！?？])/g,'$1').trim();
-  return {text:text,unknown:unknown,len:str.length};
+function cleanMand(t){
+  return String(t||'').replace(/[\s\u3000]+/g,'').replace(/，+/g,'，').replace(/^，|，$/g,'').replace(/。+$/,'');
 }
-/* 粵語 → 書面語（普通話）→ 英文：兩段式翻譯 */
-function normCant(s){
-  var src=String(s||'').replace(/[\s\u3000]+/g,'');
-  var out=[],i=0,changed=false;
-  while(i<src.length){
-    var hit=null,L=0,maxLen=Math.min(7,src.length-i);
-    for(var len=maxLen;len>=1;len--){
-      var seg=src.substr(i,len);
-      if(Object.prototype.hasOwnProperty.call(CANT2MAND,seg)){ hit=CANT2MAND[seg]; L=len; break; }
-    }
-    if(hit!==null){ out.push(hit); i+=L; changed=true; }
-    else { out.push(src.charAt(i)); i++; }
-  }
-  return {text:out.join(''),changed:changed};
+function cleanCant(t){
+  return String(t||'').replace(/[\s\u3000]+/g,'').replace(/，+/g,'，').replace(/^，|，$/g,'').replace(/。+$/,'');
 }
-function segTrans(str,maxLen){
-  var out=[],i=0,unknown=0;
-  while(i<str.length){
-    var hit=null,L=0;
-    for(var len=Math.min(maxLen,str.length-i);len>=1;len--){
-      var seg=str.substr(i,len);
-      if(Object.prototype.hasOwnProperty.call(T,seg)){ hit=T[seg]; L=len; break; }
-    }
-    if(hit!==null){ if(hit!=='') out.push(hit); i+=L; }
-    else { out.push(str.charAt(i)); unknown++; i++; }
-  }
-  var text=out.join(' ').replace(/\s+/g,' ').replace(/ ([,，。；;:：!！?？])/g,'$1').trim();
-  return {text:text,unknown:unknown,len:str.length};
+function cleanEn(t){
+  t=String(t||'').replace(/\s+/g,' ').replace(/\s+([,.;:!?])/g,'$1').trim();
+  if(t){ t=t.charAt(0).toUpperCase()+t.slice(1); if(!/[.!?]$/.test(t)) t+='.'; }
+  return t;
 }
-function trZH(s){
-  var raw=String(s||'').replace(/[\s\u3000]+/g,'');
-  if(Object.prototype.hasOwnProperty.call(T,raw)){
-    return {text:T[raw],unknown:0,usedNorm:false,norm:raw,len:raw.length};
-  }
-  var n=normCant(raw);
-  var r=segTrans(n.text,12);
-  return {text:r.text,unknown:r.unknown,usedNorm:n.changed,norm:n.text,len:r.len};
+function toMandObj(o){
+  var raw=String(o||'').replace(/^(個|呢個|嗰個|部|條|支|把|隻)/,'');
+  if(OBJ_MAND[raw]) return OBJ_MAND[raw];
+  if(CANT2MAND[raw]) return CANT2MAND[raw];
+  var r=longestReplace(raw,CANT2MAND,7);
+  return r.text||raw;
 }
-function trEN(s){
-  var toks=(String(s||'').toLowerCase().match(/[a-z0-9']+/g))||[];
-  var out=[],i=0,unknown=0;
+function toEnObj(o){
+  var raw=String(o||'').replace(/^(個|呢個|嗰個|部|條|支|把|隻)/,'');
+  if(OBJ_EN[raw]) return OBJ_EN[raw];
+  if(T[raw]) return T[raw];
+  var m=toMandObj(raw);
+  if(MAND_EN[m]) return MAND_EN[m];
+  if(MAND2EN[m]) return MAND2EN[m];
+  return null;
+}
+function toCantObj(o){
+  var m=String(o||'').replace(/^(the|a|an)\s+/i,'').trim();
+  if(SUB_CANT[m]) return SUB_CANT[m];
+  if(MAND2CANT[m]) return MAND2CANT[m];
+  return null;
+}
+function toMandObjFromEn(o){
+  var m=String(o||'').replace(/^(the|a|an)\s+/i,'').trim();
+  if(SUB_MAND[m]) return SUB_MAND[m];
+  if(EN2MAND[m]) return EN2MAND[m];
+  return null;
+}
+
+/* ========= 粵語 → 普通話 → 英文 ========= */
+function cantToMand(s){
+  var raw=String(s||'').trim();
+  if(!raw) return '';
+  var r=longestReplace(raw.replace(/[\s\u3000]+/g,''),CANT2MAND,7);
+  return cleanMand(r.text);
+}
+function mandToEn(s){
+  var raw=String(s||'').trim();
+  if(!raw) return '';
+  var r=longestReplace(raw,MAND2EN,12);
+  return cleanEn(r.text);
+}
+function parseCantStruct(s){
+  var t=String(s||'').replace(/^(唔該|麻煩你|請)\s*/,'').replace(/[，,。.!?！？]+$/,'').trim();
+  var m=t.match(/^(?:幫我|幫你|幫佢|幫手)?\s*(睇下|睇|檢查下|檢查|整下|整|修理|維修|換|裝|拆|開|關|試下|試|量下|量|清潔|洗|通)(?:個|呢個|嗰個|部|條|支|把|隻)?\s*(.+?)\s*(?:，|,)?\s*(唔凍|唔夠凍|唔著|唔行|壞咗|塞咗|滴水|漏水|跳掣|有異響|好嘈|過熱|燒咗|閃下閃下|好污糟)?$/);
+  if(!m) return null;
+  var v=C_VERB[m[1]], oM=toMandObj(m[2]), oE=toEnObj(m[2]), st=m[3]?C_STATE[m[3]]:null;
+  if(!v||!oM||!oE) return null;
+  var mid='请帮我'+v[0]+oM+(st?'，'+st[0]:'');
+  var out='Please '+v[2]+' the '+oE+(st?' — it '+st[1]:'')+'.';
+  return {mid:mid,out:cleanEn(out),exact:false,struct:true};
+}
+function zh2en(s){
+  var raw=String(s||'').trim();
+  if(!raw) return {mid:'',out:''};
+  var key=normKey(raw);
+  if(TRI_C[key]){ var r=TRI_C[key]; return {mid:r[1],out:r[2],exact:true}; }
+  var st=parseCantStruct(raw);
+  if(st) return st;
+  var mid=cantToMand(raw);
+  var en=mandToEn(mid);
+  return {mid:mid,out:en,exact:false,struct:false};
+}
+
+/* ========= 英文 → 普通話 → 粵語 ========= */
+function enToMand(s){
+  var raw=String(s||'').trim();
+  if(!raw) return '';
+  var toks=(raw.toLowerCase().match(/[a-z0-9']+/g))||[];
+  var out=[],i=0;
   while(i<toks.length){
-    var hit=null,L=0,maxLen=Math.min(4,toks.length-i);
-    for(var len=maxLen;len>=1;len--){
+    var hit=null,L=0;
+    for(var len=Math.min(4,toks.length-i);len>=1;len--){
       var seg=toks.slice(i,i+len).join(' ');
-      if(Object.prototype.hasOwnProperty.call(EN2ZH,seg)){ hit=EN2ZH[seg]; L=len; break; }
+      if(Object.prototype.hasOwnProperty.call(EN2MAND,seg)){ hit=EN2MAND[seg]; L=len; break; }
     }
-    if(hit!==null){ if(hit!=='') out.push(hit); i+=L; }else{ out.push(toks[i]); unknown++; i++; }
+    if(hit!==null){ out.push(hit); i+=L; } else { out.push(toks[i]); i++; }
   }
-  return {text:out.join('').trim(),unknown:unknown};
+  return cleanMand(out.join(''));
+}
+function mandToCant(s){
+  var raw=String(s||'').trim();
+  if(!raw) return '';
+  var r=longestReplace(raw,MAND2CANT,7);
+  return cleanCant(r.text);
+}
+function parseEnStruct(s){
+  var t=String(s||'').replace(/[.!?]+$/,'').replace(/\s+/g,' ').trim();
+  var m=t.match(/^(?:please\s+)?(check|inspect|repair|fix|replace|install|remove|test|turn on|turn off|measure|clean|unblock)\s+(?:the\s+|a\s+)?(.+?)(?:\s+for me)?$/i);
+  if(m){
+    var v=E_VERB[m[1].toLowerCase()], oM=toMandObjFromEn(m[2]), oC=toCantObj(m[2]);
+    if(v&&oM&&oC){
+      return {mid:'请帮我'+v[0]+oM, out:cleanCant('唔該幫我'+v[1]+(v[2]?'下':'')+'個'+oC), objMand:oM, objCant:oC, exact:false, struct:true};
+    }
+  }
+  var m2=t.match(/^(?:the\s+|a\s+)?(.+?)\s+(?:is|are)\s+(not\s+)?(cooling|cold enough|working|running|broken|out of order|clogged|dripping|leaking|tripped|noisy|overheating|burnt out|flickering|very dirty)$/i);
+  if(m2){
+    var sub=m2[1].trim().toLowerCase(), neg=m2[2]?'not ':'', adj=m2[3].toLowerCase();
+    var key=(neg?neg:'')+adj;
+    var st=E_STATE[key]||E_STATE[adj];
+    var sM=toMandObjFromEn(sub), sC=toCantObj(sub);
+    if(st&&sM&&sC){
+      return {mid:sM+st[0], out:cleanCant('個'+sC+st[1]), exact:false, struct:true};
+    }
+  }
+  if(/^how long\b/i.test(t)) return {mid:'要多久',out:'要幾耐',exact:false,struct:true};
+  if(/^when\b/i.test(t)) return {mid:'什么时候',out:'幾時',exact:false,struct:true};
+  if(/^where is\b/i.test(t)) return {mid:'在哪里',out:'喺邊度',exact:false,struct:true};
+  if(/^what time\b/i.test(t)) return {mid:'几点',out:'幾點',exact:false,struct:true};
+  return null;
+}
+function parseEnCompound(t){
+  t=String(t||'').replace(/[.!?]+$/,'').trim();
+  var m=t.match(/^(.*?)\s*(?:[,;]|—|–|-)\s*(?:it|they)\s+(?:is|are)\s+(not\s+)?(cooling|cold enough|working|running|broken|out of order|clogged|dripping|leaking|tripped|noisy|overheating|burnt out|flickering|very dirty)$/i);
+  if(!m) return null;
+  var main=parseEnStruct(m[1]);
+  if(!main || !main.objMand || !main.objCant) return null;
+  var key=(m[2]?'not ':'')+m[3].toLowerCase();
+  var st=E_STATE[key]||E_STATE[m[3].toLowerCase()];
+  if(!st) return null;
+  return {mid:main.mid+'，它'+st[0], out:cleanCant(main.out+'，佢'+st[1]), exact:false, struct:true};
+}
+function en2zh(s){
+  var raw=String(s||'').trim();
+  if(!raw) return {mid:'',out:''};
+  var key=normKey(raw);
+  if(TRI_E[key]){ var r=TRI_E[key]; return {mid:r[1],out:r[0],exact:true}; }
+  var cp=parseEnCompound(raw);
+  if(cp) return cp;
+  var st=parseEnStruct(raw);
+  if(st) return st;
+  var mid=enToMand(raw);
+  var cant=mandToCant(mid);
+  return {mid:mid,out:cant,exact:false,struct:false};
 }
 
 /* ========= 介面 ========= */
-var dir='zh2en', lastOut='', lastLang='en-US', SLOW=false;
+var dir='zh2en', lastOut='', lastLang='en-US', lastMid='';
 var $=function(id){return document.getElementById(id);};
 function toast(msg){ var t=$('toast'); t.textContent=msg; t.className='toast show'; clearTimeout(window._tt); window._tt=setTimeout(function(){t.className='toast';},1600); }
 function setDir(d){
   dir=d;
   $('d2e').setAttribute('aria-pressed', d==='zh2en'?'true':'false');
   $('e2d').setAttribute('aria-pressed', d==='en2zh'?'true':'false');
-  $('src').placeholder = d==='zh2en' ? '例如：唔該幫我睇下個冷氣，好似唔凍' : 'e.g. Please check the air conditioner';
+  $('src').placeholder = d==='zh2en' ? '例如：唔該幫我睇下個冷氣，個冷氣唔凍' : 'e.g. Please check the air conditioner, it is not cooling.';
   $('out').className='out empty';
   $('out').textContent = d==='zh2en' ? '輸入粵語後按「翻譯」' : 'Enter English then press Translate';
-  $('tag').textContent='詞庫翻譯';
-  lastOut='';
+  $('mid').textContent='—';
+  $('tag').textContent='整句對譯';
+  $('status').textContent = d==='zh2en' ? '鎖定：所有收音當粵語處理 → 普通話構思 → English' : '鎖定：所有收音當英文處理 → 普通話構思 → 粵語';
+  lastOut=''; lastMid=''; lastLang = d==='zh2en' ? 'en-US' : 'zh-HK';
 }
-var GOOG_ON=false;
-async function gTrans(txt,sl,tl){
-  var u='https://translate.googleapis.com/translate_a/single?client=gtx&sl='+sl+'&tl='+tl+'&dt=t&q='+encodeURIComponent(txt);
-  var res=await fetch(u);
-  if(!res.ok) throw new Error('HTTP '+res.status);
-  var j=await res.json();
-  var s='';
-  (j&&j[0]||[]).forEach(function(x){ if(x&&x[0]) s+=x[0]; });
-  return s.trim();
-}
-function toggleGoog(){
-  GOOG_ON=!GOOG_ON;
-  var b=$('goog');
-  b.setAttribute('aria-pressed',GOOG_ON?'true':'false');
-  b.textContent = GOOG_ON ? '🌐 Google 翻譯：開（連網）' : '🌐 用 Google 翻譯（連網更準；離線自動回詞庫）';
-  toast(GOOG_ON?'已開啟 Google 翻譯':'已改用離線詞庫');
-  if(GOOG_ON) refreshNet();
-}
-function refreshNet(){
-  var b=$('goog');
-  if(!b) return;
-  if(GOOG_ON) b.textContent = (navigator.onLine===false?'🌐 Google：開（現時離線，會用詞庫）':'🌐 Google 翻譯：開（連網）');
-}
-window.addEventListener('online',refreshNet);
-window.addEventListener('offline',refreshNet);
-async function run(){
+function translate(){
   var v=$('src').value.trim();
   if(!v){ toast('請先輸入內容'); return; }
-  var hasCJK=/[\u4e00-\u9fff]/.test(v);
-  if(dir==='en2zh' && hasCJK) setDir('zh2en');
-  if(dir==='zh2en' && !hasCJK) setDir('en2zh');
-  if(GOOG_ON && navigator.onLine!==false){
-    $('tag').textContent='Google 翻譯中…';
-    try{
-      var gt=await gTrans(v, dir==='zh2en'?'zh-CN':'en', dir==='zh2en'?'en':'zh-TW');
-      if(gt){
-        lastOut=gt; lastLang = dir==='zh2en' ? 'en-US' : 'zh-HK';
-        var oo=$('out'); oo.className='out'; oo.textContent=gt;
-        $('tag').textContent='Google 翻譯（連網）';
-        var nb=$('norm'); nb.style.display='none'; nb.textContent='';
-        return;
-      }
-    }catch(e){ toast('Google 翻譯失敗，改用離線詞庫'); }
-  }
-  var r = dir==='zh2en' ? trZH(v) : trEN(v);
-  lastOut=r.text;
+  var r = dir==='zh2en' ? zh2en(v) : en2zh(v);
+  lastMid=r.mid; lastOut=r.out;
   lastLang = dir==='zh2en' ? 'en-US' : 'zh-HK';
-  var out=$('out'); out.className='out'; out.textContent=r.text;
-  var ratio = r.text ? r.unknown/Math.max(1, (r.len || v.length)) : 0;
-  var normBox=$('norm');
-  if(dir==='zh2en' && r.usedNorm && r.norm && r.norm!==v){
-    normBox.style.display='block'; normBox.textContent='普通話（書面語）：'+r.norm;
-  }else{ normBox.style.display='none'; normBox.textContent=''; }
-  if(!r.text){ out.className='out empty'; out.textContent='（詞庫未能處理，請拆短句試下）'; }
-  else if(ratio>0.35){ $('tag').textContent='部分字詞未收錄（保留原文）'; }
-  else if(ratio>0){ $('tag').textContent='已翻譯（個別字詞未收錄）'; }
-  else { $('tag').textContent='已完整翻譯'; }
+  $('mid').textContent = r.mid || '—';
+  var out=$('out');
+  out.className='out'; out.textContent = r.out || '（未能翻譯）';
+  if(!r.out){ out.className='out empty'; out.textContent='（未能翻譯，請拆短句試下）'; }
+  $('tag').textContent = r.exact ? '整句對譯' : (r.struct ? '句式重組' : '詞庫組合');
 }
-function speak(){
-  if(!lastOut){ toast('未有結果可朗讀'); return; }
-  if(!('speechSynthesis' in window)){ toast('此裝置唔支援朗讀'); return; }
-  try{ speechSynthesis.cancel(); }catch(e){}
-  var u=new SpeechSynthesisUtterance(lastOut);
-  u.lang=lastLang; u.rate=SLOW?0.72:0.95;
-  var vs=speechSynthesis.getVoices()||[];
-  var best=null;
-  for(var i=0;i<vs.length;i++){
-    var v=vs[i], tag=(v.lang||'')+' '+(v.name||'');
-    if(lastLang.indexOf('zh')===0 && /zh[-_]?(HK|TW)|Cantonese|粵|Yue/i.test(tag)){ best=v; break; }
-    if(lastLang.indexOf('en')===0 && /^en(-|_)?(US|GB)?/i.test(v.lang||'')){ best=best||v; }
-  }
-  if(best) u.voice=best;
-  speechSynthesis.speak(u);
-  toast('朗讀中');
-}
-var rec=null;
-function mic(){
-  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){ toast('此裝置唔支援語音輸入，請用鍵盤'); return; }
-  if(rec){ try{rec.stop();}catch(e){} rec=null; return; }
-  rec=new SR();
-  rec.lang = dir==='zh2en' ? 'yue-Hant-HK' : 'en-US';
-  rec.interimResults=false; rec.maxAlternatives=1;
-  rec.onresult=function(e){ var t=e.results[0][0].transcript; $('src').value=t; run(); };
-  rec.onerror=function(e){ toast('語音輸入失敗：'+(e.error||'unknown')); rec=null; };
-  rec.onend=function(){ toast('語音輸入完成'); rec=null; };
-  try{ rec.start(); toast('請講…'); }catch(e){ toast('無法啟動語音輸入'); rec=null; }
-}
-var autoOn=false, autoLang='zh2en';
 function speakText(txt,lang,cb){
   if(!('speechSynthesis' in window)){ if(cb)cb(); return; }
   try{ speechSynthesis.cancel(); }catch(e){}
   var u=new SpeechSynthesisUtterance(txt);
-  u.lang=lang; u.rate=SLOW?0.72:0.95;
+  u.lang=lang; u.rate=0.95;
   var vs=speechSynthesis.getVoices()||[], best=null;
   for(var i=0;i<vs.length;i++){
     var v=vs[i], tg=(v.lang||'')+' '+(v.name||'');
@@ -454,44 +574,68 @@ function speakText(txt,lang,cb){
   u.onend=function(){ if(cb)cb(); };
   speechSynthesis.speak(u);
 }
-function listenOnce(onText){
+function speak(){
+  if(!lastOut){ toast('未有結果可朗讀'); return; }
+  speakText(lastOut,lastLang,function(){});
+  toast('朗讀中');
+}
+var rec=null, autoOn=false, speaking=false;
+function listenOnce(lang,onText){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){ toast('此裝置唔支援語音識別'); autoStop(); return; }
-  try{ if(rec) rec.stop(); }catch(e){}
+  if(!SR){ toast('此裝置唔支援語音識別，請用鍵盤'); stopAuto(); return; }
+  try{ if(rec) rec.abort(); }catch(e){}
   rec=new SR();
-  rec.lang = autoLang==='zh2en' ? 'yue-Hant-HK' : 'en-US';
-  rec.interimResults=false; rec.maxAlternatives=1;
-  rec.onresult=function(e){ var t=e.results[0][0].transcript; onText(t); };
-  rec.onerror=function(e){ if(e.error==='no-speech'){ if(autoOn) setTimeout(listenOnce.bind(null,onText),800); return; } toast('識別失敗：'+(e.error||'')); rec=null; if(autoOn) autoStop(); };
-  rec.onend=function(){ if(autoOn && !window._recGot) setTimeout(function(){ if(autoOn && !window._recGot) listenOnce(onText); },700); };
-  window._recGot=false;
-  try{ rec.start(); }catch(e){ toast('無法啟動語音輸入'); rec=null; }
+  rec.lang=lang; rec.interimResults=false; rec.maxAlternatives=1; rec.continuous=false;
+  var got=false;
+  rec.onresult=function(e){ got=true; var t=e.results[0][0].transcript; onText(t); };
+  rec.onerror=function(e){
+    if(e.error==='no-speech'){
+      if(autoOn && !speaking) setTimeout(function(){ listenOnce(lang,onText); },700);
+      return;
+    }
+    toast('識別失敗：'+(e.error||'unknown'));
+    if(autoOn) stopAuto();
+  };
+  rec.onend=function(){
+    if(autoOn && !got && !speaking) setTimeout(function(){ listenOnce(lang,onText); },700);
+  };
+  try{ rec.start(); }catch(e){ toast('無法啟動語音輸入'); }
 }
 function autoTurn(){
-  if(!autoOn) return;
-  setDir(autoLang);
-  $('tag').textContent='等候你講'+(autoLang==='zh2en'?'粵語':'英文')+'…';
-  listenOnce(async function(t){
-    window._recGot=true;
-    $('src').value=t;
-    await run();
-    var say=lastOut, sayLang=(autoLang==='zh2en'?'en-US':'zh-HK');
-    $('tag').textContent='朗讀中（'+(autoLang==='zh2en'?'英文':'粵語')+'）';
-    speakText(say, sayLang, function(){
-      if(!autoOn) return;
-      autoLang = autoLang==='zh2en' ? 'en2zh' : 'zh2en';
-      setTimeout(autoTurn, 350);
+  if(!autoOn || speaking) return;
+  var lang = dir==='zh2en' ? 'yue-Hant-HK' : 'en-US';
+  $('status').textContent = (dir==='zh2en'?'等候你講粵語…':'等候你講英文…');
+  listenOnce(lang,function(text){
+    if(!autoOn) return;
+    $('src').value=text;
+    translate();
+    $('status').textContent = '翻譯完成，朗讀'+(dir==='zh2en'?'英文':'粵語')+'…';
+    speaking=true;
+    speakText(lastOut,lastLang,function(){
+      speaking=false;
+      if(autoOn) setTimeout(autoTurn,450);
     });
   });
 }
-function autoStop(){ autoOn=false; try{ if(rec) rec.stop(); }catch(e){} rec=null; $('auto').setAttribute('aria-pressed','false'); $('auto').textContent='▶ 即時對話（講完自動翻譯＋自動朗讀，雙向輪替）'; }
-function toggleAuto(){
-  if(autoOn){ autoStop(); toast('已停止'); return; }
-  autoOn=true; autoLang='zh2en';
+function startAuto(){
+  autoOn=true; speaking=false;
   $('auto').setAttribute('aria-pressed','true');
-  $('auto').textContent='■ 停止即時對話';
-  toast('請講粵語');
+  $('auto').textContent='■ 停止即時翻譯';
   autoTurn();
+}
+function stopAuto(){
+  autoOn=false; speaking=false;
+  try{ if(rec) rec.abort(); }catch(e){}
+  try{ speechSynthesis.cancel(); }catch(e){}
+  $('auto').setAttribute('aria-pressed','false');
+  $('auto').textContent='▶ 即時翻譯（鎖定語言，講完自動翻譯＋朗讀）';
+  $('status').textContent='已停止';
+}
+function toggleAuto(){ if(autoOn) stopAuto(); else startAuto(); }
+function micOnce(){
+  var lang = dir==='zh2en' ? 'yue-Hant-HK' : 'en-US';
+  toast(dir==='zh2en'?'請講粵語…':'Please speak English…');
+  listenOnce(lang,function(t){ $('src').value=t; translate(); });
 }
 function refreshDev(){
   var box=$('devline');
@@ -505,9 +649,7 @@ function refreshDev(){
       (hp?'　<br>已偵測耳機／藍牙：系統會把聲音送去耳機；要用手機喇叭出聲，請先斷開藍牙或拔耳機。':'');
   }).catch(function(){ box.textContent='（裝置清單需授權後才顯示）'; });
 }
-
 function copyOut(){
-
   if(!lastOut){ toast('未有結果'); return; }
   var done=function(){ toast('已複製'); };
   if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(lastOut).then(done,function(){ fallbackCopy(); }); }
@@ -528,23 +670,21 @@ var CHIPS=[
   var box=$('chips');
   CHIPS.forEach(function(p){
     var b=document.createElement('button'); b.className='chip'; b.textContent=p;
-    b.onclick=function(){ setDir('zh2en'); $('src').value=p; run(); };
+    b.onclick=function(){ setDir('zh2en'); $('src').value=p; translate(); };
     box.appendChild(b);
   });
 })();
 
-$('d2e').onclick=function(){ setDir('zh2en'); };
-$('e2d').onclick=function(){ setDir('en2zh'); };
-$('go').onclick=run;
-$('goog').onclick=toggleGoog;
-$('slow').onclick=function(){ SLOW=!SLOW; this.textContent=SLOW?'🐢 慢速：開':'🐢 慢速：關'; this.setAttribute('aria-pressed',SLOW?'true':'false'); toast(SLOW?'慢速朗讀已開':'已回復正常速度'); };
-$('mic').onclick=mic;
+$('d2e').onclick=function(){ if(autoOn) stopAuto(); setDir('zh2en'); };
+$('e2d').onclick=function(){ if(autoOn) stopAuto(); setDir('en2zh'); };
+$('go').onclick=translate;
+$('mic').onclick=micOnce;
 $('auto').onclick=toggleAuto;
 $('speak').onclick=speak;
 $('copy').onclick=copyOut;
 $('clear').onclick=function(){ $('src').value=''; setDir(dir); $('src').focus(); };
-$('src').addEventListener('keydown',function(e){ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)) run(); });
-$('note').textContent='內置離線詞庫 '+Object.keys(T).length+' 條（粵語⇄英文），涵蓋日常、職場、電工與工程術語；短句最準，長句會按詞序組合。翻譯同朗讀完全離線；「即時對話」的語音識別由手機系統提供，多數手機要連網才可識別。要最準嘅譯法，可開「🌐 Google 翻譯」（需連網，離線時自動回落詞庫）；聲音經手機喇叭抑或耳機播出，由手機系統決定，網頁無法強制切換。';
+$('src').addEventListener('keydown',function(e){ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)) translate(); });
+$('note').textContent='翻譯流程：粵語／英文先經「普通話構思」整句執齊，再輸出目標語言，避免逐詞硬拼。內置離線詞庫 '+Object.keys(T).length+' 條＋三語整句庫，涵蓋日常、職場、電工與工程術語。翻譯同朗讀完全離線；語音識別由手機系統提供，多數手機要連網才可識別。聲音經手機喇叭抑或耳機播出，由手機系統決定，網頁無法強制切換。';
 setDir('zh2en');
 if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged=function(){}; }
 refreshDev();
