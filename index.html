@@ -89,10 +89,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   #quiz-card > *:not(.wm),.wm-zone > *:not(.wm){position:relative;z-index:1}
   .wm-zone{position:relative;overflow:hidden}
   .wm{position:absolute;inset:-24px;z-index:0;opacity:.10;pointer-events:none;transform:rotate(-18deg);display:flex;flex-wrap:wrap;align-content:space-around;justify-content:space-around;gap:28px 46px;overflow:hidden;color:#0f172a;font-weight:700;font-size:14px;line-height:1.4;white-space:nowrap;background-repeat:repeat;background-size:92px 104px;background-position:center}
-  .content-img{display:inline-block;max-width:min(100%,260px);height:auto;margin:0 2px;vertical-align:middle;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
-  .content-img-S{height:2em}
-  .content-img-M{height:4.5em}
-  .content-img-L{height:9em}
+  .content-img{display:inline-block;max-width:100%;height:auto;margin:0 2px;vertical-align:middle;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+  .content-img-S{height:4.5em}
+  .content-img-M{height:8em}
+  .content-img-L{height:14em}
   .admin-imgbox{padding:10px;overflow-x:auto;overflow-y:hidden;background:#fff;border:1px solid var(--line);border-radius:8px;margin:6px 0}
   .admin-imgbox .content-img{max-width:100%;max-height:260px}  details.qfold{background:#fff;border-radius:10px}
   details.qfold[open]{box-shadow:0 1px 4px rgba(18,38,68,.08)}
@@ -151,6 +151,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   <div id="splash-tip" style="margin-top:42px;font-size:15px;font-weight:700;background:#fff;color:#0d2a5e;border-radius:999px;padding:12px 34px;box-shadow:0 8px 24px rgba(0,0,0,.28);cursor:pointer;display:inline-block;animation:blink 1.6s infinite">輕觸螢幕進入</div>
 </div>
 <style>@keyframes blink{0%,100%{opacity:.75}50%{opacity:.3}}</style>
+<button id="lang-toggle" class="no-tr" onclick="toggleLang()" style="position:fixed;left:10px;top:10px;z-index:100000;background:#e8720c;color:#000;font-weight:800;font-size:14px;letter-spacing:.5px;border:2px solid #b85400;border-radius:10px;padding:7px 16px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.3);font-family:inherit">English</button>
 <div class="app">
 
   <!-- ========== 頁面：首頁（學生入場） ========== -->
@@ -370,6 +371,17 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   <div style="color:#cbd5e1;font-size:13px;margin-top:12px">撳一下退回上一頁</div>
 </div>
 
+<!-- 題目圖片全屏放大（似廣告彈出，撳圖片一下即全屏睇整張） -->
+<div id="img-viewer" onclick="closeImgViewer()" class="no-tr" style="display:none;position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,.94);align-items:center;justify-content:center;flex-direction:column;overflow:hidden">
+  <button onclick="event.stopPropagation();closeImgViewer()" style="position:absolute;right:12px;top:10px;z-index:100003;width:44px;height:44px;border:none;border-radius:50%;background:#e8720c;color:#000;font-size:22px;font-weight:900;cursor:pointer;line-height:1">×</button>
+  <img id="img-viewer-img" style="max-width:97vw;max-height:88vh;width:auto;height:auto;object-fit:contain;background:#fff;border-radius:8px;box-shadow:0 12px 60px rgba(0,0,0,.7);transition:transform .18s ease;transform-origin:center center">
+  <div style="position:absolute;bottom:14px;left:0;right:0;display:flex;gap:14px;align-items:center;justify-content:center;z-index:100003" onclick="event.stopPropagation()">
+    <button onclick="imgViewerZoom(-1)" style="width:52px;height:46px;border:none;border-radius:10px;background:#e8720c;color:#000;font-size:20px;font-weight:900;cursor:pointer">－</button>
+    <div style="color:#fff;font-size:13px;opacity:.9">撳畫面任何位置返回</div>
+    <button onclick="imgViewerZoom(1)" style="width:52px;height:46px;border:none;border-radius:10px;background:#e8720c;color:#000;font-size:20px;font-weight:900;cursor:pointer">＋</button>
+  </div>
+</div>
+
 <script>
 /* ================= 數據層（localStorage） ================= */
 const DB = {
@@ -387,6 +399,247 @@ const K = {
   tsesh:'quiz_teacher_session', draft:'quiz_draft_v1', logo:'quiz_logo_custom', btext:'quiz_brand_text', examOpen:'quiz_exam_open', wm:'quiz_wm_custom', footerLogo:'quiz_footer_logo', backups:'quiz_backups_v1'
 };
 const LEAP_LOGO_URL=(document.querySelector('#splash img')||{}).src||'';
+
+/* ================= 語言切換 examLang（zh / en）================= */
+const LANG_KEY='examLang';
+function getLang(){ try{ const v=localStorage.getItem(LANG_KEY); return v==='en'?'en':'zh'; }catch(e){ return 'zh'; } }
+function setLang(v){ try{ localStorage.setItem(LANG_KEY, v==='en'?'en':'zh'); }catch(e){} }
+const EN_DICT={
+  '電工答題':'Electrical Quiz',
+  '飛躍教育中心 · 初級維修電工課程':'LEAP Education Center · Basic Electrical Maintenance Course',
+  '飛躍教育中心':'LEAP Education Center',
+  '初級維修電工課程 · 電工答題系統':'Basic Electrical Maintenance Course · Quiz System',
+  '輕觸螢幕進入':'Tap to enter',
+  '輸入考試碼入場':'Enter the exam code',
+  '同步最新考試資料':'Sync latest exam data',
+  '考試碼（老師派發嘅數字）':'Exam code (given by the teacher)',
+  '驗證考試碼':'Verify code',
+  '入場方式（二揀一）':'Entry method (choose one)',
+  '揀學生名':'Student name',
+  '電話號碼':'Phone number',
+  '揀班次（分流）':'Class (grouping)',
+  '選擇學生學號':'Select student ID',
+  '— 請揀學生學號 —':'— Select student ID —',
+  '— 揀班 —':'— Select class —',
+  '輸入電話號碼（8或11位，可加 +852／+86／+853）':'Phone (8 or 11 digits, +852/+86/+853 optional)',
+  '電話號碼就係身份・可無限刷題・直到老師關卷先停':'Phone number is your ID · unlimited attempts until the teacher closes the exam',
+  '進入考卷':'Enter exam',
+  '改考試碼':'Change exam code',
+  '開卷考試（無限刷・無需考試碼）':'Open-book practice (unlimited · no code needed)',
+  '學生直接揀自己個帳號就開卷考・全部題庫・隨時睇答案・無限次重刷':'Pick your account to start · full question bank · answers shown · unlimited retries',
+  '開卷考試：全部題庫・隨機出題・冇任何限制・交卷後可以無限次再刷':'Open-book: full bank · random order · no limits · unlimited retries after submitting',
+  '揀班次（可留空＝全部班）':'Class (leave empty = all classes)',
+  '— 全部班次 —':'— All classes —',
+  '選擇學生帳號（基礎測驗班：可以唔揀，直接用下面電話號碼）':'Student account (Basic class: optional, use the phone below)',
+  '— 請揀班再揀學生 —':'— Select a class first —',
+  '或者直接輸入電話號碼（可加國家前綴 +852／+86／+853）':'Or enter a phone number (+852/+86/+853 optional)',
+  '基礎測驗班唔使學生學號・電話號碼（8或11位，可加 +852／+86／+853）就係身份，即刻開卷考':'Basic class needs no student ID · phone number (8 or 11 digits) is your ID',
+  '開始開卷考':'Start open-book practice',
+  '返回考試碼入口':'Back to exam code',
+  '考試中':'Exam in progress',
+  '跳去第':'Go to',
+  '跳去':'Go',
+  '題號':'No.',
+  '換考場（未交卷離開，草稿保留）':'Leave exam (draft kept)',
+  '上一題':'Previous',
+  '下一題':'Next',
+  '交卷':'Submit',
+  '計算機':'Calculator',
+  '成績':'Result',
+  '答對題數':'Correct answers',
+  '正確率（上限100%）':'Accuracy (max 100%)',
+  '作答用時':'Time used',
+  '錯題序號':'Wrong item numbers',
+  '逐題對答案':'Answer review',
+  '再刷一轉（無限次）':'Try again (unlimited)',
+  '返回首頁':'Back to home',
+  '單選題':'Single choice',
+  '多選題':'Multiple choice',
+  '計算題':'Calculation',
+  '混合題':'Mixed',
+  '圖片作答':'Photo answer',
+  '填寫題':'Fill-in',
+  '是非題':'True / False',
+  '正確':'True',
+  '錯誤':'False',
+  '正確答案':'Correct answer',
+  '學生答案':'Student answer',
+  '答案':'Answer',
+  '未作答':'Not answered',
+  '（未作答）':'(not answered)',
+  '已批改':'Graded',
+  '待批改':'Pending grading',
+  '滿分':'Full marks',
+  '得分':'Score',
+  '答對':'Correct',
+  '答錯':'Wrong',
+  '全對':'All correct',
+  '錯題':'Wrong items',
+  '題目':'Question',
+  '選項':'Option',
+  '老師管理':'Teacher panel',
+  '老師密碼登入':'Teacher login',
+  '輸入主管密碼':'Enter supervisor password',
+  '登入':'Log in',
+  '登出':'Log out',
+  '返回學生考試介面':'Back to student exam',
+  '發起考試碼':'Launch exam',
+  '學生管理（班次）':'Student management (classes)',
+  '成績後台':'Results dashboard',
+  '圖片作答批改':'Photo answer grading',
+  '考卷管理':'Paper management',
+  '導入 X 檔題庫':'Import X-file question bank',
+  '題庫管理（改題）':'Question bank (edit)',
+  '刷新界面 Logo':'Refresh interface logo',
+  '版本號設定':'Version setting',
+  '雲端同步設置':'Cloud sync settings',
+  '數據管理（清理舊成績）':'Data management (clean old results)',
+  '修改密碼':'Change password',
+  '儲存到雲端（覆蓋其他裝置）':'Save to cloud (overwrite other devices)',
+  '從雲端重新整理（覆蓋本機）':'Refresh from cloud (overwrite this device)',
+  '清空考場（停止進入）':'Close exam room (stop entry)',
+  '通知其他老師30秒後登出':'Notify other teachers to log out in 30s',
+  '刷新':'Refresh',
+  '確定，我仲喺度':'OK, I am still here',
+  '老師登出通知':'Teacher logout notice',
+  '收到登出通知，30秒內無動作將自動登出':'Logout notice received. Auto logout in 30 seconds.',
+  '生成考試碼':'Generate exam code',
+  '進行中考試':'Exams in progress',
+  '揀班次':'Class',
+  '揀考卷（可多張混合；唔勾選＝全部題庫）':'Papers (multi-select; none = full bank)',
+  '全部題庫':'Full question bank',
+  '出題順序':'Question order',
+  '順序出題':'Sequential',
+  '隨機出題':'Random (per student)',
+  '統一隨機（所有人同一順序）':'Unified random (same for everyone)',
+  '抽題數量（0＝全部；混合時隨機抽指定題數）':'Number of questions (0 = all)',
+  '入場方式':'Entry method',
+  '固定學生（舊規矩：揀學號・交卷鎖名）':'Fixed student (select ID · name locked on submit)',
+  '只要電話（電話號碼即身份・無限刷題・關卷先停）':'Phone only (phone is identity · unlimited · until closed)',
+  '考試碼（阿拉伯數字）':'Exam code (digits)',
+  '開放時長（小時；0＝無限時間直到關閉考場，平時默認2）':'Open duration (hours; 0 = until closed)',
+  '考後檢討':'Post-exam review',
+  '考後檢討模式':'Review mode',
+  '只顯示錯題、唔顯示答案':'Wrong items only, no answers',
+  '錯題＋正確答案都顯示':'Wrong items + correct answers',
+  '考卷設置':'Exam settings',
+  '學生入場':'Student entry',
+  '開卷練習':'Open-book practice',
+  '版權所有':'All rights reserved',
+  '本系統採用 GPLv3 開源協議：教學用途免費使用，禁止商業閉源抄襲':'Licensed under GPLv3: free for teaching use, commercial closed-source copying prohibited',
+  '換 X 檔就係新考試・考試碼 1 小時有效':'New X file = new exam · exam code valid for 1 hour',
+  '版本':'Version',
+  '導入':'Import',
+  '練習模式':'Practice mode',
+  '做題':'Answering',
+  '時間':'Time',
+  '姓名':'Name',
+  '班次':'Class',
+  '儲存':'Save',
+  '取消':'Cancel',
+  '確定':'Confirm',
+  '關閉':'Close',
+  '返回':'Back',
+  '複製':'Copy',
+  '貼上題目':'Paste question',
+  '新增':'Add',
+  '刪除':'Delete',
+  '拆除':'Remove',
+  '開始':'Start',
+  '結束':'End'
+};
+const EN_KEYS=Object.keys(EN_DICT).filter(k=>k.length>=2).sort((a,b)=>b.length-a.length);
+function langSeg(s){
+  if(!s) return s;
+  const lead=(s.match(/^\s*/)||[''])[0];
+  const trail=(s.match(/\s*$/ )||[''])[0];
+  const tr=s.trim();
+  if(!tr) return s;
+  if(Object.prototype.hasOwnProperty.call(EN_DICT,tr)) return lead+EN_DICT[tr]+trail;
+  let out=tr;
+  out=out.replace(/第\s*(\d+)\s*\/\s*(\d+)\s*題/g,'Question $1 / $2');
+  out=out.replace(/第\s*(\d+)\s*題/g,'Question $1');
+  out=out.replace(/(\d+(?:\.\d+)?)\s*分/g,'$1 pts');
+  for(let i=0;i<EN_KEYS.length;i++){ const k=EN_KEYS[i]; if(out.indexOf(k)>=0) out=out.split(k).join(EN_DICT[k]); }
+  return lead+out+trail;
+}
+// 翻譯一段文字：{{xxx}} 佔位符原封不動，其餘照樣翻譯
+function tStr(s){
+  if(getLang()!=='en') return s;
+  const str=String(s);
+  if(str.indexOf('{{')<0) return langSeg(str);
+  return str.split(/(\{\{[^{}]*\}\})/g).map(p=>{
+    if(p && p.indexOf('{{')===0 && p.lastIndexOf('}}')===p.length-2) return p;
+    return langSeg(p);
+  }).join('');
+}
+const _origText=new WeakMap(), _origAttr=new WeakMap(), _langValue=new WeakMap();
+function trSkip(node){
+  let el=node.parentNode;
+  while(el&&el.nodeType===1){
+    if(el.classList&&el.classList.contains('no-tr')) return true;
+    const tag=el.tagName;
+    if(tag==='SCRIPT'||tag==='STYLE'||tag==='TEXTAREA'||tag==='CODE'||tag==='NOSCRIPT') return true;
+    el=el.parentNode;
+  }
+  return false;
+}
+function translateTree(root){
+  if(!root) return;
+  if(root.nodeType===3){
+    if(trSkip(root)) return;
+    if(!_origText.has(root)) _origText.set(root, root.nodeValue);
+    const o=_origText.get(root);
+    const want=getLang()==='en'?tStr(o):o;
+    if(root.nodeValue!==want){ root.nodeValue=want; _langValue.set(root, want); }
+    return;
+  }
+  if(root.nodeType!==1) return;
+  let m=_origAttr.get(root);
+  if(!m){ m={}; _origAttr.set(root,m); }
+  ['placeholder','title','alt'].forEach(a=>{
+    if(root.hasAttribute&&root.hasAttribute(a)){
+      if(m[a]===undefined) m[a]=root.getAttribute(a);
+      const want=getLang()==='en'?tStr(m[a]):m[a];
+      if(root.getAttribute(a)!==want) root.setAttribute(a,want);
+    }
+  });
+  const w=document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  const list=[]; let n=w.nextNode();
+  while(n){ list.push(n); n=w.nextNode(); }
+  list.forEach(n=>{
+    if(trSkip(n)) return;
+    if(!_origText.has(n)) _origText.set(n, n.nodeValue);
+    const o=_origText.get(n);
+    const want=getLang()==='en'?tStr(o):o;
+    if(n.nodeValue!==want){ n.nodeValue=want; _langValue.set(n, want); }
+  });
+}
+let _langObs=null;
+function startLangObserver(){
+  if(_langObs||typeof MutationObserver==='undefined') return;
+  _langObs=new MutationObserver(muts=>{
+    muts.forEach(mu=>{
+      if(mu.type==='characterData'){
+        const n=mu.target;
+        if(n.nodeValue===_langValue.get(n)) return;
+        _origText.set(n, n.nodeValue);
+        translateTree(n);
+        return;
+      }
+      if(mu.addedNodes&&mu.addedNodes.length){ mu.addedNodes.forEach(x=>{ if(x.nodeType===1||x.nodeType===3) translateTree(x); }); }
+    });
+  });
+  _langObs.observe(document.body,{childList:true,subtree:true,characterData:true});
+}
+function refreshLangBtn(){ const b=document.getElementById('lang-toggle'); if(b) b.textContent=(getLang()==='en'?'中文':'English'); }
+function toggleLang(){
+  setLang(getLang()==='en'?'zh':'en');
+  refreshLangBtn();
+  translateTree(document.body);
+  toast(getLang()==='en'?'Language: English':'語言：中文');
+}
+
 
 /* ================= 雲端同步（Firebase Realtime Database REST，可選；唔設網址就退回純本機） ================= */
 const CLOUD_KEY='quiz_cloud_url';
@@ -597,11 +850,11 @@ function renderOptContent(text){
   // Markdown 圖片 ![圖片](url|size) size=S/M/L
   // 如果圖獨立一行（前後係換行或首尾），就 block 獨佔一行；否則 inline
   s=s.replace(/(^|\n)!\[([^\]]*)\]\(([^)|]+)(?:\|([SML]))?\)(?=\n|$)/g, function(m,pre,alt,url,sz){
-    const h = sz==='L' ? '9em' : sz==='M' ? '4.5em' : '2em';
+    const h = sz==='L' ? '14em' : sz==='M' ? '8em' : '4.5em';
     return pre+'<div style="text-align:center;margin:6px 0"><img class="content-img content-img-'+(sz||'S')+'" style="height:'+h+';cursor:zoom-in" src="'+url+'" alt="'+alt+'" data-size="'+(sz||'S')+'" onclick="zoomImgAns(this)"></div>';
   });
   s=s.replace(/!\[([^\]]*)\]\(([^)|]+)(?:\|([SML]))?\)/g, function(m,alt,url,sz){
-    const h = sz==='L' ? '9em' : sz==='M' ? '4.5em' : '2em';
+    const h = sz==='L' ? '14em' : sz==='M' ? '8em' : '4.5em';
     return '<img class="content-img content-img-'+(sz||'S')+'" style="height:'+h+';cursor:zoom-in" src="'+url+'" alt="'+alt+'" data-size="'+(sz||'S')+'" onclick="zoomImgAns(this)">';
   });
   // DISPIMG 公式 =DISPIMG("ID_xxx",1)
@@ -759,8 +1012,27 @@ function onImgAnsFile(input){
   input.value='';
 }
 function zoomImgAns(img){
-  const ov=document.getElementById('logo-zoom'), big=document.getElementById('logo-zoom-img');
-  if(ov&&big){ big.src=img.src||''; big.style.width=''; big.style.maxWidth='92vw'; ov.style.display='flex'; }
+  const src=(img&&img.src)||'';
+  if(!src) return;
+  const ov=document.getElementById('img-viewer'), big=document.getElementById('img-viewer-img');
+  if(!ov||!big) return;
+  _ivScale=1;
+  big.style.transform='scale(1)';
+  big.src=src;
+  big.alt=(img&&img.alt)||'圖片';
+  ov.style.display='flex';
+}
+let _ivScale=1;
+function closeImgViewer(){
+  const ov=document.getElementById('img-viewer'), big=document.getElementById('img-viewer-img');
+  if(ov) ov.style.display='none';
+  if(big){ big.removeAttribute('src'); big.style.transform='scale(1)'; }
+  _ivScale=1;
+}
+function imgViewerZoom(d){
+  _ivScale=Math.min(4,Math.max(1,Math.round((_ivScale+d)*100)/100));
+  const big=document.getElementById('img-viewer-img');
+  if(big) big.style.transform='scale('+_ivScale+')';
 }
 function durationHours(ms){
   if(ms==null||isNaN(ms)||ms<0) return '';
@@ -918,6 +1190,12 @@ function buildQuizList(exam){
   let arr=pool.slice();
   if(exam.order==='rand'){
     for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=arr[i]; arr[i]=arr[j]; arr[j]=t; }
+  } else if(exam.order==='srand'){
+    // 統一隨機：用考場 code 做 seed，所有人見到同一個打亂順序
+    let seed=0; const c=String(exam.code||'exam');
+    for(let k=0;k<c.length;k++){ seed=((seed<<5)-seed+c.charCodeAt(k))|0; }
+    const rnd=()=>{ seed=(seed*9301+49297)%233280; return seed/233280; };
+    for(let i=arr.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); const t=arr[i]; arr[i]=arr[j]; arr[j]=t; }
   }
   const n=Number(exam.drawCount)||0;
   if(n>0&&n<arr.length) arr=arr.slice(0,n);
@@ -2358,6 +2636,7 @@ function renderSub(g){
         <div style="font-size:13px">
           <label class="L-opt" style="cursor:pointer"><input type="radio" name="L-order" value="seq" checked> 順序出題</label>
           <label class="L-opt" style="margin-left:12px;cursor:pointer"><input type="radio" name="L-order" value="rand"> 隨機出題</label>
+          <label class="L-opt" style="margin-left:12px;cursor:pointer;color:#7c3aed"><input type="radio" name="L-order" value="srand"> 統一隨機（所有人同一順序）</label>
         </div>
         <label>抽題數量（0＝全部；混合時隨機抽指定題數）</label>
         <input id="L-count" type="number" min="0" value="0" inputmode="numeric">
@@ -3392,7 +3671,7 @@ function renderSub(g){
           const partCount=fillParts.length>0?fillParts.length:1;
           x+=`<div style="margin:4px 0;padding:6px;background:#f8fafc;border-radius:8px">`;
           for(let pi=0;pi<partCount;pi++){
-            const pt=fillParts[pi]||{answer: pi===0?(q.answer==null?'':String(q.answer)):''};
+            const pt=fillParts[pi]||{answer:''};
             const label='ABCDEF'.charAt(pi);
             x+=`<div style="display:flex;gap:6px;margin-top:4px;align-items:center">
               <label style="flex:0 0 30px;font-size:13px;color:#64748b;font-weight:700">${label}：</label>
@@ -3811,7 +4090,7 @@ function renderActiveExams(){
     else if(e.paperId){ const p=paperById(e.paperId); if(p&&p.questions) poolN=p.questions.length; }
     const drawN=Number(e.drawCount)||0;
     const showN=drawN>0?drawN:poolN;
-    const ordTxt=e.order==='rand'?'隨機出題':'順序出題';
+    const ordTxt=e.order==='rand'?'隨機出題':(e.order==='srand'?'統一隨機':'順序出題');
     return `<div style="padding:8px;border-bottom:1px solid var(--line)">
       <b>碼 ${e.code}${e.session?' · 第'+e.session+'場':''}</b> · ${esc(e.className)} · ${esc(pname)} · ${ordTxt} · ${showN}題 · ${e.phoneOpen?'<span class="tag" style="background:#ea580c;color:#fff">電話開放・無限刷</span> · <span style="color:#ea580c">長期開放（關卷先停）</span>':(e.unlimited?'<span style="color:#16a34a">無限時間（直到關閉考場）</span>':'剩餘 '+Math.max(0,Math.round((e.expireAt-Date.now())/3600000*10)/10)+'小時')}
       ${paperList}
@@ -3876,13 +4155,7 @@ function exportPapers(){
       r[1]=q.question||'';
       r[35]=(q.score&&q.score>0)?q.score:'';
       if(q.type===5){ r[6]='1'; }
-      else if(q.type===3){
-        r[2]='1';
-        const fillParts=(q.parts||[]).filter(pt=>pt.kind==='fill'&&pt.visible!==false);
-        let fillAns=Array.isArray(q.answer)?q.answer.join(';'):(q.answer==null?'':q.answer);
-        if(fillParts.length>1) fillAns=fillParts.map(p=>p.answer==null?'':String(p.answer)).join(';');
-        r[7]=fillAns;
-      }
+      else if(q.type===3){ r[2]='1'; r[7]=Array.isArray(q.answer)?q.answer.join(';'):(q.answer==null?'':q.answer); }
       else if(q.type===4){
         (q.parts||[]).forEach(part=>{
           if(part.kind==='single'){ r[3]='1'; (part.options||[]).forEach((o,i)=>r[9+i]=o); (part.answer||[]).forEach(i=>r[21+i]='1'); }
@@ -4283,11 +4556,7 @@ function exportPaperXlsx(){
     }
     if(q.type===3){
       row[2]=1; // 填寫題
-      // 填充題：多個填空位（ABCDEF 格）以「;」分隔寫入「填寫題答案位內容」，匯入時再拆返做多個填空位
-      const fillParts=(q.parts||[]).filter(pt=>pt.kind==='fill'&&pt.visible!==false);
-      let fillAns=(Array.isArray(q.answer)?q.answer.join(';'):(q.answer==null?'':q.answer));
-      if(fillParts.length>1) fillAns=fillParts.map(p=>p.answer==null?'':String(p.answer)).join(';');
-      row[7]=cleanText(fillAns);
+      row[7]=cleanText(q.answer); // 填寫答案
     } else if(q.type===1){
       row[3]=1; // 單選題
       const ans=q.answer||[];
@@ -4537,20 +4806,13 @@ function rowToQuestion(cells, col){
       else if(kind==='multi'){ const mo=col.multiOpt.map(get).filter(Boolean); const ma=[]; col.multiStudent.forEach((s,i)=>{ if(isMark(s)&&i<mo.length) ma.push(i); }); if(mo.length) parts.push({kind:'multi',options:mo,answer:ma}); }
       else if(kind==='tf'){ const ta=[]; if(isMark(col.tfTrue)) ta.push(0); if(isMark(col.tfFalse)) ta.push(1); parts.push({kind:'tf',options:['正確','錯誤'],answer:ta}); }
       else { const raw=get(col.fillAns); const vals=String(raw).split(/[;,，；\s]+/).filter(t=>t.trim());
-        if(vals.length===0) parts.push({kind:'fill',answer:''});
-        else vals.forEach(t=>{ const n=parseFloat(t); parts.push({kind:'fill',answer:isNaN(n)?t:n}); });
+        if(vals.length>1) parts.push({kind:'fill',answer:vals.map(t=>{const n=parseFloat(t); return isNaN(n)?t:n;})});
+        else if(vals.length===1){ const n=parseFloat(vals[0]); parts.push({kind:'fill',answer:isNaN(n)?vals[0]:n}); }
+        else parts.push({kind:'fill',answer:''});
       }
     });
     q.type=4; q.parts=parts; q.options=[]; q.answer=[];
-  } else if(type===3){
-    // 填充題：答案以「; , ， ；」分隔＝多個填空位（ABCDEF 格）；單一答案=A 格
-    const rawAns=get(col.fillAns);
-    const vals=String(rawAns==null?'':rawAns).split(/[;,，；]+/).map(t=>t.trim()).filter(t=>t!=='');
-    const first=vals.length?vals[0]:'';
-    const nf=parseFloat(first);
-    q.answer=vals.length?(isNaN(nf)?first:nf):'';
-    q.parts=vals.length?vals.map(t=>{const n=parseFloat(t); return {kind:'fill',answer:isNaN(n)?t:n,visible:true};}):[{kind:'fill',answer:'',visible:true}];
-  }
+  } else if(type===3){ const n=parseFloat(get(col.fillAns)); q.answer=isNaN(n)?get(col.fillAns):n; }
   else if(type===2){ col.multiOpt.forEach(o=>{ const v=get(o); if(v) q.options.push(v); }); while(q.options.length<4) q.options.push('選項'+String.fromCharCode(65+q.options.length)); const idxs=[]; col.multiStudent.forEach((s,i)=>{ if(isMark(s)&&i<q.options.length) idxs.push(i); }); q.answer=idxs; }
   else if(tfHas){ q.options=['正確','錯誤']; q.answer=isMark(col.tfTrue)?[0]:[1]; }
   else { col.singleOpt.forEach(o=>{ const v=get(o); if(v) q.options.push(v); }); while(q.options.length<4) q.options.push('選項'+String.fromCharCode(65+q.options.length)); let idx=-1; col.singleStudent.forEach((s,i)=>{ if(isMark(s)&&i<q.options.length) idx=i; }); q.answer=idx>=0?[idx]:[]; }
@@ -4576,6 +4838,9 @@ function rowsToQuestions(rows, col){
 
 // 初始化：首頁顯示
 applyBranding();
+refreshLangBtn();
+translateTree(document.body);
+startLangObserver();
 document.getElementById('view-home').classList.add('active');
 updateVerBadge();
 updateVerDisplay();
