@@ -3611,6 +3611,7 @@ function renderSub(g){
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <p class="muted" style="margin:0">先揀考卷，再睇嗰卷題目。直接改下面欄位就會即時儲存；改選項做正確答案請撳旁邊圓圈。</p>
         <button class="btn" style="width:auto;padding:6px 14px;font-size:13px;background:#10b981;color:#fff" onclick="exportPaperXlsx()">導出X檔</button>
+        <button class="btn" id="btn-autoEN" style="width:auto;padding:6px 12px;font-size:13px;background:#2563eb;color:#fff" onclick="autoENPaper(document.getElementById('Q-paperSel').value)">🌐 一鍵生成英文（Google 翻譯）</button>
       </div>
       ${papers.length===0?'<div class="muted" style="padding:20px;text-align:center">未導入考卷，請先去「導入 X 檔題庫」</div>':`
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0;font-size:13px">
@@ -4484,6 +4485,53 @@ function editQText(pid, i, v){
   const papers=getPapers();
   const p=papers.find(x=>x.id===Number(pid)); if(!p||!p.questions[i]) return;
   p.questions[i].question=v; DB.set(K.papers,papers); toast('題目已更新');
+}
+async function autoENPaper(pid){
+  const papers=getPapers();
+  const p=papers.find(x=>x.id===Number(pid));
+  if(!p){ toast('請先揀考卷'); return; }
+  const qs=p.questions||[];
+  if(!qs.length){ toast('呢張卷冇題目'); return; }
+  const n=qs.length;
+  if(!confirm('呢張卷有 '+n+' 題。系統會用 Google 翻譯逐題生成英文，只補「未有英文」嘅欄位，需連網，約 '+Math.ceil(n*0.4)+' 秒。開始？')) return;
+  window._enStop=false;
+  const btn=document.getElementById('btn-autoEN');
+  let done=0,fail=0;
+  for(let i=0;i<n;i++){
+    if(window._enStop) break;
+    const q=qs[i];
+    try{
+      if(q.question && !q.questionEn){ q.questionEn=await gTransOne(q.question); }
+      const opts=q.options||[];
+      if(opts.length && q.type!==3){
+        if(!Array.isArray(q.optionsEn) || q.optionsEn.length!==opts.length){
+          q.optionsEn=new Array(opts.length).fill('');
+        }
+        for(let k=0;k<opts.length;k++){
+          if(opts[k] && !q.optionsEn[k]) q.optionsEn[k]=await gTransOne(opts[k]);
+        }
+      }
+      done++;
+    }catch(e){
+      fail++;
+      if(fail>=3){ toast('翻譯失敗（'+e.message+'），已中止，請檢查網絡'); break; }
+    }
+    if(btn) btn.textContent='翻譯中 '+done+'/'+n;
+    if(i%6===5) await new Promise(function(r){ setTimeout(r,250); });
+  }
+  DB.set(K.papers,papers);
+  if(btn) btn.textContent='🌐 一鍵生成英文（Google 翻譯）';
+  toast('完成：'+done+' 題已補英文'+(fail?'，失敗 '+fail+' 題':''));
+  renderSub('questions');
+}
+async function gTransOne(txt){
+  const u='https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh-CN&tl=en&dt=t&q='+encodeURIComponent(txt);
+  const res=await fetch(u);
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const j=await res.json();
+  let s='';
+  (j&&j[0]||[]).forEach(function(x){ if(x&&x[0]) s+=x[0]; });
+  return s.trim();
 }
 function saveQEn(pid, i){
   const papers=getPapers();
