@@ -331,11 +331,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <button class="btn" style="margin-right:8px;padding:8px 16px" onclick="cloudSaveAll()">儲存到雲端（覆蓋其他裝置）</button>
         <button class="btn secondary" style="padding:8px 16px" onclick="cloudRefreshAll()">從雲端重新整理（覆蓋本機）</button>
       </div>
-      <div class="card" id="teacher-transCard" style="padding:12px;margin-bottom:10px;display:none">
-        <div class="muted" style="font-size:13px;margin-bottom:8px">離線粵英翻譯 APP：獨立檔案，下載落手機就可以離線用（同考試系統完全分開，唔影響任何考試功能同作答流程）。</div>
-        <button class="btn" id="btn-dlTrans" style="width:100%;padding:10px" onclick="downloadTransApp()">⬇ 下載離線粵英翻譯 APP</button>
-        <div id="trans-file-status" class="muted" style="font-size:12px;margin-top:6px"></div>
-      </div>
+
       <div class="link-grid" id="t-grid1">
         <button data-go="launch">發起考試碼</button>
         <button data-go="classes">學生管理（班次）</button>
@@ -354,6 +350,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <button data-go="logout" style="color:var(--red)">登出</button>
       </div>
       <div id="t-sub" style="margin-top:14px"></div>
+      <div class="card" id="teacher-transCard" style="padding:12px;margin-top:14px">
+        <div class="muted" style="font-size:13px;margin-bottom:8px">離線粵英翻譯 APP：獨立檔案，下載落手機就可以離線用（同考試系統完全分開，唔影響任何考試功能同作答流程）。</div>
+        <button class="btn" id="btn-dlTrans" style="width:100%;padding:10px" onclick="downloadTransApp()">⬇ 下載離線粵英翻譯 APP</button>
+        <div id="trans-file-status" class="muted" style="font-size:12px;margin-top:6px"></div>
+      </div>
     </div>
   </div>
 
