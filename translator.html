@@ -84,6 +84,7 @@
     <div class="norm" id="norm"></div>
     <div class="row">
       <button class="btn ghost" id="speak">🔊 朗讀</button>
+      <button class="btn ghost" id="slow">🐢 慢速：關</button>
       <button class="btn ghost" id="copy">複製</button>
       <button class="btn ghost" id="clear">清空</button>
     </div>
@@ -336,7 +337,7 @@ function trEN(s){
 }
 
 /* ========= 介面 ========= */
-var dir='zh2en', lastOut='', lastLang='en-US';
+var dir='zh2en', lastOut='', lastLang='en-US', SLOW=false;
 var $=function(id){return document.getElementById(id);};
 function toast(msg){ var t=$('toast'); t.textContent=msg; t.className='toast show'; clearTimeout(window._tt); window._tt=setTimeout(function(){t.className='toast';},1600); }
 function setDir(d){
@@ -412,7 +413,7 @@ function speak(){
   if(!('speechSynthesis' in window)){ toast('此裝置唔支援朗讀'); return; }
   try{ speechSynthesis.cancel(); }catch(e){}
   var u=new SpeechSynthesisUtterance(lastOut);
-  u.lang=lastLang; u.rate=0.95;
+  u.lang=lastLang; u.rate=SLOW?0.72:0.95;
   var vs=speechSynthesis.getVoices()||[];
   var best=null;
   for(var i=0;i<vs.length;i++){
@@ -442,7 +443,7 @@ function speakText(txt,lang,cb){
   if(!('speechSynthesis' in window)){ if(cb)cb(); return; }
   try{ speechSynthesis.cancel(); }catch(e){}
   var u=new SpeechSynthesisUtterance(txt);
-  u.lang=lang; u.rate=0.95;
+  u.lang=lang; u.rate=SLOW?0.72:0.95;
   var vs=speechSynthesis.getVoices()||[], best=null;
   for(var i=0;i<vs.length;i++){
     var v=vs[i], tg=(v.lang||'')+' '+(v.name||'');
@@ -536,6 +537,7 @@ $('d2e').onclick=function(){ setDir('zh2en'); };
 $('e2d').onclick=function(){ setDir('en2zh'); };
 $('go').onclick=run;
 $('goog').onclick=toggleGoog;
+$('slow').onclick=function(){ SLOW=!SLOW; this.textContent=SLOW?'🐢 慢速：開':'🐢 慢速：關'; this.setAttribute('aria-pressed',SLOW?'true':'false'); toast(SLOW?'慢速朗讀已開':'已回復正常速度'); };
 $('mic').onclick=mic;
 $('auto').onclick=toggleAuto;
 $('speak').onclick=speak;
