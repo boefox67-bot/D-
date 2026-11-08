@@ -37,6 +37,10 @@
   .out.empty{color:#9aa9b8;font-size:15px}
   .norm{font-size:12.5px;color:#7c8b9a;margin-top:8px;line-height:1.5;display:none}
   .tag{display:inline-block;font-size:12px;color:var(--ok);background:#e6f4f1;border-radius:8px;padding:2px 8px;margin-bottom:8px}
+  .auto{margin-top:10px;width:100%;border:1.5px solid var(--orange);background:#fff;color:var(--orange);
+        border-radius:12px;padding:11px;font-size:14.5px;font-weight:800;cursor:pointer}
+  .auto[aria-pressed="true"]{background:var(--orange);color:#fff}
+  .devline{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6}
   .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
   .chip{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;font-size:13.5px;
         color:var(--ink);cursor:pointer}
@@ -60,6 +64,8 @@
     <button id="d2e" aria-pressed="true">粵 → 英</button>
     <button id="e2d" aria-pressed="false">英 → 粵</button>
   </div>
+  <button class="auto" id="auto" aria-pressed="false">▶ 即時對話（講完自動翻譯＋自動朗讀，雙向輪替）</button>
+  <div class="devline" id="devline"></div>
 
   <div class="panel">
     <label class="mini">輸入</label>
@@ -73,7 +79,8 @@
   <div class="panel">
     <label class="mini">結果</label>
     <div class="tag" id="tag">詞庫翻譯</div>
-    <div class="out empty" id="out">輸入內容後按「翻譯」</div>`n    <div class="norm" id="norm"></div>
+    <div class="out empty" id="out">輸入內容後按「翻譯」</div>
+    <div class="norm" id="norm"></div>
     <div class="row">
       <button class="btn ghost" id="speak">🔊 朗讀</button>
       <button class="btn ghost" id="copy">複製</button>
@@ -380,7 +387,76 @@ function mic(){
   rec.onend=function(){ toast('語音輸入完成'); rec=null; };
   try{ rec.start(); toast('請講…'); }catch(e){ toast('無法啟動語音輸入'); rec=null; }
 }
+var autoOn=false, autoLang='zh2en';
+function speakText(txt,lang,cb){
+  if(!('speechSynthesis' in window)){ if(cb)cb(); return; }
+  try{ speechSynthesis.cancel(); }catch(e){}
+  var u=new SpeechSynthesisUtterance(txt);
+  u.lang=lang; u.rate=0.95;
+  var vs=speechSynthesis.getVoices()||[], best=null;
+  for(var i=0;i<vs.length;i++){
+    var v=vs[i], tg=(v.lang||'')+' '+(v.name||'');
+    if(lang.indexOf('zh')===0 && /zh[-_]?(HK|TW)|Cantonese|Yue|粵/i.test(tg)){ best=v; break; }
+    if(lang.indexOf('en')===0 && /^en/i.test(v.lang||'')){ best=best||v; }
+  }
+  if(best) u.voice=best;
+  u.onend=function(){ if(cb)cb(); };
+  speechSynthesis.speak(u);
+}
+function listenOnce(onText){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ toast('此裝置唔支援語音識別'); autoStop(); return; }
+  try{ if(rec) rec.stop(); }catch(e){}
+  rec=new SR();
+  rec.lang = autoLang==='zh2en' ? 'yue-Hant-HK' : 'en-US';
+  rec.interimResults=false; rec.maxAlternatives=1;
+  rec.onresult=function(e){ var t=e.results[0][0].transcript; onText(t); };
+  rec.onerror=function(e){ if(e.error==='no-speech'){ if(autoOn) setTimeout(listenOnce.bind(null,onText),800); return; } toast('識別失敗：'+(e.error||'')); rec=null; if(autoOn) autoStop(); };
+  rec.onend=function(){ if(autoOn && !window._recGot) setTimeout(function(){ if(autoOn && !window._recGot) listenOnce(onText); },700); };
+  window._recGot=false;
+  try{ rec.start(); }catch(e){ toast('無法啟動語音輸入'); rec=null; }
+}
+function autoTurn(){
+  if(!autoOn) return;
+  setDir(autoLang);
+  $('tag').textContent='等候你講'+(autoLang==='zh2en'?'粵語':'英文')+'…';
+  listenOnce(function(t){
+    window._recGot=true;
+    $('src').value=t;
+    run();
+    var say=lastOut, sayLang=(autoLang==='zh2en'?'en-US':'zh-HK');
+    $('tag').textContent='朗讀中（'+(autoLang==='zh2en'?'英文':'粵語')+'）';
+    speakText(say, sayLang, function(){
+      if(!autoOn) return;
+      autoLang = autoLang==='zh2en' ? 'en2zh' : 'zh2en';
+      setTimeout(autoTurn, 350);
+    });
+  });
+}
+function autoStop(){ autoOn=false; try{ if(rec) rec.stop(); }catch(e){} rec=null; $('auto').setAttribute('aria-pressed','false'); $('auto').textContent='▶ 即時對話（講完自動翻譯＋自動朗讀，雙向輪替）'; }
+function toggleAuto(){
+  if(autoOn){ autoStop(); toast('已停止'); return; }
+  autoOn=true; autoLang='zh2en';
+  $('auto').setAttribute('aria-pressed','true');
+  $('auto').textContent='■ 停止即時對話';
+  toast('請講粵語');
+  autoTurn();
+}
+function refreshDev(){
+  var box=$('devline');
+  if(!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices){ box.textContent='此裝置無法列出音訊裝置。'; return; }
+  navigator.mediaDevices.enumerateDevices().then(function(list){
+    var outs=list.filter(function(d){return d.kind==='audiooutput';}).map(function(d){return d.label||'系統預設';});
+    var ins=list.filter(function(d){return d.kind==='audioinput';}).map(function(d){return d.label||'系統預設';});
+    var all=outs.concat(ins).join(' ');
+    var hp=/藍牙|蓝牙|Bluetooth|耳機|耳机|Headset|AirPods/i.test(all);
+    box.innerHTML='輸出：'+(outs.join('、')||'由系統決定')+'　·　輸入：'+(ins.join('、')||'由系統決定')+
+      (hp?'　<br>已偵測耳機／藍牙：系統會把聲音送去耳機；要用手機喇叭出聲，請先斷開藍牙或拔耳機。':'');
+  }).catch(function(){ box.textContent='（裝置清單需授權後才顯示）'; });
+}
+
 function copyOut(){
+
   if(!lastOut){ toast('未有結果'); return; }
   var done=function(){ toast('已複製'); };
   if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(lastOut).then(done,function(){ fallbackCopy(); }); }
@@ -410,13 +486,16 @@ $('d2e').onclick=function(){ setDir('zh2en'); };
 $('e2d').onclick=function(){ setDir('en2zh'); };
 $('go').onclick=run;
 $('mic').onclick=mic;
+$('auto').onclick=toggleAuto;
 $('speak').onclick=speak;
 $('copy').onclick=copyOut;
 $('clear').onclick=function(){ $('src').value=''; setDir(dir); $('src').focus(); };
 $('src').addEventListener('keydown',function(e){ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)) run(); });
-$('note').textContent='內置離線詞庫 '+Object.keys(T).length+' 條（粵語⇄英文），涵蓋日常、職場、電工與工程術語；短句最準，長句會按詞序組合。整個程式離線運作，唔會上傳任何內容。';
+$('note').textContent='內置離線詞庫 '+Object.keys(T).length+' 條（粵語⇄英文），涵蓋日常、職場、電工與工程術語；短句最準，長句會按詞序組合。翻譯同朗讀完全離線；「即時對話」的語音識別由手機系統提供，多數手機要連網才可識別。聲音經手機喇叭抑或耳機播出，由手機系統決定，網頁無法強制切換。';
 setDir('zh2en');
 if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged=function(){}; }
+refreshDev();
+navigator.mediaDevices && navigator.mediaDevices.addEventListener && navigator.mediaDevices.addEventListener('devicechange', refreshDev);
 </script>
 </body>
 </html>
