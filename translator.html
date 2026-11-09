@@ -944,6 +944,11 @@ function parseEnCompound(t){
 function en2zhCore(s){
   var raw=String(s||'').trim();
   if(!raw) return {mid:'',out:''};
+  var hz=(raw.match(/[\u3400-\u4dbf\u4e00-\u9fff]/g)||[]).length;
+  if(hz && hz/(raw.replace(/\s+/g,'').length||1)>=0.4){
+    var cm=mandToCant(raw);
+    return {mid:raw, out:(cm||raw), exact:true, struct:false};
+  }
   var key=normKey(raw);
   if(TRI_E[key]){ var r=TRI_E[key]; return {mid:r[1],out:r[0],exact:true}; }
   var cp=parseEnCompound(raw);
