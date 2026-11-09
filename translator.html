@@ -1088,36 +1088,70 @@ function pickVoice(lang){
 function unlockTTS(){
   try{ var u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }catch(e){}
 }
+
+var ttsAudio=null;
+function unlockAudio(){
+  if(ttsAudio) return;
+  try{
+    ttsAudio=new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=');
+    ttsAudio.volume=0;
+    var p=ttsAudio.play();
+    if(p&&p.catch) p.catch(function(){});
+  }catch(e){}
+}
+function audioSpeak(txt,lang,onDone){
+  var t=String(txt||'').trim();
+  if(!t){ if(onDone) onDone(false); return; }
+  if(t.length>180) t=t.slice(0,180);
+  var en=/^en/i.test(lang), enc=encodeURIComponent(t);
+  var urls = en
+    ? ['https://dict.youdao.com/dictvoice?type=1&audio='+enc,
+       'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q='+enc]
+    : ['https://dict.youdao.com/dictvoice?type=2&audio='+enc,
+       'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=zh-TW&q='+enc];
+  var i=0, done=false;
+  function next(){
+    if(done) return;
+    if(i>=urls.length){ done=true; if(onDone) onDone(false); return; }
+    if(!ttsAudio) unlockAudio();
+    if(!ttsAudio){ done=true; if(onDone) onDone(false); return; }
+    try{
+      ttsAudio.onended=function(){ if(done) return; done=true; if(onDone) onDone(true); };
+      ttsAudio.onerror=function(){ next(); };
+      ttsAudio.src=urls[i++];
+      ttsAudio.volume=1;
+      var p=ttsAudio.play();
+      if(p&&p.catch) p.catch(function(){ next(); });
+    }catch(e){ next(); }
+  }
+  next();
+}
 function speakText(txt,lang,cb){
-  if(!('speechSynthesis' in window)){ toast('此裝置冇語音引擎，無法朗讀'); if(cb)cb(); return; }
-  try{ speechSynthesis.cancel(); }catch(e){}
-  setTimeout(function(){
-    var finished=false;
-    function fin(){ if(finished) return; finished=true; if(cb)cb(); }
+  var finished=false;
+  function fin(ok){ if(finished) return; finished=true; if(cb)cb(ok); }
+  var t=String(txt||'').trim();
+  if(!t){ fin(false); return; }
+  try{ unlockAudio(); }catch(e){}
+  if('speechSynthesis' in window){
+    try{ speechSynthesis.cancel(); }catch(e){}
     var started=false, guard=null;
-    function attempt(useVoice){
-      var u=new SpeechSynthesisUtterance(txt);
-      u.lang=lang; u.rate=0.95;
-      if(useVoice){ var v=pickVoice(lang); if(v){ u.voice=v; u.lang=v.lang; } }
-      u.onstart=function(){ started=true; };
-      u.onend=function(){ if(guard) clearTimeout(guard); fin(); };
-      u.onerror=function(e){
-        var err=(e&&e.error)||'';
-        if(err==='language-unavailable'||err==='voice-unavailable'){ toast('系統冇安裝對應語音包，請在系統設定下載'); }
-        else if(err==='not-allowed'){ toast('系統阻止朗讀，請再按一次「朗讀」'); }
-        if(guard) clearTimeout(guard); fin();
-      };
-      try{ speechSynthesis.resume(); speechSynthesis.speak(u); }
-      catch(e){ fin(); return; }
-      guard=setTimeout(function(){
-        if(started||finished) return;
-        try{ speechSynthesis.cancel(); }catch(e){}
-        if(useVoice){ setTimeout(function(){ attempt(false); },150); }
-        else { toast('語音引擎無反應，請在系統設定檢查文字轉語音'); fin(); }
-      },1200);
-    }
-    attempt(!!pickVoice(lang));
-  },120);
+    var u=new SpeechSynthesisUtterance(t);
+    u.lang=lang; u.rate=0.95; u.volume=1;
+    var v=pickVoice(lang);
+    if(v){ try{ u.voice=v; u.lang=v.lang||lang; }catch(e){} }
+    u.onstart=function(){ started=true; if(guard) clearTimeout(guard); };
+    u.onend=function(){ if(guard) clearTimeout(guard); fin(true); };
+    u.onerror=function(){ if(guard) clearTimeout(guard); audioSpeak(t,lang,function(ok){ if(!ok) toast('朗讀失敗，請檢查網絡或系統語音包'); fin(ok); }); };
+    try{ speechSynthesis.speak(u); }
+    catch(e){ audioSpeak(t,lang,function(ok){ if(!ok) toast('朗讀失敗，請檢查網絡或系統語音包'); fin(ok); }); return; }
+    guard=setTimeout(function(){
+      if(started||finished) return;
+      try{ speechSynthesis.cancel(); }catch(e){}
+      audioSpeak(t,lang,function(ok){ if(!ok) toast('朗讀失敗，請檢查網絡或系統語音包'); fin(ok); });
+    },900);
+  } else {
+    audioSpeak(t,lang,function(ok){ if(!ok) toast('朗讀失敗，請檢查網絡或系統語音包'); fin(ok); });
+  }
 }
 function voiceTest(){
   var box=$('status');
@@ -1128,6 +1162,7 @@ function voiceTest(){
   speakText(dir==='zh2en'?'This is a voice test.':'呢個係發聲測試。', dir==='zh2en'?'en-US':'zh-HK', function(){});
 }
 function speak(){
+  try{ unlockAudio(); }catch(e){}
   if(!lastOut){ toast('未有結果可朗讀'); return; }
   speakText(lastOut,lastLang,function(){});
   toast('朗讀中');
