@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>手機性能自檢</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;padding:14px 12px 40px;font-family:-apple-system,"Noto Sans CJK TC","Microsoft JhengHei",sans-serif;background:#0f172a;color:#e9f0ff}
+  h1{font-size:26px;margin:4px 0 10px;letter-spacing:1px}
+  .sub{font-size:15px;color:#93a4c4;line-height:1.6;margin-bottom:14px}
+  #go{display:block;width:100%;padding:22px;font-size:26px;font-weight:700;border:0;border-radius:14px;background:#f97316;color:#fff;letter-spacing:2px}
+  #go:active{background:#ea580c}
+  .row{background:#1b2540;border-radius:12px;padding:12px 14px;margin:9px 0;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .row .k{font-size:17px;color:#b9c7e4;flex:1}
+  .row .v{font-size:20px;font-weight:700;text-align:right}
+  .ok{color:#4ade80}.bad{color:#f87171}.warn{color:#fbbf24}
+  .verdict{margin-top:18px;padding:16px;border-radius:14px;font-size:19px;line-height:1.7;background:#0b3b2e;border:2px solid #10b981}
+  .verdict.bad{background:#3b0b0b;border-color:#ef4444}
+  .small{font-size:13px;color:#8fa2c4;line-height:1.6;margin-top:18px}
+  #frame{width:1px;height:1px;opacity:0;position:absolute;left:-10px;top:-10px;border:0}
+</style>
+</head>
+<body>
+<h1>手機性能自檢</h1>
+<div class="sub">按下面橙色按鈕，等 15 秒左右跑完，然後把整頁截圖給我。<br>（同一個畫面最好分兩張截：上半／下半）</div>
+<button id="go">開始檢測</button>
+<div id="out"></div>
+<div class="small">此頁只讀本機資訊，不上傳任何東西。</div>
+<iframe id="frame"></iframe>
+<script>
+(function(){
+  var out=document.getElementById('out'), frame=document.getElementById('frame');
+  var rows=[];
+  function add(k,v,cls){ rows.push({k:k,v:v,cls:cls||''}); render(); }
+  function render(){
+    var h='';
+    for(var i=0;i<rows.length;i++){
+      h+='<div class="row"><div class="k">'+rows[i].k+'</div><div class="v '+rows[i].cls+'">'+rows[i].v+'</div></div>';
+    }
+    out.innerHTML=h;
+  }
+  function now(){ return performance.now(); }
+  function fmt(ms){ return ms<1?ms.toFixed(2)+' ms':(ms<1000?Math.round(ms)+' ms':(ms/1000).toFixed(2)+' s'); }
+  function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+
+  function env(){
+    add('裝置 UA', (navigator.userAgent||'').slice(0,70));
+    add('屏幕', screen.width+'×'+screen.height+'  DPR '+ (window.devicePixelRatio||1));
+    add('CPU 核心', navigator.hardwareConcurrency||'未知');
+    add('記憶體 RAM', navigator.deviceMemory? navigator.deviceMemory+' GB':'無法讀取');
+    var m=(navigator.userAgent||'').match(/Chrome\/([0-9.]+)/);
+    add('WebView/瀏覽器核心', m? 'Chromium '+m[1] : '非 Chromium（可能是系統瀏覽器）');
+    add('是否在 file:// 開啟', location.protocol==='file:'?'是（語音會被禁）':'否（'+location.protocol+'）', location.protocol==='file:'?'bad':'ok');
+  }
+
+  async function benchCpu(){
+    var t=now(); var s=''; for(var i=0;i<20000;i++){ s+='x'; }
+    add('字串拼接 2 萬次', fmt(now()-t));
+
+    t=now(); var arr=[]; for(i=0;i<30000;i++){ arr.push({'k'+i:'v'+i}); }
+    add('建 3 萬項物件', fmt(now()-t));
+
+    t=now(); var j=JSON.stringify(arr); add('序列化 3 萬項', fmt(now()-t)+'（'+Math.round(j.length/1024)+' KB）');
+
+    t=now(); var p=JSON.parse(j); add('解析 3 萬項', fmt(now()-t));
+
+    var txt=''; for(i=0;i<400;i++){ txt+='唔該幫我睇下個冷氣，個冷氣唔凍。'; }
+    var re=/[\u4e00-\u9fa5]/g;
+    t=now(); var n=0; for(i=0;i<60;i++){ var m=txt.match(re); n=m?m.length:0; }
+    add('中文正則掃 7,200 字 ×60', fmt(now()-t)+'（命中 '+n+' 字／次）');
+  }
+
+  async function benchStorage(){
+    var pay=''; for(var i=0;i<1000;i++){ pay+='x'; }
+    var t=now();
+    try{
+      for(i=0;i<60;i++){ localStorage.setItem('__dx'+i, pay); }
+      add('localStorage 寫 60 KB', fmt(now()-t));
+      t=now();
+      var hit=0;
+      for(i=0;i<60;i++){ if(localStorage.getItem('__dx'+i)) hit++; }
+      add('localStorage 讀 60 KB', fmt(now()-t)+'（'+hit+'/60）');
+      for(i=0;i<60;i++){ localStorage.removeItem('__dx'+i); }
+    }catch(e){ add('localStorage', '不可用：'+e.message, 'bad'); }
+  }
+
+  async function benchTTS(){
+    var has = ('speechSynthesis' in window);
+    add('內建語音合成 API', has?'有':'沒有', has?'ok':'bad');
+    if(!has) return;
+    await sleep(600);
+    var vs=[];
+    try{ vs = window.speechSynthesis.getVoices()||[]; }catch(e){}
+    add('可用語音包數量', vs.length, vs.length>0?'ok':'bad');
+    if(vs.length){
+      var en=vs.filter(function(v){ return /en/i.test(v.lang||''); });
+      var zh=vs.filter(function(v){ return /zh|yue|CMN/i.test(v.lang||''); });
+      add('英文語音包', en.length, en.length?'ok':'bad');
+      add('中文語音包', zh.length, zh.length?'ok':'bad');
+      add('第一個語音', (vs[0].name||'?')+' ('+(vs[0].lang||'?')+')');
+    }
+    // 播一句英文，看引擎是否真的啟動
+    var started=false, ended=false;
+    var u=new SpeechSynthesisUtterance('Hello, this is a voice test.');
+    u.lang='en-US'; u.rate=0.9; u.volume=1;
+    u.onstart=function(){ started=true; };
+    u.onend=function(){ ended=true; };
+    u.onerror=function(e){ add('語音播放錯誤', e.error||e.type||'unknown', 'bad'); };
+    try{ window.speechSynthesis.speak(u); }catch(e){ add('語音呼叫失敗', e.message, 'bad'); }
+    for(var i=0;i<50;i++){
+      await sleep(100);
+      if(ended) break;
+    }
+    add('英文播放：引擎啟動', started?'有反應':'完全沒反應', started?'ok':'bad');
+    add('英文播放：播完回報', ended?'正常結束（應該有聲）':'未完結（可能卡住／無聲）', ended?'ok':'warn');
+    // 中文
+    var started2=false, ended2=false;
+    var u2=new SpeechSynthesisUtterance('你好，呢個係語音測試。');
+    u2.lang='zh-CN'; u2.rate=0.9;
+    u2.onstart=function(){ started2=true; };
+    u2.onend=function(){ ended2=true; };
+    try{ window.speechSynthesis.speak(u2); }catch(e){}
+    for(i=0;i<40;i++){ await sleep(100); if(ended2) break; }
+    add('中文播放：引擎啟動', started2?'有反應':'完全沒反應', started2?'ok':'bad');
+    add('中文播放：播完回報', ended2?'正常結束（應該有聲）':'未完結（可能卡住／無聲）', ended2?'ok':'warn');
+    try{ window.speechSynthesis.cancel(); }catch(e){}
+  }
+
+  async function benchAudio(){
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC){ add('AudioContext', '不支援', 'bad'); return; }
+    try{
+      var ac=new AC();
+      add('AudioContext 初始狀態', ac.state, ac.state==='running'?'ok':'warn');
+      // 播 0.3 秒 A 音，測解鎖
+      var osc=ac.createOscillator(), g=ac.createGain();
+      osc.frequency.value=660; g.gain.value=0.25;
+      osc.connect(g); g.connect(ac.destination);
+      var t0=ac.currentTime;
+      osc.start(t0); osc.stop(t0+0.3);
+      await sleep(600);
+      add('WebAudio 播放 0.3 秒', ac.state==='running'?'已播（應有短「咇」聲）':'被瀏覽器暫停（需再點一下）', ac.state==='running'?'ok':'warn');
+      try{ ac.close(); }catch(e){}
+    }catch(e){ add('AudioContext', '建立失敗：'+e.message, 'bad'); }
+  }
+
+  function benchLoad(){
+    return new Promise(function(res){
+      var t=now();
+      frame.onload=function(){
+        var ms=now()-t;
+        add('打開翻譯頁（3.6 MB）', fmt(ms), ms<3000?'ok':(ms<6000?'warn':'bad'));
+        add('換算：每秒', (3601515/1024/1024)/(ms/1000)>=1? ((3601515/1024/1024)/(ms/1000)).toFixed(2)+' MB/s':'—');
+        res();
+      };
+      frame.src='./translator.html?diag='+Date.now();
+    });
+  }
+
+  async function benchNet(){
+    var t=now();
+    try{
+      var r=await fetch('./translator.html?probe='+Date.now(),{cache:'no-store'});
+      var txt=await r.blob();
+      add('下載翻譯頁檔案', fmt(now()-t)+'（'+Math.round(txt.size/1024)+' KB）', txt.size>1000000?'ok':'bad');
+    }catch(e){ add('下載翻譯頁', '失敗：'+e.message, 'bad'); }
+  }
+
+  function verdict(){
+    var slow=[];
+    for(var i=0;i<rows.length;i++){
+      if(rows[i].cls==='bad') slow.push(rows[i].k);
+    }
+    var box=document.createElement('div');
+    box.className='verdict'+(slow.length?' bad':'');
+    var msg = slow.length? ('有問題的項目：<br>'+slow.join('、')) : '全部項目基本正常。';
+    msg += '<br><br>請截圖這一頁，連同上面數字一齊發我。';
+    box.innerHTML=msg;
+    out.appendChild(box);
+  }
+
+  document.getElementById('go').onclick=async function(){
+    this.disabled=true; this.textContent='檢測中…（約 15 秒）';
+    rows=[]; render();
+    try{
+      env(); await sleep(50);
+      await benchStorage(); await sleep(20);
+      await benchCpu(); await sleep(20);
+      await benchAudio(); await sleep(20);
+      await benchTTS(); await sleep(20);
+      await benchNet(); await sleep(20);
+      await benchLoad();
+    }catch(e){ add('檢測中斷', e.message, 'bad'); }
+    verdict();
+    this.disabled=false; this.textContent='再測一次';
+  };
+})();
+</script>
+</body>
+</html>
