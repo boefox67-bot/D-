@@ -7790,7 +7790,7 @@ function parseXObjState(s){
 }
 
 /* ===== 高頻詞補丁 ===== */
-const XW_EN={'姓名':'Name','名字':'Name','性別':'Gender','年齡':'Age','日期':'Date','簽名':'Signature','電話':'Telephone','地址':'Address','部門':'Department','職位':'Post','數量':'Quantity','單位':'Unit'};
+const XW_EN={'姓名':'Name','名字':'Name','性別':'Gender','年齡':'Age','日期':'Date','簽名':'Signature','電話':'Telephone','地址':'Address','部門':'Department','職位':'Post','數量':'Quantity','單位':'Unit','電工':'Electrician','技術員':'Technician','工程師':'Engineer','高級技術員':'Senior technician','助理工程師':'Assistant engineer','領班':'Foreman','管工':'Foreman','判頭':'Contractor','技工':'Technician','學徒':'Apprentice','維修員':'Maintenance technician','操作員':'Operator','司機':'Driver','保安員':'Security guard','清潔員':'Cleaner','倉務員':'Storekeeper','文員':'Clerk','會計':'Accountant','秘書':'Secretary','採購員':'Buyer','物業管理員':'Property officer','設施管理員':'Facilities officer','電器':'Electrical appliance','電箱':'Distribution board','電纜':'Cable','配電箱':'Distribution board','水泵房':'Pump room'};
 function xwTry(s){ var k=normKey(s); var t=XW_EN[k]; if(t) return {mid:String(s||'').trim(),out:cleanEn(t),exact:true}; return null; }
 
 /* 常用對話整句（擴充，粵／普／英） */
@@ -8208,6 +8208,8 @@ function zh2en(s){
   var pg=parseGoAct(raw);
   if(pg) return pg;
   var mid=cantToMand(raw);
+  var learnEn=learnGet(raw,'zh2en');
+  if(learnEn) return {mid:mid,out:learnEn,exact:true};
   var en=mandToEn(mid);
   if(!en || /[\u4e00-\u9fa5]/.test(en)){ var bt=bilTry(raw); if(bt) return bt; }
   return {mid:mid,out:en,exact:false,struct:false};
@@ -8283,6 +8285,8 @@ function en2zhCore(s){
   if(TRI_E[key]){ var r=TRI_E[key]; return {mid:r[1],out:r[0],exact:true}; }
   var eb=enBilTry(raw);
   if(eb) return eb;
+  var learnZh=learnGet(raw,'en2zh');
+  if(learnZh) return {mid:raw,out:learnZh,exact:true};
   var cp=parseEnCompound(raw);
   if(cp) return cp;
   var st=parseEnStruct(raw);
@@ -8371,6 +8375,7 @@ function translate(silent){
     $('tag').textContent='線上翻譯';
     onlineTranslate(v,dir).then(function(t){
       if(!t) throw new Error('empty');
+      learnSave(v,dir,t);
       renderResult({mid:r.mid||v,out:t,exact:false,struct:false},silent,true);
     }).catch(function(){
       renderResult(r,true,false);
@@ -8496,6 +8501,33 @@ function offlineSpeak(txt,lang,cb){
     }catch(e){ fin(false); }
   });
 }
+/* ===== 自學習詞庫：線上譯成功即自動記落本機，下次離線照樣查得到 ===== */
+var LEARN={};
+try{ LEARN=JSON.parse(localStorage.getItem('TR_LEARN')||'{}')||{}; }catch(e){ LEARN={}; }
+function learnPersist(){ try{ localStorage.setItem('TR_LEARN',JSON.stringify(LEARN)); }catch(e){} }
+function learnGet(s,dir){
+  try{ var k=dir+'\u0001'+normKey(s); if(LEARN[k]) return LEARN[k]; }catch(e){}
+  return '';
+}
+function learnSave(s,dir,out){
+  try{
+    s=String(s||'').trim(); out=String(out||'').trim();
+    if(!s || !out || out.length>80) return;
+    if(dir==='zh2en'){
+      if(!/[A-Za-z]{2,}/.test(out)) return;
+      if(/[\u3400-\u4dbf\u4e00-\u9fff]/.test(out)) return;
+    } else {
+      if(!/[\u3400-\u4dbf\u4e00-\u9fff]/.test(out)) return;
+      if(/[A-Za-z]{2,}/.test(out) && !/[\u3400-\u4dbf\u4e00-\u9fff]/.test(out)) return;
+    }
+    var k=dir+'\u0001'+normKey(s);
+    if(LEARN[k]===out) return;
+    LEARN[k]=out;
+    var ks=Object.keys(LEARN);
+    if(ks.length>3000){ for(var i=0;i<ks.length-2000;i++) delete LEARN[ks[i]]; }
+    learnPersist();
+  }catch(e){}
+}
 var ttsAudio=null;
 function unlockAudio(){
   if(ttsAudio) return;
@@ -8592,7 +8624,7 @@ function ensureMic(){
 }
 function listenOnce(lang,onInterim,onFinal){
   var r=getRec();
-  if(!r){ toast('此裝置唔支援語音識別，請用鍵盤'); if($('focus').classList.contains('on')) $('fStatus').textContent='此瀏覽器不支援語音識別，請用鍵盤輸入'; return; }
+  if(!r){ toast(location.protocol==='file:'?'此位址（file://）唔支援手機語音識別，請改用 https 網址或鍵盤':('此裝置唔支援語音識別，請用鍵盤')); if($('focus').classList.contains('on')) $('fStatus').textContent='此瀏覽器不支援語音識別，請用鍵盤輸入'; return; }
   try{ r.abort(); }catch(e){}
   r.lang=lang; r.interimResults=true; r.maxAlternatives=1; r.continuous=false;
   var acc='';
@@ -8619,7 +8651,11 @@ function listenOnce(lang,onInterim,onFinal){
   };
   setTimeout(function(){
     try{ r.start(); }
-    catch(e){ if(autoOn) setTimeout(function(){ listenOnce(lang,onInterim,onFinal); },500); else toast('無法啟動語音輸入'); }
+    catch(e){
+      if(autoOn){ setTimeout(function(){ listenOnce(lang,onInterim,onFinal); },500); }
+      else if(location.protocol==='file:'){ toast('此位址（file://）唔准手機用語音，請改用 https 網址開啟'); $('fStatus').textContent='離線開啟時語音受限制，可改用鍵盤輸入，或改用線上 https 網址收音'; }
+      else { toast('無法啟動語音輸入，請改用鍵盤輸入'); }
+    }
   },0);
 }
 function autoTurn(){
