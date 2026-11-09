@@ -8455,6 +8455,31 @@ function msInit(cb){
     },80);
   }catch(e){ finish(false); }
 }
+function msPlayUri(uri,cb){
+  var done=false;
+  function fin(ok){ if(done) return; done=true; if(cb)cb(ok); }
+  try{
+    var a=new Audio(uri);
+    a.onended=function(){ fin(true); };
+    a.onerror=function(){ fin(false); };
+    var pr=a.play();
+    if(pr&&pr.catch) pr.catch(function(){ fin(false); });
+    setTimeout(function(){ fin(true); }, 6000);
+  }catch(e){
+    try{
+      var AC=window.AudioContext||window.webkitAudioContext;
+      if(!AC){ fin(false); return; }
+      var ctx=new AC();
+      fetch(uri).then(function(r){ return r.arrayBuffer(); }).then(function(b){
+        return new Promise(function(res,rej){ ctx.decodeAudioData(b,res,rej); });
+      }).then(function(buf){
+        var s=ctx.createBufferSource(); s.buffer=buf; s.connect(ctx.destination);
+        s.onended=function(){ fin(true); }; s.start(0);
+        setTimeout(function(){ fin(true); }, 6000);
+      }).catch(function(){ fin(false); });
+    }catch(e2){ fin(false); }
+  }
+}
 function offlineSpeak(txt,lang,cb){
   var done=false;
   function fin(ok){ if(done) return; done=true; if(cb)cb(ok); }
@@ -8465,9 +8490,9 @@ function offlineSpeak(txt,lang,cb){
     if(!ok){ fin(false); return; }
     try{
       var v=/^en/i.test(lang)?'en/en-us':'zh-yue';
-      var r=meSpeak.speak(t,{voice:v, speed:150, amplitude:100});
-      if(r===false){ fin(false); return; }
-      setTimeout(function(){ fin(true); }, Math.max(1500, t.length*90));
+      var uri=meSpeak.speak(t,{voice:v, speed:150, amplitude:100, rawdata:'data-url'});
+      if(!uri || String(uri).indexOf('data:audio')!==0){ fin(false); return; }
+      msPlayUri(String(uri), fin);
     }catch(e){ fin(false); }
   });
 }
