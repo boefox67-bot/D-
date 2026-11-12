@@ -3222,9 +3222,17 @@ function renderSub(g){
         try{
           const buf=new Uint8Array(e.target.result);
           const wb=XLSX.read(buf,{type:'array'});
-          const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+          const zhSheet=wb.SheetNames[0];
+          const rows=XLSX.utils.sheet_to_json(wb.Sheets[zhSheet],{header:1,defval:''});
           document.getElementById('I-msg').textContent='⏳ 讀到 '+rows.length+' 行，分析格式...';
           const d=detectColumns(rows);
+          // 雙語方案：偵測第二張「英文」表（題庫(英文)），匯入時填入 questionEn / optionsEn
+          let enRows=null, dEn=null;
+          const enSheet=wb.SheetNames.find(n=>n!==zhSheet && /英文|english|英語/i.test(String(n)));
+          if(enSheet){
+            enRows=XLSX.utils.sheet_to_json(wb.Sheets[enSheet],{header:1,defval:''});
+            dEn=detectColumns(enRows);
+          }
           if(!d.fmt){ document.getElementById('I-msg').textContent='❌ 認唔到格式！表头要有「問題」「填寫題」「單選題」等標準欄位。你個檔案第一行係：'+(rows[0]||[]).slice(0,5).join(' | '); return; }
           // 讀取 XLSX 入面嘅圖片（DISPIMG）
           let imgMap={};
@@ -3309,6 +3317,24 @@ function renderSub(g){
             q.options=(q.options||[]).map(persistImg);
             (q.parts||[]).forEach(pt=>{ pt.options=(pt.options||[]).map(persistImg); });
           });
+          // 中英對位：英文表逐行對應中文表，填入 questionEn / optionsEn
+          let enMatched=0;
+          if(enRows&&dEn&&dEn.fmt){
+            const enQs=rowsToQuestions(enRows, dEn.col);
+            qs.forEach((q,i)=>{
+              const eq=enQs[i];
+              if(!eq||!eq.question) return;
+              q.questionEn=String(eq.question).trim();
+              const isTf=(q.options||[]).length===2 && q.options[0]==='正確' && q.options[1]==='錯誤';
+              if(isTf){
+                q.optionsEn=['True','False'];
+              } else {
+                q.optionsEn=(eq.options||[]).slice(0,(q.options||[]).length);
+                while(q.optionsEn.length<(q.options||[]).length) q.optionsEn.push('');
+              }
+              enMatched++;
+            });
+          }
           if(!qs.length){ document.getElementById('I-msg').textContent='搵唔到題目，檢查格式'; return; }
           // 自動讀取卷名（如果 X 檔有「卷名」欄位）
           let autoName=name;
@@ -3320,7 +3346,7 @@ function renderSub(g){
           }
           // debug：顯示第一題讀到嘅選項
           const q0=qs[0]||{};
-          const debugMsg='導入成功：'+qs.length+' 題\n卷名：'+autoName+'\n第1題類型：'+q0.type+'\n第1題選項：'+JSON.stringify(q0.options)+'\n第1題答案：'+JSON.stringify(q0.answer)+'\n載入圖片：'+Object.keys(imgMap).length+' 張';
+          const debugMsg='導入成功：'+qs.length+' 題\n卷名：'+autoName+'\n英文對位：'+enMatched+' 題\n第1題類型：'+q0.type+'\n第1題選項：'+JSON.stringify(q0.options)+'\n第1題答案：'+JSON.stringify(q0.answer)+'\n第1題英文：'+JSON.stringify(q0.questionEn||'')+'\n載入圖片：'+Object.keys(imgMap).length+' 張';
           document.getElementById('I-msg').textContent=debugMsg;
           alert(debugMsg); // 彈出視窗
           const papers=getPapers();
