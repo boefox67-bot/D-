@@ -370,6 +370,17 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     <button class="btn" style="margin-top:14px" onclick="cancelTeacherSignout()">確定，我仲喺度</button>
   </div>
 </div>
+<!-- 自訂確認彈窗：確定／取消，撳確定先執行回調 -->
+<div id="app-confirm" style="display:none;position:fixed;inset:0;z-index:100010;background:rgba(15,23,42,.62);align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:18px;max-width:420px;width:100%;padding:26px 22px;box-shadow:0 20px 60px rgba(0,0,0,.35)">
+    <div id="app-confirm-title" style="font-size:18px;font-weight:800;margin-bottom:10px"></div>
+    <div id="app-confirm-msg" style="font-size:14px;color:#475569;line-height:1.6;margin-bottom:20px;white-space:pre-line"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn secondary" id="app-confirm-cancel" style="width:auto;padding:8px 18px">取消</button>
+      <button class="btn" id="app-confirm-ok" style="width:auto;padding:8px 18px">確定</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <!-- Logo 放大查看：撳一下查看，再撳一下退回 -->
@@ -927,6 +938,24 @@ function downloadTransApp(){
 function toast(msg){  const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
   clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',2200);
 }
+// 自訂確認彈窗：撳「確定」先執行 cb，「取消／遮罩」唔執行
+let appConfirmCb=null;
+function appConfirm(title,msg,cb){
+  document.getElementById('app-confirm-title').textContent=title||'確認';
+  document.getElementById('app-confirm-msg').textContent=msg||'';
+  appConfirmCb=cb;
+  const m=document.getElementById('app-confirm');
+  m.style.display='flex';
+}
+document.getElementById('app-confirm-ok').onclick=()=>{
+  document.getElementById('app-confirm').style.display='none';
+  const cb=appConfirmCb; appConfirmCb=null;
+  if(cb) cb();
+};
+document.getElementById('app-confirm-cancel').onclick=()=>{
+  document.getElementById('app-confirm').style.display='none';
+  appConfirmCb=null;
+};
 
 /* ================= 判分（同小程序一致） ================= */
 function matchCalc(correct, user){
@@ -2874,19 +2903,20 @@ function renderSub(g){
       const hit=vis.map(r=>Number(r.dataset.row)).filter(i=>sts2[i]);
       const names=hit.map(i=>stuName(sts2[i]));
       const sample=names.slice(0,5).join('、')+(names.length>5?' 等':'');
-      if(!confirm('確認永久拆除已顯示嘅 '+hit.length+' 名學生？\n'+sample+'\n\n只會刪而家查找／班次篩選出嚟嘅學生，其他保留；拆除後名鎖記錄一併清除，唔可以還原。')) return;
-      const hitSet=new Set(hit);
-      const locks=getLocks();
-      sts2.forEach((s,i)=>{
-        if(!hitSet.has(i)) return;
-        delete locks[s.id];
-        const nm=stuName(s);
-        if(s.id!==nm) delete locks[nm];
+      appConfirm('永久拆除學生', '確認永久拆除已顯示嘅 '+hit.length+' 名學生？\n'+sample+'\n\n只會刪而家查找／班次篩選出嚟嘅學生，其他保留；拆除後名鎖記錄一併清除，唔可以還原。', ()=>{
+        const hitSet=new Set(hit);
+        const locks=getLocks();
+        sts2.forEach((s,i)=>{
+          if(!hitSet.has(i)) return;
+          delete locks[s.id];
+          const nm=stuName(s);
+          if(s.id!==nm) delete locks[nm];
+        });
+        DB.set(K.students, sts2.filter((_,i)=>!hitSet.has(i)));
+        DB.set(K.locks, locks);
+        toast('已永久拆除 '+hit.length+' 名學生');
+        renderSub('classes');
       });
-      DB.set(K.students, sts2.filter((_,i)=>!hitSet.has(i)));
-      DB.set(K.locks, locks);
-      toast('已永久拆除 '+hit.length+' 名學生');
-      renderSub('classes');
     };
     // 點學生列一次即展開改班，唔使按兩下
     document.querySelectorAll('#C-stuList details').forEach(det=>{
