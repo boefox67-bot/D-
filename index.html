@@ -2841,10 +2841,9 @@ function renderSub(g){
         <div id="C-stuClsBox2">${cls.map(c=>`<label style="display:inline-block;margin-right:10px;font-size:13px"><input type="checkbox" class="C-stuCls2" value="${esc(c)}"> ${esc(c)}</label>`).join('')||'<span class="muted">先加班次</span>'}</div>
         <button class="btn" id="C-stuBtn">加入名單</button>
         <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)">
-          <label>批量加入（按班次編號範圍，一次過由幾號加到幾號）</label>
+          <label>批量加入（上面「加學生名」輸入底名，後面自動補編號）</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <select id="C-batchCls" style="padding:6px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--text)"><option value="">— 揀班次 —</option>${cls.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select>
-            <input id="C-batchPrefix" placeholder="代碼前綴 A55A" style="width:110px;padding:6px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px">
+            <select id="C-batchCls" style="padding:6px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--text)"><option value="">— 揀班次（可唔揀）—</option>${cls.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select>
             <input id="C-batchFrom" type="number" min="1" placeholder="由" style="width:72px;padding:6px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px">
             <span class="muted" style="font-size:13px">至</span>
             <input id="C-batchTo" type="number" min="1" placeholder="停" style="width:72px;padding:6px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px">
@@ -2852,7 +2851,7 @@ function renderSub(g){
             <button class="btn secondary" type="button" style="width:auto;padding:6px 10px;font-size:12px" data-range="1,12">01–12</button>
             <button class="btn secondary" type="button" style="width:auto;padding:6px 10px;font-size:12px" data-range="16,30">16–30</button>
           </div>
-          <p class="muted" style="font-size:12px;margin:6px 0 0">揀班次後前綴自動填代碼（如 A55A），可手改；由 01 至 12 → 生成 A55A01…A55A12，16 至 30 → A55A16…A55A30。編號兩位數，帳號即名稱，事後可逐個改名；已存在嘅編號會自動跳過。</p>
+          <p class="muted" style="font-size:12px;margin:6px 0 0">底名用上面「加學生名」欄輸入嘅名：底名 A55A、由 01 至 03 → A55A01、A55A02、A55A03；底名 李文、由 06 至 08 → 李文06、李文07、李文08。編號兩位數，已存在嘅名會自動跳過。</p>
         </div></div>`;
     function applyStuFilter(){
       const kw=(document.getElementById('C-search').value||'').trim().toLowerCase();
@@ -2915,40 +2914,31 @@ function renderSub(g){
       sts2.push({id:sid, name:n, cls:picked});
       DB.set(K.students,sts2); renderSub('classes');
     };
-    // 批量加入學生：揀班次＋起止編號，前綴自動生成 A55A01…A55A12（兩位補零，重號跳過）
+    // 批量加入學生：底名＝上面「加學生名」輸入嘅名，後面補兩位編號（重號跳過）
     document.getElementById('C-batchBtn').onclick=()=>{
-      const clsV=document.getElementById('C-batchCls').value;
-      if(!clsV) return toast('先揀班次');
+      const base=(document.getElementById('C-stu').value||'').trim();
+      if(!base) return toast('先喺「加學生名」輸入底名，如 A55A 或 李文');
       const from=Number(document.getElementById('C-batchFrom').value);
       const to=Number(document.getElementById('C-batchTo').value);
       if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<1||from>to) return toast('起止編號唔正確（由 ≤ 停，正整數）');
-      const prefixInput=document.getElementById('C-batchPrefix');
-      let prefix=(prefixInput.value||'').trim().toUpperCase();
-      if(!prefix) prefix=clsSeqPrefix(clsV);
-      if(!prefix) return toast('請填代碼前綴（如 A55A），唔會用中文班名做帳號');
+      const picked=Array.from(document.querySelectorAll('.C-stuCls2:checked')).map(c=>c.value);
+      const clsSel=document.getElementById('C-batchCls').value;
+      const clsArr=picked.length?picked:(clsSel?[clsSel]:[]);
       const sts2=getStudents();
       const already=n=>{
-        const pad=String(n).padStart(2,'0');
-        return sts2.some(s=>{
-          const nm=stuName(s), id=String(s.id||'');
-          return nm===prefix+pad||id===prefix+pad||nm===prefix+n||id===prefix+n;
-        });
+        const code=base+String(n).padStart(2,'0');
+        return sts2.some(s=>stuName(s)===code||String(s.id||'')===code);
       };
       let added=0, skipped=0;
       for(let n=from;n<=to;n++){
         if(already(n)){ skipped++; continue; }
-        const code=prefix+String(n).padStart(2,'0');
-        sts2.push({id:code, name:code, cls:[clsV]});
+        const code=base+String(n).padStart(2,'0');
+        sts2.push({id:code, name:code, cls:clsArr});
         added++;
       }
       DB.set(K.students,sts2);
       toast('批量加入完成：新增 '+added+' 人'+(skipped?'，跳過已有 '+skipped+' 個':''));
       renderSub('classes');
-    };
-    document.getElementById('C-batchCls').onchange=()=>{
-      const cv=document.getElementById('C-batchCls').value;
-      const pf=document.getElementById('C-batchPrefix');
-      if(cv) pf.value=clsSeqPrefix(cv);
     };
     document.querySelectorAll('[data-range]').forEach(b=>{
       b.onclick=()=>{
