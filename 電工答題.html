@@ -2689,6 +2689,7 @@ function renderSub(g){
       <div style="border:2px solid #3b82f6;border-radius:10px;padding:10px;margin-bottom:10px;background:#eff6ff">
         <div style="font-size:14px;font-weight:700;color:#1e40af;margin-bottom:8px">📋 考卷設置</div>
         <label>揀班次</label><select id="L-cls">${cls.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
+        <input id="L-clsKw" placeholder="🔍 查找班次（輸入即時過濾）" style="width:100%;padding:6px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;margin:6px 0;background:var(--card);color:var(--text)" oninput="filterClsSelect('L-cls','L-clsKw')">
         <label>揀考卷（可多張混合；唔勾選＝全部題庫）</label>
         <div style="display:flex;gap:0;margin-bottom:6px;border-bottom:1px solid var(--line);padding-bottom:4px">
           <button type="button" onclick="togglePaperSortLaunch('name')" style="flex:2;text-align:left;background:none;border:none;cursor:pointer;font-size:12px;color:#64748b;padding:2px">名稱${arrow('name')}</button>
@@ -2833,6 +2834,7 @@ function renderSub(g){
         <button class="btn secondary" style="width:auto;padding:5px 12px;font-size:13px" onclick="document.getElementById('C-impFile').click()">📤 匯入名單X檔</button>
         <input type="file" id="C-impFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importStudents(this)">
       </div>
+      <input id="C-expClsKw" placeholder="🔍 查找班次（輸入即時過濾）" style="width:100%;padding:6px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;margin-bottom:8px;background:var(--card);color:var(--text)" oninput="filterClsSelect('C-expCls','C-expClsKw')">
       <p class="muted" style="font-size:12px;margin:0 0 8px">💾 匯入／匯出嘅 X 檔放喺 <code>D:\BB\班加學生</code>（匯入直接跟班別）</p>
       <label>現有班次（撳改名變確定，直接同步雲端）</label>
       <div id="C-clsList">${cls.map((c,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid var(--line)"><span id="C-cls-name-${i}">${esc(c)}</span><span style="display:flex;gap:6px"><button class="btn secondary" style="width:auto;padding:4px 12px;margin:0;font-size:13px" id="C-cls-rn-${i}" onclick="startRenameCls(${i})">改名</button><button class="btn danger" style="width:auto;padding:4px 12px;margin:0;font-size:13px" data-delcls="${esc(c)}">拆除</button></span></div>`).join('')||'<span class="muted">暫無班次</span>'}</div>
@@ -3284,6 +3286,7 @@ function renderSub(g){
         <button onclick="togglePaperSort('count')" style="flex:1;text-align:center;background:none;border:none;cursor:pointer;font-size:13px;font-weight:600;color:#334155;padding:4px">題數${arrow('count')}</button>
         <span style="flex:0 0 40px"></span>
       </div>
+      <input id="P-kw" placeholder="🔍 查找考卷名稱（輸入即時過濾）" style="width:100%;padding:6px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;margin-bottom:8px;background:var(--card);color:var(--text)" oninput="filterPaperList()">
       <div id="paper-list">${ps.map(p=>`<div draggable="true" data-pid="${p.id}" style="padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;cursor:grab;user-select:none;display:flex;align-items:center">
         <span style="display:inline-block;color:#94a3b8;margin-right:8px;flex:0 0 auto">⋮⋮</span>
         <b style="flex:2">${esc(p.name)}</b>
@@ -4392,6 +4395,24 @@ function sortPapers(dir){
   DB.set(K.papers,ps);
   toast(dir==='asc'?'已按號碼細→大排序':'已按號碼大→細排序');
   renderSub('papers');
+}
+function filterClsSelect(selId, kwId){
+  const sel=document.getElementById(selId), kw=document.getElementById(kwId);
+  if(!sel||!kw) return;
+  const q=kw.value.trim().toLowerCase();
+  Array.from(sel.options).forEach(op=>{
+    if(!op.value){ op.style.display=''; return; }
+    op.style.display=(!q||(op.textContent||'').toLowerCase().includes(q))?'':'none';
+  });
+}
+function filterPaperList(){
+  const kwEl=document.getElementById('P-kw');
+  const kw=(kwEl?kwEl.value:'').trim().toLowerCase();
+  document.querySelectorAll('#paper-list [data-pid]').forEach(el=>{
+    const b=el.querySelector('b');
+    const nm=(b?b.textContent:'').toLowerCase();
+    el.style.display=(!kw||nm.includes(kw))?'':'none';
+  });
 }
 function togglePaperSort(key){
   if(!window._paperSort) window._paperSort={key:'id',dir:1};
