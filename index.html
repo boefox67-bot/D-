@@ -2890,7 +2890,9 @@ function renderSub(g){
       document.querySelectorAll('#C-stuList [data-row]').forEach(row=>{
         const name=row.dataset.name||'';
         const arr=(row.dataset.cls||'').split(',').filter(Boolean);
-        const show=(!kw||name.includes(kw))&&(!want||arr.includes(want));
+        // 關鍵字同時匹配學生名／帳號同綠色班別標籤
+        const hay=(name+' '+arr.join(' ')).toLowerCase();
+        const show=(!kw||hay.includes(kw))&&(!want||arr.includes(want));
         row.style.display=show?'':'none';
       });
     }
