@@ -2834,10 +2834,10 @@ function renderSub(g){
         <button class="btn secondary" style="width:auto;padding:5px 12px;font-size:13px" onclick="document.getElementById('C-impFile').click()">📤 匯入名單X檔</button>
         <input type="file" id="C-impFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importStudents(this)">
       </div>
-      <input id="C-expClsKw" placeholder="🔍 查找班次（輸入即時過濾）" style="width:100%;padding:6px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;margin-bottom:8px;background:var(--card);color:var(--text)" oninput="filterClsSelect('C-expCls','C-expClsKw')">
+      <input id="C-clsKw" placeholder="🔍 查找現有班次（輸入即時過濾）" style="width:100%;padding:6px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;margin-bottom:8px;background:var(--card);color:var(--text)" oninput="filterClsList()">
       <p class="muted" style="font-size:12px;margin:0 0 8px">💾 匯入／匯出嘅 X 檔放喺 <code>D:\BB\班加學生</code>（匯入直接跟班別）</p>
       <label>現有班次（撳改名變確定，直接同步雲端）</label>
-      <div id="C-clsList">${cls.map((c,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid var(--line)"><span id="C-cls-name-${i}">${esc(c)}</span><span style="display:flex;gap:6px"><button class="btn secondary" style="width:auto;padding:4px 12px;margin:0;font-size:13px" id="C-cls-rn-${i}" onclick="startRenameCls(${i})">改名</button><button class="btn danger" style="width:auto;padding:4px 12px;margin:0;font-size:13px" data-delcls="${esc(c)}">拆除</button></span></div>`).join('')||'<span class="muted">暫無班次</span>'}</div>
+      <div id="C-clsList">${cls.map((c,i)=>`<div data-cls="${esc(c.toLowerCase())}" style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid var(--line)"><span id="C-cls-name-${i}">${esc(c)}</span><span style="display:flex;gap:6px"><button class="btn secondary" style="width:auto;padding:4px 12px;margin:0;font-size:13px" id="C-cls-rn-${i}" onclick="startRenameCls(${i})">改名</button><button class="btn danger" style="width:auto;padding:4px 12px;margin:0;font-size:13px" data-delcls="${esc(c)}">拆除</button></span></div>`).join('')||'<span class="muted">暫無班次</span>'}</div>
       <label>加新班次名</label>
       <input id="C-add" placeholder="新班次名">
       <button class="btn" id="C-addBtn">加班</button>
@@ -4402,9 +4402,20 @@ function filterClsSelect(selId, kwId){
   const sel=document.getElementById(selId), kw=document.getElementById(kwId);
   if(!sel||!kw) return;
   const q=kw.value.trim().toLowerCase();
-  Array.from(sel.options).forEach(op=>{
-    if(!op.value){ op.style.display=''; return; }
-    op.style.display=(!q||(op.textContent||'').toLowerCase().includes(q))?'':'none';
+  if(!sel.dataset.all){
+    sel.dataset.all=JSON.stringify(Array.from(sel.options).map(o=>({v:o.value,t:o.textContent})));
+  }
+  const all=JSON.parse(sel.dataset.all);
+  const cur=sel.value;
+  const hit=all.filter(o=>!q||o.t.toLowerCase().includes(q));
+  sel.innerHTML=hit.map(o=>`<option value="${esc(o.v)}">${esc(o.t)}</option>`).join('')||'<option value="">（無匹配）</option>';
+  if(Array.from(sel.options).some(o=>o.value===cur)) sel.value=cur;
+}
+function filterClsList(){
+  const kwEl=document.getElementById('C-clsKw');
+  const kw=(kwEl?kwEl.value:'').trim().toLowerCase();
+  document.querySelectorAll('#C-clsList > div[data-cls]').forEach(el=>{
+    el.style.display=(!kw||(el.dataset.cls||'').includes(kw))?'':'none';
   });
 }
 function filterPaperList(){
