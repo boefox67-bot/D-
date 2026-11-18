@@ -2650,7 +2650,7 @@ function renderSub(g){
       va=Number(a.id); vb=Number(b.id); return (va-vb)*window._paperSort.dir;
     });
     const arrow=k=>window._paperSort.key===k?(window._paperSort.dir===1?' ▲':' ▼'):'';
-    const paperBoxes=papers.map(p=>`<label class="L-opt" style="display:block;font-size:13px;margin:4px 0;cursor:pointer"><input type="checkbox" class="L-pchk" value="${p.id}"> ${esc(p.name)}（${Array.isArray(p.questions)?p.questions.length:0}題）</label>`).join('')||'<span class="muted">未有考卷，先去導入</span>';
+    const paperBoxes=papers.map(p=>`<label class="L-opt" data-pname="${esc(String(p.name||'').toLowerCase())}" style="display:block;font-size:13px;margin:4px 0;cursor:pointer"><input type="checkbox" class="L-pchk" value="${p.id}"> ${esc(p.name)}（${Array.isArray(p.questions)?p.questions.length:0}題）</label>`).join('')||'<span class="muted">未有考卷，先去導入</span>';
     el.innerHTML=subHead('發起考試碼')+`
       <!-- 考卷設置 -->
       <div style="border:2px solid #3b82f6;border-radius:10px;padding:10px;margin-bottom:10px;background:#eff6ff">
@@ -2662,6 +2662,7 @@ function renderSub(g){
           <button type="button" onclick="togglePaperSortLaunch('id')" style="flex:1;text-align:center;background:none;border:none;cursor:pointer;font-size:12px;color:#64748b;padding:2px">日期${arrow('id')}</button>
           <button type="button" onclick="togglePaperSortLaunch('count')" style="flex:1;text-align:center;background:none;border:none;cursor:pointer;font-size:12px;color:#64748b;padding:2px">題數${arrow('count')}</button>
         </div>
+        <input id="L-paperKw" placeholder="🔍 多關鍵字過濾，空格隔開，例如：變壓器 控制" style="width:100%;padding:6px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;margin-bottom:6px;background:var(--card);color:var(--text)">
         <div style="max-height:140px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff">
           <label class="L-opt" style="font-size:13px;cursor:pointer"><input type="checkbox" class="L-pchk" value="0"> 全部題庫（${getQuestions().length}題）</label>
           ${paperBoxes}
@@ -2727,6 +2728,19 @@ function renderSub(g){
       else if(cb.checked){ const all=document.querySelector('.L-pchk[value="0"]'); if(all) all.checked=false; }
       syncLaunchOpt();
     });
+    // 多關鍵字過濾考卷清單（全部題庫行常駐；已勾選狀態保留）
+    const paperKw=document.getElementById('L-paperKw');
+    if(paperKw){
+      paperKw.oninput=()=>{
+        const tokens=paperKw.value.trim().toLowerCase().split(/[\s,，、]+/).filter(Boolean);
+        document.querySelectorAll('.L-pchk').forEach(cb=>{
+          const lb=cb.closest('label'); if(!lb) return;
+          if(cb.value==='0'){ lb.style.display=''; return; }
+          const nm=lb.dataset.pname||'';
+          lb.style.display=(!tokens.length||tokens.every(t=>nm.includes(t)))?'':'none';
+        });
+      };
+    }
     document.querySelectorAll('input[name="L-order"]').forEach(r=>r.onchange=syncLaunchOpt);
     document.querySelectorAll('input[name="L-mode"]').forEach(r=>r.onchange=syncLaunchOpt);
     document.querySelectorAll('input[name="L-review"]').forEach(r=>r.onchange=syncLaunchOpt);
@@ -2817,7 +2831,20 @@ function renderSub(g){
         <label>加學生名</label><input id="C-stu" placeholder="學生姓名">
         <label>分流選班（可多選，唔揀就未編班）</label>
         <div id="C-stuClsBox2">${cls.map(c=>`<label style="display:inline-block;margin-right:10px;font-size:13px"><input type="checkbox" class="C-stuCls2" value="${esc(c)}"> ${esc(c)}</label>`).join('')||'<span class="muted">先加班次</span>'}</div>
-        <button class="btn" id="C-stuBtn">加入名單</button></div>`;
+        <button class="btn" id="C-stuBtn">加入名單</button>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)">
+          <label>批量加入（按班次編號範圍，一次過由幾號加到幾號）</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <select id="C-batchCls" style="padding:6px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--text)"><option value="">— 揀班次 —</option>${cls.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select>
+            <input id="C-batchFrom" type="number" min="1" placeholder="由" style="width:72px;padding:6px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px">
+            <span class="muted" style="font-size:13px">至</span>
+            <input id="C-batchTo" type="number" min="1" placeholder="停" style="width:72px;padding:6px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px">
+            <button class="btn secondary" id="C-batchBtn" style="width:auto;padding:6px 14px;font-size:13px">批量加入</button>
+            <button class="btn secondary" type="button" style="width:auto;padding:6px 10px;font-size:12px" data-range="1,12">01–12</button>
+            <button class="btn secondary" type="button" style="width:auto;padding:6px 10px;font-size:12px" data-range="16,30">16–30</button>
+          </div>
+          <p class="muted" style="font-size:12px;margin:6px 0 0">例如揀班次 A55A、由 01 至 12 → 一次生成 A55A01…A55A12；16 至 30 → A55A16…A55A30。編號兩位數，帳號即名稱，事後可逐個改名；已存在嘅編號會自動跳過。</p>
+        </div></div>`;
     function applyStuFilter(){
       const kw=(document.getElementById('C-search').value||'').trim().toLowerCase();
       const want=document.getElementById('C-filterCls').value;
@@ -2856,6 +2883,40 @@ function renderSub(g){
       sts2.push({id:sid, name:n, cls:picked});
       DB.set(K.students,sts2); renderSub('classes');
     };
+    // 批量加入學生：揀班次＋起止編號，前綴自動生成 A55A01…A55A12（兩位補零，重號跳過）
+    document.getElementById('C-batchBtn').onclick=()=>{
+      const clsV=document.getElementById('C-batchCls').value;
+      if(!clsV) return toast('先揀班次');
+      const from=Number(document.getElementById('C-batchFrom').value);
+      const to=Number(document.getElementById('C-batchTo').value);
+      if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<1||from>to) return toast('起止編號唔正確（由 ≤ 停，正整數）');
+      const prefix=clsSeqPrefix(clsV)||clsV;
+      const sts2=getStudents();
+      const already=n=>{
+        const pad=String(n).padStart(2,'0');
+        return sts2.some(s=>{
+          const nm=stuName(s), id=String(s.id||'');
+          return nm===prefix+pad||id===prefix+pad||nm===prefix+n||id===prefix+n;
+        });
+      };
+      let added=0, skipped=0;
+      for(let n=from;n<=to;n++){
+        if(already(n)){ skipped++; continue; }
+        const code=prefix+String(n).padStart(2,'0');
+        sts2.push({id:code, name:code, cls:[clsV]});
+        added++;
+      }
+      DB.set(K.students,sts2);
+      toast('批量加入完成：新增 '+added+' 人'+(skipped?'，跳過已有 '+skipped+' 個':''));
+      renderSub('classes');
+    };
+    document.querySelectorAll('[data-range]').forEach(b=>{
+      b.onclick=()=>{
+        const [f,t]=(b.dataset.range||'').split(',').map(Number);
+        document.getElementById('C-batchFrom').value=f;
+        document.getElementById('C-batchTo').value=t;
+      };
+    });
     // 改學生班別（toggle）
     document.querySelectorAll('#C-stuList [data-cls-toggle]').forEach(cb=>{
       cb.onchange=()=>{
