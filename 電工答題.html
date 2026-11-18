@@ -2811,6 +2811,10 @@ function renderSub(g){
         <input id="C-search" placeholder="例如：陳大文">
         <label>查找班次</label>
         <select id="C-filterCls"><option value="">全部</option>${cls.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select>
+        <div style="margin:6px 0">
+          <button class="btn danger" id="C-delShown" style="width:auto;padding:6px 12px;font-size:13px">🗑 清除已顯示學生</button>
+          <span class="muted" style="font-size:12px;margin-left:8px">只刪而家查找／班次篩選出嚟嘅學生；撳掣會先問確認，永久拆除唔可以還原</span>
+        </div>
         <div id="C-stuList">${sts.length?sts.map((s,idx)=>{
           const nm=stuName(s), arr=stuCls(s);
           const cbs=cls.map(c=>`<label style="display:inline-block;margin-right:10px;font-size:13px"><input type="checkbox" data-cls-toggle="${idx}" value="${esc(c)}" ${arr.includes(c)?'checked':''}> ${esc(c)}</label>`).join('');
@@ -2857,6 +2861,29 @@ function renderSub(g){
     }
     document.getElementById('C-search').oninput=applyStuFilter;
     document.getElementById('C-filterCls').onchange=applyStuFilter;
+    // 永久拆除「已顯示」嘅學生：只刪當前查找／班次篩選出嚟嘅列，其餘保留；撳掣先彈確認
+    document.getElementById('C-delShown').onclick=()=>{
+      const rows=[...document.querySelectorAll('#C-stuList [data-row]')];
+      const vis=rows.filter(r=>r.style.display!=='none');
+      if(!vis.length) return toast('冇可清除嘅學生');
+      const sts2=getStudents();
+      const hit=vis.map(r=>Number(r.dataset.row)).filter(i=>sts2[i]);
+      const names=hit.map(i=>stuName(sts2[i]));
+      const sample=names.slice(0,5).join('、')+(names.length>5?' 等':'');
+      if(!confirm('確認永久拆除已顯示嘅 '+hit.length+' 名學生？\n'+sample+'\n\n只會刪而家查找／班次篩選出嚟嘅學生，其他保留；拆除後名鎖記錄一併清除，唔可以還原。')) return;
+      const hitSet=new Set(hit);
+      const locks=getLocks();
+      sts2.forEach((s,i)=>{
+        if(!hitSet.has(i)) return;
+        delete locks[s.id];
+        const nm=stuName(s);
+        if(s.id!==nm) delete locks[nm];
+      });
+      DB.set(K.students, sts2.filter((_,i)=>!hitSet.has(i)));
+      DB.set(K.locks, locks);
+      toast('已永久拆除 '+hit.length+' 名學生');
+      renderSub('classes');
+    };
     // 點學生列一次即展開改班，唔使按兩下
     document.querySelectorAll('#C-stuList details').forEach(det=>{
       const sum=det.querySelector('summary');
