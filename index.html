@@ -1110,7 +1110,11 @@ function nextStuId(){
 // 班次序號前綴：班次名「電工初級31期B」→「A31B」；「電工初级53期A」→「A53A」
 // 規則：初級=A 中級=B 高級=C；中間數字=期數；尾字母=A/B/C 班別
 function clsSeqPrefix(clsName){
-  const n=String(clsName||'');
+  let n=String(clsName||'').trim();
+  if(!n) return '';
+  // 已經係代碼（如 A55A / b31b）直接大寫返回
+  const codeOnly=n.match(/^([ABC])\s*(\d+)\s*([ABC])$/i);
+  if(codeOnly) return codeOnly[1].toUpperCase()+codeOnly[2]+codeOnly[3].toUpperCase();
   let code='';
   if(/初級|初级/.test(n)) code='A';
   else if(/中級|中级/.test(n)) code='B';
@@ -1118,8 +1122,8 @@ function clsSeqPrefix(clsName){
   else return '';
   const m=n.match(/(\d+)/);
   if(!m) return '';
-  const cm=n.match(/[A-Za-z]$/);
-  const c=cm?cm[0].toUpperCase():'';
+  const cm=n.match(/([ABC])\s*班?$/i);
+  const c=cm?cm[1].toUpperCase():'';
   return code+m[1]+c;
 }
 // 按班次自動生成序號：A52A1、A52A2…（一班 1-12 人）；冇班次就普通遞增
@@ -2840,6 +2844,7 @@ function renderSub(g){
           <label>批量加入（按班次編號範圍，一次過由幾號加到幾號）</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <select id="C-batchCls" style="padding:6px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--text)"><option value="">— 揀班次 —</option>${cls.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select>
+            <input id="C-batchPrefix" placeholder="代碼前綴 A55A" style="width:110px;padding:6px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px">
             <input id="C-batchFrom" type="number" min="1" placeholder="由" style="width:72px;padding:6px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px">
             <span class="muted" style="font-size:13px">至</span>
             <input id="C-batchTo" type="number" min="1" placeholder="停" style="width:72px;padding:6px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px">
@@ -2847,7 +2852,7 @@ function renderSub(g){
             <button class="btn secondary" type="button" style="width:auto;padding:6px 10px;font-size:12px" data-range="1,12">01–12</button>
             <button class="btn secondary" type="button" style="width:auto;padding:6px 10px;font-size:12px" data-range="16,30">16–30</button>
           </div>
-          <p class="muted" style="font-size:12px;margin:6px 0 0">例如揀班次 A55A、由 01 至 12 → 一次生成 A55A01…A55A12；16 至 30 → A55A16…A55A30。編號兩位數，帳號即名稱，事後可逐個改名；已存在嘅編號會自動跳過。</p>
+          <p class="muted" style="font-size:12px;margin:6px 0 0">揀班次後前綴自動填代碼（如 A55A），可手改；由 01 至 12 → 生成 A55A01…A55A12，16 至 30 → A55A16…A55A30。編號兩位數，帳號即名稱，事後可逐個改名；已存在嘅編號會自動跳過。</p>
         </div></div>`;
     function applyStuFilter(){
       const kw=(document.getElementById('C-search').value||'').trim().toLowerCase();
@@ -2917,7 +2922,10 @@ function renderSub(g){
       const from=Number(document.getElementById('C-batchFrom').value);
       const to=Number(document.getElementById('C-batchTo').value);
       if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<1||from>to) return toast('起止編號唔正確（由 ≤ 停，正整數）');
-      const prefix=clsSeqPrefix(clsV)||clsV;
+      const prefixInput=document.getElementById('C-batchPrefix');
+      let prefix=(prefixInput.value||'').trim().toUpperCase();
+      if(!prefix) prefix=clsSeqPrefix(clsV);
+      if(!prefix) return toast('請填代碼前綴（如 A55A），唔會用中文班名做帳號');
       const sts2=getStudents();
       const already=n=>{
         const pad=String(n).padStart(2,'0');
@@ -2936,6 +2944,11 @@ function renderSub(g){
       DB.set(K.students,sts2);
       toast('批量加入完成：新增 '+added+' 人'+(skipped?'，跳過已有 '+skipped+' 個':''));
       renderSub('classes');
+    };
+    document.getElementById('C-batchCls').onchange=()=>{
+      const cv=document.getElementById('C-batchCls').value;
+      const pf=document.getElementById('C-batchPrefix');
+      if(cv) pf.value=clsSeqPrefix(cv);
     };
     document.querySelectorAll('[data-range]').forEach(b=>{
       b.onclick=()=>{
